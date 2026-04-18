@@ -1,9 +1,8 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { calculatePrices, formatMVR, buildOrderSKU } from '@/lib/pricing'
-import { renderProtectedImage, attachGlobalKeyboardProtection } from '@/lib/imageProtection'
 import Link from 'next/link'
 
 const SIZES = ['A4', 'A3', 'A2', '12×16"']
@@ -16,19 +15,9 @@ export default function ArtworkPage() {
   const [related, setRelated] = useState<any[]>([])
   const [selectedSize, setSelectedSize] = useState('A3')
   const [showArtistModal, setShowArtistModal] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    attachGlobalKeyboardProtection()
-    fetchArtwork()
-  }, [id])
-
-  useEffect(() => {
-    if (canvasRef.current && artwork?.preview_url) {
-      renderProtectedImage(canvasRef.current, artwork.preview_url, artist?.full_name || '', 800, 800)
-    }
-  }, [artwork, artist])
+  useEffect(() => { fetchArtwork() }, [id])
 
   async function fetchArtwork() {
     const { data } = await supabase
@@ -39,7 +28,6 @@ export default function ArtworkPage() {
     if (!data) return
     setArtwork(data)
     setArtist(data.profiles)
-    // Fetch related artworks from same artist
     const { data: rel } = await supabase
       .from('artworks')
       .select('*, profiles:artist_id(full_name)')
@@ -51,9 +39,7 @@ export default function ArtworkPage() {
   }
 
   if (!artwork) return (
-    <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>
-      Loading...
-    </div>
+    <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
   )
 
   const prices = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery')
@@ -92,9 +78,35 @@ export default function ArtworkPage() {
 
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
           {/* Artwork image */}
-          <div className="artwork-protected" style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', position: 'relative' }}>
-            <canvas ref={canvasRef} style={{ width: '100%', aspectRatio: '1', display: 'block' }} />
-            <div className="protect-overlay" />
+          <div style={{ position: 'relative' }}>
+            <div style={{
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              background: 'var(--color-background-secondary)',
+              position: 'relative',
+            }}>
+              {artwork.preview_url ? (
+                <img
+                  src={artwork.preview_url}
+                  alt={artwork.title}
+                  style={{
+                    width: '100%',
+                    display: 'block',
+                    pointerEvents: 'none',
+                    userSelect: 'none',
+                    WebkitUserDrag: 'none',
+                    objectFit: 'contain',
+                    maxHeight: 520,
+                  }}
+                />
+              ) : (
+                <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
+                  No preview available
+                </div>
+              )}
+              {/* Transparent overlay to block right-click */}
+              <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
+            </div>
             {artwork.offer_pct ? (
               <div style={{
                 position: 'absolute', top: 14, left: 14,
@@ -127,7 +139,6 @@ export default function ArtworkPage() {
               {artwork.description}
             </p>
 
-            {/* Price */}
             <div style={{ marginBottom: 4 }}>
               {artwork.offer_pct ? (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
@@ -153,7 +164,6 @@ export default function ArtworkPage() {
 
             <div className="divider" />
 
-            {/* Size selector */}
             <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Select print size</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
               {SIZES.map(size => (
@@ -190,8 +200,18 @@ export default function ArtworkPage() {
               {related.map((rel: any) => (
                 <Link key={rel.id} href={`/artwork/${rel.id}`} style={{ textDecoration: 'none' }}>
                   <div className="artwork-card">
-                    <div style={{ height: 160, background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: '#aaa' }}>
-                      {rel.title}
+                    <div style={{ background: 'var(--color-background-secondary)', position: 'relative' }}>
+                      {rel.preview_url ? (
+                        <img
+                          src={rel.preview_url}
+                          alt={rel.title}
+                          style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                        />
+                      ) : (
+                        <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-text-hint)' }}>
+                          No preview
+                        </div>
+                      )}
                     </div>
                     <div style={{ padding: '10px 12px' }}>
                       <p style={{ fontSize: 13, fontWeight: 500 }}>{rel.title}</p>
@@ -208,7 +228,6 @@ export default function ArtworkPage() {
         )}
       </div>
 
-      {/* Artist modal */}
       {showArtistModal && artist && (
         <ArtistModal artist={artist} onClose={() => setShowArtistModal(false)} artworks={[artwork, ...related]} />
       )}
@@ -244,7 +263,11 @@ function ArtistModal({ artist, onClose, artworks }: any) {
           {artworks.map((w: any) => (
             <Link key={w.id} href={`/artwork/${w.id}`} onClick={onClose} style={{ textDecoration: 'none' }}>
               <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border)', cursor: 'pointer' }}>
-                <div style={{ height: 90, background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#aaa' }}>{w.title}</div>
+                {w.preview_url ? (
+                  <img src={w.preview_url} alt={w.title} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                ) : (
+                  <div style={{ height: 90, background: 'var(--color-background-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--color-text-hint)' }}>No preview</div>
+                )}
                 <div style={{ padding: '8px 10px' }}>
                   <p style={{ fontSize: 12, fontWeight: 500 }}>{w.title}</p>
                   <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{w.sku}</span>
