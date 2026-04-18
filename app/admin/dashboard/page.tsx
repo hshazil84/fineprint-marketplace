@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 const TABS = ['orders', 'artists', 'listings', 'offers', 'export']
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [tab, setTab] = useState(searchParams.get('tab') || 'orders')
@@ -125,7 +125,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* ORDERS */}
         {tab === 'orders' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {orders.length === 0 ? (
@@ -146,9 +145,7 @@ export default function AdminDashboard() {
                     {o.offer_label ? ` · ${o.offer_label} −${o.offer_pct}%` : ''}
                     {' · '}{o.delivery_method === 'pickup' ? 'Pickup' : `Deliver → ${o.delivery_island}`}
                   </p>
-                  {o.slip_url && (
-                    <p style={{ fontSize: 12, color: 'var(--color-teal)', marginTop: 2 }}>✓ Slip uploaded</p>
-                  )}
+                  {o.slip_url && <p style={{ fontSize: 12, color: 'var(--color-teal)', marginTop: 2 }}>✓ Slip uploaded</p>}
                 </div>
                 {o.status === 'pending' && (
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -161,7 +158,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* ARTISTS */}
         {tab === 'artists' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {artists.map(a => {
@@ -186,7 +182,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* LISTINGS */}
         {tab === 'listings' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {artworks.map(a => (
@@ -213,13 +208,10 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* OFFERS */}
         {tab === 'offers' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: 'rgba(0,0,0,0.02)' }}>
-              <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-                Your commission is always based on the original price regardless of artist discounts.
-              </p>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Your commission is always based on the original price regardless of artist discounts.</p>
             </div>
             {artworks.filter(a => a.offer_pct).map(a => (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
@@ -238,7 +230,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* EXPORT */}
         {tab === 'export' && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
       </div>
     </div>
@@ -269,7 +260,6 @@ function AdminExportTab({ artists, onExport, orders }: any) {
   const gross = filtered.reduce((s: number, o: any) => s + o.original_price, 0)
   const comm = filtered.reduce((s: number, o: any) => s + o.fp_commission, 0)
 
-  // Build last 6 months for quick select
   const months: { label: string; value: string }[] = []
   for (let i = 0; i < 6; i++) {
     const d = new Date(); d.setMonth(d.getMonth() - i)
@@ -312,5 +302,13 @@ function AdminExportTab({ artists, onExport, orders }: any) {
       </div>
       <button className="btn btn-primary btn-full" onClick={() => onExport(from, to, artist)}>Download CSV</button>
     </div>
+  )
+}
+
+export default function AdminDashboardWrapper() {
+  return (
+    <Suspense fallback={<div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>}>
+      <AdminDashboard />
+    </Suspense>
   )
 }
