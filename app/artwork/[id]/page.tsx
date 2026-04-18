@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase'
 import { calculatePrices, formatMVR, buildOrderSKU } from '@/lib/pricing'
 import Link from 'next/link'
 
-const SIZES = ['A4', 'A3', 'A2', '12×16"']
+const SIZES = ['A4', 'A3']
 
 export default function ArtworkPage() {
   const { id } = useParams()
