@@ -72,6 +72,14 @@ function AdminDashboard() {
     fetchArtworks()
   }
 
+  async function downloadHires(hiresPath: string) {
+    const { data } = await supabase.storage
+      .from('artwork-hires')
+      .createSignedUrl(hiresPath, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    else toast.error('Could not generate download link')
+  }
+
   async function handleExport(from: string, to: string, artist: string) {
     const res = await fetch(`/api/export?type=admin&from=${from}&to=${to}&artist=${artist}`)
     const text = await res.text()
@@ -125,6 +133,7 @@ function AdminDashboard() {
           ))}
         </div>
 
+        {/* ORDERS */}
         {tab === 'orders' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {orders.length === 0 ? (
@@ -132,7 +141,7 @@ function AdminDashboard() {
             ) : orders.map(o => (
               <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 16 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                     <p style={{ fontSize: 14, fontWeight: 500 }}>{o.invoice_number}</p>
                     <span className="sku-tag">{o.order_sku}</span>
                     <span className={`badge badge-${o.status}`}>{o.status}</span>
@@ -158,9 +167,12 @@ function AdminDashboard() {
           </div>
         )}
 
+        {/* ARTISTS */}
         {tab === 'artists' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {artists.map(a => {
+            {artists.length === 0 ? (
+              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No artists yet.</p>
+            ) : artists.map(a => {
               const artistOrders = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
               const pending = artistOrders.filter(o => o.payout_status === 'unpaid').reduce((s: number, o: any) => s + o.artist_earnings, 0)
               const artworkCount = artworks.filter(w => w.artist_id === a.id).length
@@ -182,56 +194,61 @@ function AdminDashboard() {
           </div>
         )}
 
+        {/* LISTINGS */}
         {tab === 'listings' && (
-  <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-    {artworks.map(a => (
-      <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-        {a.preview_url && (
-          <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
-        )}
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-            <span className="sku-tag">{a.sku}</span>
-            <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
-            <span className={`badge badge-${a.status}`}>{a.status}</span>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {artworks.length === 0 ? (
+              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No listings yet.</p>
+            ) : artworks.map(a => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                {a.preview_url && (
+                  <img
+                    src={a.preview_url}
+                    alt={a.title}
+                    style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }}
+                  />
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                    <span className="sku-tag">{a.sku}</span>
+                    <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
+                    <span className={`badge badge-${a.status}`}>{a.status}</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                    by {a.profiles?.full_name} · {formatMVR(a.price)}
+                    {a.offer_label ? ` · ${a.offer_label} −${a.offer_pct}%` : ''}
+                  </p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                  {a.hires_path && (
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => downloadHires(a.hires_path)}
+                    >
+                      Download hi-res
+                    </button>
+                  )}
+                  {a.status === 'pending' && (
+                    <>
+                      <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-          <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-            by {a.profiles?.full_name} · {formatMVR(a.price)}
-            {a.offer_label ? ` · ${a.offer_label} −${a.offer_pct}%` : ''}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-          {a.hires_path && (
-            <button
-              className="btn btn-sm"
-              onClick={async () => {
-                const supabase = createClient()
-                const { data } = await supabase.storage
-                  .from('artwork-hires')
-                  .createSignedUrl(a.hires_path, 60)
-                if (data?.signedUrl) window.open(data.signedUrl, '_blank')
-              }}
-            >
-              Download hi-res
-            </button>
-          )}
-          {a.status === 'pending' && (
-            <>
-              <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
-              <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
-            </>
-          )}
-        </div>
-      </div>
-    ))}
-  </div>
-)}
+        )}
+
+        {/* OFFERS */}
         {tab === 'offers' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: 'rgba(0,0,0,0.02)' }}>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Your commission is always based on the original price regardless of artist discounts.</p>
             </div>
-            {artworks.filter(a => a.offer_pct).map(a => (
+            {artworks.filter(a => a.offer_pct).length === 0 ? (
+              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No active offers.</p>
+            ) : artworks.filter(a => a.offer_pct).map(a => (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.profiles?.full_name}</p>
@@ -242,12 +259,10 @@ function AdminDashboard() {
                 <span className="badge" style={{ background: 'var(--color-red-light)', color: '#A32D2D' }}>Active</span>
               </div>
             ))}
-            {artworks.filter(a => a.offer_pct).length === 0 && (
-              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No active offers.</p>
-            )}
           </div>
         )}
 
+        {/* EXPORT */}
         {tab === 'export' && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
       </div>
     </div>
