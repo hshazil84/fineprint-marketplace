@@ -94,7 +94,6 @@ export default function ArtworkPage() {
                     display: 'block',
                     pointerEvents: 'none',
                     userSelect: 'none',
-                    WebkitUserDrag: 'none',
                     objectFit: 'contain',
                     maxHeight: 520,
                   }}
