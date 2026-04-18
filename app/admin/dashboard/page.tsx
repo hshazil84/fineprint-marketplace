@@ -183,31 +183,49 @@ function AdminDashboard() {
         )}
 
         {tab === 'listings' && (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {artworks.map(a => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span className="sku-tag">{a.sku}</span>
-                    <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
-                    <span className={`badge badge-${a.status}`}>{a.status}</span>
-                  </div>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                    by {a.profiles?.full_name} · {formatMVR(a.price)}
-                    {a.offer_label ? ` · ${a.offer_label} −${a.offer_pct}%` : ''}
-                  </p>
-                </div>
-                {a.status === 'pending' && (
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+  <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+    {artworks.map(a => (
+      <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+        {a.preview_url && (
+          <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
         )}
-
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+            <span className="sku-tag">{a.sku}</span>
+            <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
+            <span className={`badge badge-${a.status}`}>{a.status}</span>
+          </div>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            by {a.profiles?.full_name} · {formatMVR(a.price)}
+            {a.offer_label ? ` · ${a.offer_label} −${a.offer_pct}%` : ''}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+          {a.hires_path && (
+            <button
+              className="btn btn-sm"
+              onClick={async () => {
+                const supabase = createClient()
+                const { data } = await supabase.storage
+                  .from('artwork-hires')
+                  .createSignedUrl(a.hires_path, 60)
+                if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+              }}
+            >
+              Download hi-res
+            </button>
+          )}
+          {a.status === 'pending' && (
+            <>
+              <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
+              <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
+            </>
+          )}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
         {tab === 'offers' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: 'rgba(0,0,0,0.02)' }}>
