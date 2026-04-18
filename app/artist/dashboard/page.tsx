@@ -9,6 +9,7 @@ import Link from 'next/link'
 
 const SIZES = ['A4', 'A3', 'A2', '12×16"']
 const TABS = ['listings', 'offers', 'upload', 'orders', 'export', 'profile']
+const COMMISSION = 25
 
 export default function ArtistDashboard() {
   const router = useRouter()
@@ -69,7 +70,7 @@ export default function ArtistDashboard() {
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 4 }}>Artist dashboard</h1>
-        <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>
+        <p style={{ color: 'var(--color-text-muted)', marginBottom: 16 }}>
           <span className="sku-tag">{profile?.artist_code ? `FP-${profile.artist_code}` : ''}</span>
         </p>
 
@@ -78,7 +79,6 @@ export default function ArtistDashboard() {
           <span>Your artwork is protected — buyers only see low-resolution watermarked previews. High-res files are stored privately for print fulfillment only.</span>
         </div>
 
-        {/* Stats */}
         <div className="grid-4" style={{ marginBottom: 24 }}>
           {[
             ['Total listings', artworks.length],
@@ -93,7 +93,6 @@ export default function ArtistDashboard() {
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="tab-bar">
           {TABS.map(t => (
             <button key={t} className={`tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
@@ -102,7 +101,6 @@ export default function ArtistDashboard() {
           ))}
         </div>
 
-        {/* Listings tab */}
         {tab === 'listings' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {artworks.length === 0 ? (
@@ -118,6 +116,11 @@ export default function ArtistDashboard() {
                       <span className={`badge badge-${a.status}`}>{a.status}</span>
                       {a.offer_label && <span className="offer-tag">{a.offer_label} −{a.offer_pct}%</span>}
                     </div>
+                    {a.sizes && (
+                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                        Sizes: {Array.isArray(a.sizes) ? a.sizes.join(', ') : a.sizes}
+                      </p>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(p.artistEarnings)}</p>
@@ -129,13 +132,9 @@ export default function ArtistDashboard() {
           </div>
         )}
 
-        {/* Offers tab */}
         {tab === 'offers' && <OffersTab artworks={artworks} onRefresh={() => init()} />}
-
-        {/* Upload tab */}
         {tab === 'upload' && <UploadTab profile={profile} nextSeq={artworks.length + 1} onSuccess={() => { setTab('listings'); init() }} />}
 
-        {/* Orders tab */}
         {tab === 'orders' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {orders.length === 0 ? (
@@ -158,23 +157,174 @@ export default function ArtistDashboard() {
           </div>
         )}
 
-        {/* Export tab */}
         {tab === 'export' && <ExportTab onExport={handleExport} orders={orders} />}
-
-        {/* Profile tab */}
         {tab === 'profile' && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
       </div>
     </div>
   )
 }
 
-// ── OFFERS TAB ───────────────────────────────
+function UploadTab({ profile, nextSeq, onSuccess }: any) {
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    sizes: ['A4', 'A3'] as string[],
+    prices: { 'A4': '', 'A3': '', 'A2': '', '12×16"': '' } as Record<string, string>,
+  })
+  const [hiresFile, setHiresFile] = useState<File | null>(null)
+  const [hiresPreview, setHiresPreview] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const nextSku = `FP-${profile?.artist_code}-${String(nextSeq).padStart(3, '0')}`
+
+  function toggleSize(size: string) {
+    setForm(f => ({
+      ...f,
+      sizes: f.sizes.includes(size) ? f.sizes.filter(s => s !== size) : [...f.sizes, size]
+    }))
+  }
+
+  function earnings(price: string) {
+    const p = parseInt(price)
+    if (!p || isNaN(p)) return null
+    return p - Math.round(p * COMMISSION / 100)
+  }
+
+  async function handleUpload() {
+    if (!form.title) { toast.error('Please fill in the title'); return }
+    const activePrices = SIZES.filter(s => form.sizes.includes(s)).map(s => form.prices[s])
+    if (form.sizes.length === 0) { toast.error('Please select at least one size'); return }
+    if (activePrices.some(p => !p || parseInt(p) < 1)) { toast.error('Please set a price for each selected size'); return }
+    if (!hiresFile) { toast.error('Please upload your artwork file'); return }
+    setUploading(true)
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const basePrice = Math.min(...form.sizes.map(s => parseInt(form.prices[s] || '0')).filter(p => p > 0))
+      const fd = new FormData()
+      fd.append('artistId', user!.id)
+      fd.append('title', form.title)
+      fd.append('description', form.description)
+      fd.append('sizes', JSON.stringify(form.sizes))
+      fd.append('prices', JSON.stringify(form.prices))
+      fd.append('price', basePrice.toString())
+      fd.append('hires', hiresFile)
+      const res = await fetch('/api/artworks', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      toast.success(`Artwork submitted! SKU: ${data.sku}`)
+      onSuccess()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="card" style={{ maxWidth: 560 }}>
+      <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Upload new artwork</p>
+      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>
+        Upload your high-res file. Buyers only see a low-res watermarked preview.
+      </p>
+
+      <div
+        className="upload-zone"
+        style={{ marginBottom: 16, padding: hiresPreview ? 0 : undefined, overflow: 'hidden' }}
+        onClick={() => document.getElementById('hires-input')?.click()}
+      >
+        {hiresPreview ? (
+          <img src={hiresPreview} alt="preview" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+        ) : (
+          <>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload high-res artwork</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · stored privately</p>
+          </>
+        )}
+      </div>
+      <input
+        type="file"
+        id="hires-input"
+        accept="image/*"
+        style={{ display: 'none' }}
+        onChange={e => {
+          const file = e.target.files?.[0] || null
+          setHiresFile(file)
+          if (file) {
+            const reader = new FileReader()
+            reader.onload = ev => setHiresPreview(ev.target?.result as string)
+            reader.readAsDataURL(file)
+          }
+        }}
+      />
+
+      <div className="form-group">
+        <label className="form-label">Title</label>
+        <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Name your artwork" />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Description</label>
+        <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about this piece..." />
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Print sizes & prices (MVR)</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
+          {SIZES.map(size => {
+            const active = form.sizes.includes(size)
+            const earn = earnings(form.prices[size])
+            return (
+              <div key={size} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px',
+                border: `0.5px solid ${active ? 'var(--color-border-primary)' : 'var(--color-border-tertiary)'}`,
+                borderRadius: 'var(--border-radius-md)',
+                background: active ? 'var(--color-background-primary)' : 'var(--color-background-secondary)',
+                opacity: active ? 1 : 0.6,
+              }}>
+                <input type="checkbox" checked={active} onChange={() => toggleSize(size)} style={{ cursor: 'pointer' }} />
+                <span style={{ fontSize: 13, fontWeight: 500, minWidth: 52 }}>{size}</span>
+                <input
+                  className="form-input"
+                  type="number"
+                  placeholder="Price"
+                  disabled={!active}
+                  value={form.prices[size]}
+                  onChange={e => setForm({ ...form, prices: { ...form.prices, [size]: e.target.value } })}
+                  style={{ maxWidth: 110 }}
+                />
+                {active && earn !== null && (
+                  <span style={{ fontSize: 12, color: 'var(--color-teal)', whiteSpace: 'nowrap' }}>
+                    You earn MVR {earn}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+          FinePrint Studio takes 25% · you receive 75% of each sale
+        </p>
+      </div>
+
+      <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>SKU assigned on approval</p>
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, marginTop: 2 }}>{nextSku} ← next available</p>
+      </div>
+
+      <button className="btn btn-primary btn-full" onClick={handleUpload} disabled={uploading}>
+        {uploading ? 'Uploading...' : 'Submit for review'}
+      </button>
+    </div>
+  )
+}
+
 function OffersTab({ artworks, onRefresh }: any) {
   const [label, setLabel] = useState('Eid Special')
   const [pct, setPct] = useState(15)
   const [target, setTarget] = useState('all')
   const supabase = createClient()
-  const COMMISSION = 25
 
   const previewPrice = artworks[0]?.price || 450
   const discount = Math.round(previewPrice * pct / 100)
@@ -183,9 +333,7 @@ function OffersTab({ artworks, onRefresh }: any) {
   const artistEarns = buyerPays - commission
 
   async function activate() {
-    const updates = target === 'all'
-      ? artworks.map((a: any) => a.id)
-      : [parseInt(target)]
+    const updates = target === 'all' ? artworks.map((a: any) => a.id) : [parseInt(target)]
     for (const id of updates) {
       await supabase.from('artworks').update({ offer_label: label, offer_pct: pct }).eq('id', id)
     }
@@ -221,7 +369,7 @@ function OffersTab({ artworks, onRefresh }: any) {
           <label className="form-label">Discount: {pct}%</label>
           <input type="range" min={5} max={50} step={5} value={pct} onChange={e => setPct(parseInt(e.target.value))} style={{ width: '100%' }} />
         </div>
-        <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--radius-md)', padding: 14, marginTop: 4 }}>
+        <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: 14, marginTop: 4 }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>Payout preview — per sale at {formatMVR(previewPrice)}</p>
           {[
             ['Original price', formatMVR(previewPrice), ''],
@@ -244,7 +392,7 @@ function OffersTab({ artworks, onRefresh }: any) {
           {activeOffers.map((a: any) => {
             const p = calculatePrices(a.price, a.offer_pct, a.offer_label)
             return (
-              <div key={a.id} style={{ border: '0.5px solid var(--color-red)', background: 'var(--color-red-light)', borderRadius: 'var(--radius-lg)', padding: 16, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={a.id} style={{ border: '0.5px solid var(--color-red)', background: 'var(--color-red-light)', borderRadius: 'var(--border-radius-lg)', padding: 16, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.offer_pct}% off</p>
                   <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
@@ -261,83 +409,6 @@ function OffersTab({ artworks, onRefresh }: any) {
   )
 }
 
-// ── UPLOAD TAB ───────────────────────────────
-function UploadTab({ profile, nextSeq, onSuccess }: any) {
-  const [form, setForm] = useState({ title: '', description: '', price: '', sizes: ['A4', 'A3'] })
-  const [hiresFile, setHiresFile] = useState<File | null>(null)
-  const [previewFile, setPreviewFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const nextSku = `FP-${profile?.artist_code}-${String(nextSeq).padStart(3, '0')}`
-
-  function toggleSize(size: string) {
-    setForm(f => ({
-      ...f,
-      sizes: f.sizes.includes(size) ? f.sizes.filter(s => s !== size) : [...f.sizes, size]
-    }))
-  }
-
-  async function handleUpload() {
-    if (!form.title || !form.price) { toast.error('Please fill in title and price'); return }
-    if (!hiresFile) { toast.error('Please upload your high-res artwork file'); return }
-    setUploading(true)
-    try {
-      const { data: { user } } = await createClient().auth.getUser()
-      const fd = new FormData()
-      fd.append('artistId', user!.id)
-      fd.append('title', form.title)
-      fd.append('description', form.description)
-      fd.append('price', form.price)
-      fd.append('sizes', JSON.stringify(form.sizes))
-      fd.append('hires', hiresFile)
-      if (previewFile) fd.append('preview', previewFile)
-      const res = await fetch('/api/artworks', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!data.success) throw new Error(data.error)
-      toast.success(`Artwork submitted! SKU: ${data.sku}`)
-      onSuccess()
-    } catch (err: any) {
-      toast.error(err.message)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <div className="card" style={{ maxWidth: 520 }}>
-      <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Upload new artwork</p>
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>Upload your high-res file. Buyers only see a low-res watermarked preview.</p>
-      <div className="upload-zone" style={{ marginBottom: 16 }} onClick={() => document.getElementById('hires-input')?.click()}>
-        <div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div>
-        <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{hiresFile ? hiresFile.name : 'Upload high-res artwork (JPG/PNG)'}</p>
-        <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>Min 3000px · stored privately</p>
-      </div>
-      <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => setHiresFile(e.target.files?.[0] || null)} />
-      <div className="form-group"><label className="form-label">Title</label><input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Name your artwork" /></div>
-      <div className="form-group"><label className="form-label">Description</label><textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about this piece..." /></div>
-      <div className="form-group"><label className="form-label">Price (MVR)</label><input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="e.g. 450" /></div>
-      <div className="form-group">
-        <label className="form-label">Print sizes</label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-          {SIZES.map(s => (
-            <label key={s} style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input type="checkbox" checked={form.sizes.includes(s)} onChange={() => toggleSize(s)} />
-              {s}
-            </label>
-          ))}
-        </div>
-      </div>
-      <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
-        <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>SKU assigned on approval</p>
-        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, marginTop: 2 }}>{nextSku} ← next available</p>
-      </div>
-      <button className="btn btn-primary btn-full" onClick={handleUpload} disabled={uploading}>
-        {uploading ? 'Uploading...' : 'Submit for review'}
-      </button>
-    </div>
-  )
-}
-
-// ── EXPORT TAB ───────────────────────────────
 function ExportTab({ onExport, orders }: any) {
   const today = new Date().toISOString().split('T')[0]
   const yearStart = `${new Date().getFullYear()}-01-01`
@@ -366,7 +437,6 @@ function ExportTab({ onExport, orders }: any) {
   )
 }
 
-// ── PROFILE TAB ──────────────────────────────
 function ProfileTab({ profile, onSave }: any) {
   const [form, setForm] = useState({ bio: profile.bio || '', location: profile.location || '', instagram: profile.instagram || '', website: profile.website || '' })
   const supabase = createClient()
