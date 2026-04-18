@@ -2,14 +2,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { calculatePrices, formatMVR } from '@/lib/pricing'
+import { calculatePrices, formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
 const SIZES = ['A4', 'A3']
 const TABS = ['listings', 'offers', 'upload', 'orders', 'export', 'profile']
-const COMMISSION = 25
+const PLATFORM_FEE = 5
 
 export default function ArtistDashboard() {
   const router = useRouter()
@@ -106,7 +106,8 @@ export default function ArtistDashboard() {
             {artworks.length === 0 ? (
               <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No listings yet. Upload your first artwork!</p>
             ) : artworks.map(a => {
-              const p = calculatePrices(a.price, a.offer_pct || 0, a.offer_label)
+              const platformFee = Math.round(a.price * PLATFORM_FEE / 100)
+              const artistEarns = a.price - platformFee
               return (
                 <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
                   {a.preview_url && (
@@ -126,7 +127,7 @@ export default function ArtistDashboard() {
                     )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(p.artistEarnings)}</p>
+                    <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(artistEarns)}</p>
                     <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>your cut</p>
                   </div>
                 </div>
@@ -171,8 +172,7 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [form, setForm] = useState({
     title: '',
     description: '',
-    sizes: ['A4', 'A3'] as string[],
-    prices: { 'A4': '', 'A3': '', 'A2': '', '12×16"': '' } as Record<string, string>,
+    price: '',
   })
   const [hiresFile, setHiresFile] = useState<File | null>(null)
   const [hiresThumb, setHiresThumb] = useState<string | null>(null)
@@ -181,24 +181,11 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [uploading, setUploading] = useState(false)
   const nextSku = `FP-${profile?.artist_code}-${String(nextSeq).padStart(3, '0')}`
 
-  function toggleSize(size: string) {
-    setForm(f => ({
-      ...f,
-      sizes: f.sizes.includes(size) ? f.sizes.filter(s => s !== size) : [...f.sizes, size]
-    }))
-  }
+  const price = parseInt(form.price) || 0
+  const platformFeeAmt = Math.round(price * PLATFORM_FEE / 100)
+  const artistEarns = price - platformFeeAmt
 
-  function earnings(price: string) {
-    const p = parseInt(price)
-    if (!p || isNaN(p)) return null
-    return p - Math.round(p * COMMISSION / 100)
-  }
-
-  function handleFileSelect(
-    file: File | null,
-    setFile: (f: File | null) => void,
-    setThumb: (s: string | null) => void
-  ) {
+  function handleFileSelect(file: File | null, setFile: (f: File | null) => void, setThumb: (s: string | null) => void) {
     setFile(file)
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader()
@@ -209,9 +196,7 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
 
   async function handleUpload() {
     if (!form.title) { toast.error('Please fill in the title'); return }
-    if (form.sizes.length === 0) { toast.error('Please select at least one size'); return }
-    const activePrices = SIZES.filter(s => form.sizes.includes(s)).map(s => form.prices[s])
-    if (activePrices.some(p => !p || parseInt(p) < 1)) { toast.error('Please set a price for each selected size'); return }
+    if (!form.price || price < 1) { toast.error('Please set a price'); return }
     if (!hiresFile) { toast.error('Please upload your hi-res print file'); return }
     if (!previewFile) { toast.error('Please upload a preview image for buyers'); return }
     setUploading(true)
@@ -221,64 +206,42 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       if (!user) throw new Error('Not logged in')
 
       const { data: prof } = await supabase
-        .from('profiles')
-        .select('artist_code, full_name')
-        .eq('id', user.id)
-        .single()
+        .from('profiles').select('artist_code, full_name').eq('id', user.id).single()
       if (!prof?.artist_code) throw new Error('Artist code not found — please contact support')
 
       const { count } = await supabase
-        .from('artworks')
-        .select('*', { count: 'exact', head: true })
-        .eq('artist_id', user.id)
+        .from('artworks').select('*', { count: 'exact', head: true }).eq('artist_id', user.id)
       const seq = String((count || 0) + 1).padStart(3, '0')
       const sku = `FP-${prof.artist_code}-${seq}`
 
-      // Upload hi-res to PRIVATE bucket
       toast.loading('Uploading hi-res file...', { id: 'upload' })
       const hiresExt = hiresFile.name.split('.').pop()
       const hiresPath = `${sku}-hires.${hiresExt}`
       const { error: hiresError } = await supabase.storage
-        .from('artwork-hires')
-        .upload(hiresPath, hiresFile, { contentType: hiresFile.type })
+        .from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type })
       if (hiresError) throw hiresError
 
-      // Upload preview to PUBLIC bucket
       toast.loading('Uploading preview image...', { id: 'upload' })
       const previewExt = previewFile.name.split('.').pop()
       const previewPath = `${sku}-preview.${previewExt}`
       const { error: previewError } = await supabase.storage
-        .from('artwork-previews')
-        .upload(previewPath, previewFile, { contentType: previewFile.type })
+        .from('artwork-previews').upload(previewPath, previewFile, { contentType: previewFile.type })
       if (previewError) throw previewError
 
-      const { data: urlData } = supabase.storage
-        .from('artwork-previews')
-        .getPublicUrl(previewPath)
+      const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
 
-      // Save to database
       toast.loading('Saving listing...', { id: 'upload' })
-      const basePrice = Math.min(...form.sizes.map(s => parseInt(form.prices[s] || '0')).filter(p => p > 0))
-      const { error: dbError } = await supabase
-        .from('artworks')
-        .insert({
-          sku,
-          artist_id: user.id,
-          title: form.title,
-          description: form.description,
-          price: basePrice,
-          hires_path: hiresPath,
-          preview_url: urlData.publicUrl,
-          sizes: form.sizes,
-          status: 'pending',
-        })
+      const { error: dbError } = await supabase.from('artworks').insert({
+        sku, artist_id: user.id, title: form.title, description: form.description,
+        price, hires_path: hiresPath, preview_url: urlData.publicUrl,
+        sizes: SIZES, status: 'pending',
+      })
       if (dbError) throw dbError
 
-      // Notify admin
       await fetch('/api/notify/artwork', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sku, title: form.title, artistName: prof.full_name, price: basePrice, sizes: form.sizes }),
+        body: JSON.stringify({ sku, title: form.title, artistName: prof.full_name, price, sizes: SIZES }),
       })
 
       toast.success(`Artwork submitted! SKU: ${sku}`, { id: 'upload' })
@@ -300,11 +263,8 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
         Hi-res print file <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— private, for printing only</span>
       </p>
-      <div
-        className="upload-zone"
-        style={{ marginBottom: 20, padding: hiresThumb ? 0 : undefined, overflow: 'hidden' }}
-        onClick={() => document.getElementById('hires-input')?.click()}
-      >
+      <div className="upload-zone" style={{ marginBottom: 20, padding: hiresThumb ? 0 : undefined, overflow: 'hidden' }}
+        onClick={() => document.getElementById('hires-input')?.click()}>
         {hiresThumb ? (
           <img src={hiresThumb} alt="hi-res" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
         ) : (
@@ -321,11 +281,8 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
         Preview image <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— shown to buyers, add your watermark first</span>
       </p>
-      <div
-        className="upload-zone"
-        style={{ marginBottom: 20, padding: previewThumb ? 0 : undefined, overflow: 'hidden' }}
-        onClick={() => document.getElementById('preview-input')?.click()}
-      >
+      <div className="upload-zone" style={{ marginBottom: 20, padding: previewThumb ? 0 : undefined, overflow: 'hidden' }}
+        onClick={() => document.getElementById('preview-input')?.click()}>
         {previewThumb ? (
           <img src={previewThumb} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
         ) : (
@@ -350,46 +307,40 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </div>
 
       <div className="form-group">
-        <label className="form-label">Print sizes & prices (MVR)</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 6 }}>
-          {SIZES.map(size => {
-            const active = form.sizes.includes(size)
-            const earn = earnings(form.prices[size])
-            return (
-              <div key={size} style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '10px 14px',
-                border: `0.5px solid ${active ? 'var(--color-border-primary)' : 'var(--color-border-tertiary)'}`,
-                borderRadius: 'var(--border-radius-md)',
-                background: active ? 'var(--color-background-primary)' : 'var(--color-background-secondary)',
-                opacity: active ? 1 : 0.6,
-              }}>
-                <input type="checkbox" checked={active} onChange={() => toggleSize(size)} style={{ cursor: 'pointer' }} />
-                <span style={{ fontSize: 13, fontWeight: 500, minWidth: 52 }}>{size}</span>
-                <input
-                  className="form-input"
-                  type="number"
-                  placeholder="Price"
-                  disabled={!active}
-                  value={form.prices[size]}
-                  onChange={e => setForm({ ...form, prices: { ...form.prices, [size]: e.target.value } })}
-                  style={{ maxWidth: 110 }}
-                />
-                {active && earn !== null && (
-                  <span style={{ fontSize: 12, color: 'var(--color-teal)', whiteSpace: 'nowrap' }}>
-                    You earn MVR {earn}
-                  </span>
-                )}
+        <label className="form-label">Your artwork price (MVR)</label>
+        <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="e.g. 800" style={{ maxWidth: 160 }} />
+        {price > 0 && (
+          <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: '12px 14px', marginTop: 10 }}>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8, fontWeight: 500 }}>What buyers pay (transparent breakdown)</p>
+            {[
+              ['Your artwork price', formatMVR(price), ''],
+              ['A4 printing fee (FinePrint)', formatMVR(PRINTING_FEES['A4']), 'var(--color-text-muted)'],
+              ['A3 printing fee (FinePrint)', formatMVR(PRINTING_FEES['A3']), 'var(--color-text-muted)'],
+              ['Delivery handling (optional)', 'MVR 100', 'var(--color-text-muted)'],
+            ].map(([k, v, c]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: (c as string) || 'var(--color-text)' }}>
+                <span>{k}</span><span>{v}</span>
               </div>
-            )
-          })}
-        </div>
-        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
-          FinePrint Studio takes 25% · you receive 75% of each sale
-        </p>
+            ))}
+            <div style={{ borderTop: '0.5px solid var(--color-border)', marginTop: 8, paddingTop: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
+                <span>Buyer pays for A4 (delivery)</span>
+                <span>{formatMVR(price + PRINTING_FEES['A4'] + 100)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+                <span>Buyer pays for A3 (delivery)</span>
+                <span>{formatMVR(price + PRINTING_FEES['A3'] + 100)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, color: 'var(--color-teal)' }}>
+                <span>You earn (after 5% platform fee)</span>
+                <span>{formatMVR(artistEarns)}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+      <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: '10px 14px', marginBottom: 14, marginTop: 8 }}>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>SKU assigned on approval</p>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, marginTop: 2 }}>{nextSku} ← next available</p>
       </div>
@@ -407,11 +358,11 @@ function OffersTab({ artworks, onRefresh }: any) {
   const [target, setTarget] = useState('all')
   const supabase = createClient()
 
-  const previewPrice = artworks[0]?.price || 450
+  const previewPrice = artworks[0]?.price || 800
   const discount = Math.round(previewPrice * pct / 100)
-  const buyerPays = previewPrice - discount
-  const commission = Math.round(previewPrice * COMMISSION / 100)
-  const artistEarns = buyerPays - commission
+  const discountedPrice = previewPrice - discount
+  const platformFee = Math.round(discountedPrice * PLATFORM_FEE / 100)
+  const artistEarns = discountedPrice - platformFee
 
   async function activate() {
     const updates = target === 'all' ? artworks.map((a: any) => a.id) : [parseInt(target)]
@@ -434,7 +385,7 @@ function OffersTab({ artworks, onRefresh }: any) {
     <div>
       <div className="card" style={{ maxWidth: 520, marginBottom: 20 }}>
         <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Create an offer</p>
-        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>Discounts come entirely out of your share. FinePrint Studio's 25% is always based on the original price.</p>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>Discounts come entirely out of your share. Platform fee (5%) is applied after discount.</p>
         <div className="form-group">
           <label className="form-label">Apply to</label>
           <select className="form-input" value={target} onChange={e => setTarget(e.target.value)}>
@@ -451,12 +402,12 @@ function OffersTab({ artworks, onRefresh }: any) {
           <input type="range" min={5} max={50} step={5} value={pct} onChange={e => setPct(parseInt(e.target.value))} style={{ width: '100%' }} />
         </div>
         <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: 14, marginTop: 4 }}>
-          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>Payout preview — per sale at {formatMVR(previewPrice)}</p>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>Payout preview — artwork price at {formatMVR(previewPrice)}</p>
           {[
-            ['Original price', formatMVR(previewPrice), ''],
+            ['Your artwork price', formatMVR(previewPrice), ''],
             [`Discount (${pct}%)`, `− ${formatMVR(discount)}`, 'var(--color-red)'],
-            ['Buyer pays', formatMVR(buyerPays), ''],
-            ['FinePrint commission (25% of original)', formatMVR(commission), 'var(--color-text-muted)'],
+            ['Discounted price', formatMVR(discountedPrice), ''],
+            ['Platform fee (5%)', `− ${formatMVR(platformFee)}`, 'var(--color-text-muted)'],
             ['Your earnings', formatMVR(artistEarns), 'var(--color-teal)'],
           ].map(([k, v, c]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', color: (c as string) || 'var(--color-text)' }}>
@@ -471,13 +422,14 @@ function OffersTab({ artworks, onRefresh }: any) {
         <div>
           <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Active offers</p>
           {activeOffers.map((a: any) => {
-            const p = calculatePrices(a.price, a.offer_pct, a.offer_label)
+            const discounted = a.price - Math.round(a.price * a.offer_pct / 100)
+            const earn = discounted - Math.round(discounted * PLATFORM_FEE / 100)
             return (
               <div key={a.id} style={{ border: '0.5px solid var(--color-red)', background: 'var(--color-red-light)', borderRadius: 'var(--border-radius-lg)', padding: 16, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.offer_pct}% off</p>
                   <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    {a.sku} · Buyer pays {formatMVR(p.printPrice)} · You earn {formatMVR(p.artistEarnings)}
+                    {a.sku} · You earn {formatMVR(earn)} after platform fee
                   </p>
                 </div>
                 <button className="btn btn-sm btn-danger" onClick={() => removeOffer(a.id)}>Remove</button>
