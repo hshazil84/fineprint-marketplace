@@ -191,30 +191,65 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
 
   async function handleUpload() {
     if (!form.title) { toast.error('Please fill in the title'); return }
-    const activePrices = SIZES.filter(s => form.sizes.includes(s)).map(s => form.prices[s])
     if (form.sizes.length === 0) { toast.error('Please select at least one size'); return }
+    const activePrices = SIZES.filter(s => form.sizes.includes(s)).map(s => form.prices[s])
     if (activePrices.some(p => !p || parseInt(p) < 1)) { toast.error('Please set a price for each selected size'); return }
     if (!hiresFile) { toast.error('Please upload your artwork file'); return }
     setUploading(true)
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not logged in')
+
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('artist_code, full_name')
+        .eq('id', user.id)
+        .single()
+      if (!prof?.artist_code) throw new Error('Artist code not found — please contact support')
+
+      const { count } = await supabase
+        .from('artworks')
+        .select('*', { count: 'exact', head: true })
+        .eq('artist_id', user.id)
+      const seq = String((count || 0) + 1).padStart(3, '0')
+      const sku = `FP-${prof.artist_code}-${seq}`
+
+      toast.loading('Uploading artwork file...', { id: 'upload' })
+      const ext = hiresFile.name.split('.').pop()
+      const hiresPath = `${sku}-hires.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('artwork-hires')
+        .upload(hiresPath, hiresFile, { contentType: hiresFile.type })
+      if (uploadError) throw uploadError
+
+      toast.loading('Saving listing...', { id: 'upload' })
       const basePrice = Math.min(...form.sizes.map(s => parseInt(form.prices[s] || '0')).filter(p => p > 0))
-      const fd = new FormData()
-      fd.append('artistId', user!.id)
-      fd.append('title', form.title)
-      fd.append('description', form.description)
-      fd.append('sizes', JSON.stringify(form.sizes))
-      fd.append('prices', JSON.stringify(form.prices))
-      fd.append('price', basePrice.toString())
-      fd.append('hires', hiresFile)
-      const res = await fetch('/api/artworks', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!data.success) throw new Error(data.error)
-      toast.success(`Artwork submitted! SKU: ${data.sku}`)
+      const { error: dbError } = await supabase
+        .from('artworks')
+        .insert({
+          sku,
+          artist_id: user.id,
+          title: form.title,
+          description: form.description,
+          price: basePrice,
+          hires_path: hiresPath,
+          preview_url: null,
+          sizes: form.sizes,
+          status: 'pending',
+        })
+      if (dbError) throw dbError
+
+      await fetch('/api/notify/artwork', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku, title: form.title, artistName: prof.full_name, price: basePrice, sizes: form.sizes }),
+      })
+
+      toast.success(`Artwork submitted! SKU: ${sku}`, { id: 'upload' })
       onSuccess()
     } catch (err: any) {
-      toast.error(err.message)
+      toast.error(err.message, { id: 'upload' })
     } finally {
       setUploading(false)
     }
@@ -238,7 +273,7 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
           <>
             <div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div>
             <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload high-res artwork</p>
-            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · stored privately</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · min 200dpi · up to 35MB · stored privately</p>
           </>
         )}
       </div>
@@ -438,7 +473,12 @@ function ExportTab({ onExport, orders }: any) {
 }
 
 function ProfileTab({ profile, onSave }: any) {
-  const [form, setForm] = useState({ bio: profile.bio || '', location: profile.location || '', instagram: profile.instagram || '', website: profile.website || '' })
+  const [form, setForm] = useState({
+    bio: profile.bio || '',
+    location: profile.location || '',
+    instagram: profile.instagram || '',
+    website: profile.website || ''
+  })
   const supabase = createClient()
 
   async function save() {
