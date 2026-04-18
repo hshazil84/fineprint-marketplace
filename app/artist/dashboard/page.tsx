@@ -76,7 +76,7 @@ export default function ArtistDashboard() {
 
         <div className="protection-banner">
           <span>🔒</span>
-          <span>Your artwork is protected — buyers only see low-resolution watermarked previews. High-res files are stored privately for print fulfillment only.</span>
+          <span>Your artwork is protected — buyers only see your watermarked preview. Hi-res files are stored privately for print fulfillment only.</span>
         </div>
 
         <div className="grid-4" style={{ marginBottom: 24 }}>
@@ -109,6 +109,9 @@ export default function ArtistDashboard() {
               const p = calculatePrices(a.price, a.offer_pct || 0, a.offer_label)
               return (
                 <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+                  {a.preview_url && (
+                    <img src={a.preview_url} alt={a.title} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
+                  )}
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
                     <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -172,7 +175,9 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
     prices: { 'A4': '', 'A3': '', 'A2': '', '12×16"': '' } as Record<string, string>,
   })
   const [hiresFile, setHiresFile] = useState<File | null>(null)
-  const [hiresPreview, setHiresPreview] = useState<string | null>(null)
+  const [hiresThumb, setHiresThumb] = useState<string | null>(null)
+  const [previewFile, setPreviewFile] = useState<File | null>(null)
+  const [previewThumb, setPreviewThumb] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const nextSku = `FP-${profile?.artist_code}-${String(nextSeq).padStart(3, '0')}`
 
@@ -189,12 +194,26 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
     return p - Math.round(p * COMMISSION / 100)
   }
 
+  function handleFileSelect(
+    file: File | null,
+    setFile: (f: File | null) => void,
+    setThumb: (s: string | null) => void
+  ) {
+    setFile(file)
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = ev => setThumb(ev.target?.result as string)
+      reader.readAsDataURL(file)
+    }
+  }
+
   async function handleUpload() {
     if (!form.title) { toast.error('Please fill in the title'); return }
     if (form.sizes.length === 0) { toast.error('Please select at least one size'); return }
     const activePrices = SIZES.filter(s => form.sizes.includes(s)).map(s => form.prices[s])
     if (activePrices.some(p => !p || parseInt(p) < 1)) { toast.error('Please set a price for each selected size'); return }
-    if (!hiresFile) { toast.error('Please upload your artwork file'); return }
+    if (!hiresFile) { toast.error('Please upload your hi-res print file'); return }
+    if (!previewFile) { toast.error('Please upload a preview image for buyers'); return }
     setUploading(true)
     try {
       const supabase = createClient()
@@ -215,14 +234,29 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       const seq = String((count || 0) + 1).padStart(3, '0')
       const sku = `FP-${prof.artist_code}-${seq}`
 
-      toast.loading('Uploading artwork file...', { id: 'upload' })
-      const ext = hiresFile.name.split('.').pop()
-      const hiresPath = `${sku}-hires.${ext}`
-      const { error: uploadError } = await supabase.storage
+      // Upload hi-res to PRIVATE bucket
+      toast.loading('Uploading hi-res file...', { id: 'upload' })
+      const hiresExt = hiresFile.name.split('.').pop()
+      const hiresPath = `${sku}-hires.${hiresExt}`
+      const { error: hiresError } = await supabase.storage
         .from('artwork-hires')
         .upload(hiresPath, hiresFile, { contentType: hiresFile.type })
-      if (uploadError) throw uploadError
+      if (hiresError) throw hiresError
 
+      // Upload preview to PUBLIC bucket
+      toast.loading('Uploading preview image...', { id: 'upload' })
+      const previewExt = previewFile.name.split('.').pop()
+      const previewPath = `${sku}-preview.${previewExt}`
+      const { error: previewError } = await supabase.storage
+        .from('artwork-previews')
+        .upload(previewPath, previewFile, { contentType: previewFile.type })
+      if (previewError) throw previewError
+
+      const { data: urlData } = supabase.storage
+        .from('artwork-previews')
+        .getPublicUrl(previewPath)
+
+      // Save to database
       toast.loading('Saving listing...', { id: 'upload' })
       const basePrice = Math.min(...form.sizes.map(s => parseInt(form.prices[s] || '0')).filter(p => p > 0))
       const { error: dbError } = await supabase
@@ -234,12 +268,13 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
           description: form.description,
           price: basePrice,
           hires_path: hiresPath,
-          preview_url: null,
+          preview_url: urlData.publicUrl,
           sizes: form.sizes,
           status: 'pending',
         })
       if (dbError) throw dbError
 
+      // Notify admin
       await fetch('/api/notify/artwork', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -258,40 +293,51 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
   return (
     <div className="card" style={{ maxWidth: 560 }}>
       <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Upload new artwork</p>
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>
-        Upload your high-res file. Buyers only see a low-res watermarked preview.
+      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 20 }}>
+        Upload both your hi-res print file and a watermarked preview for buyers.
       </p>
 
+      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+        Hi-res print file <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— private, for printing only</span>
+      </p>
       <div
         className="upload-zone"
-        style={{ marginBottom: 16, padding: hiresPreview ? 0 : undefined, overflow: 'hidden' }}
+        style={{ marginBottom: 20, padding: hiresThumb ? 0 : undefined, overflow: 'hidden' }}
         onClick={() => document.getElementById('hires-input')?.click()}
       >
-        {hiresPreview ? (
-          <img src={hiresPreview} alt="preview" style={{ width: '100%', maxHeight: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+        {hiresThumb ? (
+          <img src={hiresThumb} alt="hi-res" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
         ) : (
           <>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload high-res artwork</p>
-            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · min 200dpi · up to 35MB · stored privately</p>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>🖨</div>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload hi-res file</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · min 200dpi · up to 35MB</p>
           </>
         )}
       </div>
-      <input
-        type="file"
-        id="hires-input"
-        accept="image/*"
-        style={{ display: 'none' }}
-        onChange={e => {
-          const file = e.target.files?.[0] || null
-          setHiresFile(file)
-          if (file) {
-            const reader = new FileReader()
-            reader.onload = ev => setHiresPreview(ev.target?.result as string)
-            reader.readAsDataURL(file)
-          }
-        }}
-      />
+      <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }}
+        onChange={e => handleFileSelect(e.target.files?.[0] || null, setHiresFile, setHiresThumb)} />
+
+      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
+        Preview image <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— shown to buyers, add your watermark first</span>
+      </p>
+      <div
+        className="upload-zone"
+        style={{ marginBottom: 20, padding: previewThumb ? 0 : undefined, overflow: 'hidden' }}
+        onClick={() => document.getElementById('preview-input')?.click()}
+      >
+        {previewThumb ? (
+          <img src={previewThumb} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+        ) : (
+          <>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload preview image</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · 800–1200px · watermark before uploading</p>
+          </>
+        )}
+      </div>
+      <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }}
+        onChange={e => handleFileSelect(e.target.files?.[0] || null, setPreviewFile, setPreviewThumb)} />
 
       <div className="form-group">
         <label className="form-label">Title</label>
