@@ -10,44 +10,37 @@ export async function POST(req: NextRequest) {
     const description = formData.get('description') as string
     const price       = parseInt(formData.get('price') as string)
     const sizes       = JSON.parse(formData.get('sizes') as string) as string[]
-    const previewFile = formData.get('preview') as File   // low-res
-    const hiresFile   = formData.get('hires') as File     // high-res
+    const hiresFile   = formData.get('hires') as File
 
     const supabase = createAdminClient()
 
-    // Generate SKU
-    const { data: sku } = await supabase.rpc('generate_artwork_sku', { p_artist_id: artistId })
+    // Get artist profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name, artist_code')
+      .eq('id', artistId)
+      .single()
 
-    // Upload low-res preview to public bucket
-    let previewUrl = null
-    if (previewFile) {
-      const previewPath = `${sku}-preview.${previewFile.name.split('.').pop()}`
-      const bytes = await previewFile.arrayBuffer()
-      const { error } = await supabase.storage
-        .from('artwork-previews')
-        .upload(previewPath, bytes, { contentType: previewFile.type })
-      if (!error) {
-        const { data } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
-        previewUrl = data.publicUrl
-      }
-    }
+    if (!profile) throw new Error('Artist profile not found')
+
+    // Count existing artworks to generate sequence number
+    const { count } = await supabase
+      .from('artworks')
+      .select('*', { count: 'exact', head: true })
+      .eq('artist_id', artistId)
+
+    const seq = String((count || 0) + 1).padStart(3, '0')
+    const sku = `FP-${profile.artist_code}-${seq}`
 
     // Upload high-res to private bucket
     let hiresPath = null
-    if (hiresFile) {
+    if (hiresFile && hiresFile.size > 0) {
       hiresPath = `${sku}-hires.${hiresFile.name.split('.').pop()}`
       const bytes = await hiresFile.arrayBuffer()
       await supabase.storage
         .from('artwork-hires')
         .upload(hiresPath, bytes, { contentType: hiresFile.type })
     }
-
-    // Get artist name
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', artistId)
-      .single()
 
     // Insert artwork record
     const { data: artwork, error } = await supabase
@@ -58,7 +51,7 @@ export async function POST(req: NextRequest) {
         title,
         description,
         price,
-        preview_url: previewUrl,
+        preview_url: null,
         hires_path:  hiresPath,
         sizes,
         status:      'pending',
@@ -72,7 +65,7 @@ export async function POST(req: NextRequest) {
     await notifyNewArtwork({
       sku,
       title,
-      artistName: profile?.full_name || 'Unknown',
+      artistName: profile.full_name,
       price,
       sizes,
     })
