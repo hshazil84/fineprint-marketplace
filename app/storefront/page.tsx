@@ -92,12 +92,19 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
       <div className="artwork-card">
-        <div className="artwork-protected" style={{ height: 220 }}>
-          <canvas
-            ref={canvasRef}
-            style={{ width: '100%', height: 220, objectFit: 'cover' }}
-          />
-          <div className="protect-overlay" />
+       <div className="artwork-protected" style={{ height: 220, background: 'var(--color-background-secondary)' }}>
+  {artwork.preview_url ? (
+    <img
+      src={artwork.preview_url}
+      alt={artwork.title}
+      style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
+    />
+  ) : (
+    <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
+      No preview
+    </div>
+  )}
+  <div className="protect-overlay" />
           {artwork.offer_pct ? (
             <div style={{
               position: 'absolute', top: 10, left: 10,
