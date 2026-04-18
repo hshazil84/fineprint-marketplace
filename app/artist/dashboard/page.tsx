@@ -7,7 +7,7 @@ import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
-const SIZES = ['A4', 'A3', 'A2', '12×16"']
+const SIZES = ['A4', 'A3']
 const TABS = ['listings', 'offers', 'upload', 'orders', 'export', 'profile']
 const COMMISSION = 25
 
