@@ -2,10 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { calculatePrices, formatMVR, buildOrderSKU } from '@/lib/pricing'
+import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES } from '@/lib/pricing'
 import Link from 'next/link'
-
-const SIZES = ['A4', 'A3']
 
 export default function ArtworkPage() {
   const { id } = useParams()
@@ -13,7 +11,7 @@ export default function ArtworkPage() {
   const [artwork, setArtwork] = useState<any>(null)
   const [artist, setArtist] = useState<any>(null)
   const [related, setRelated] = useState<any[]>([])
-  const [selectedSize, setSelectedSize] = useState('A3')
+  const [selectedSize, setSelectedSize] = useState('A4')
   const [showArtistModal, setShowArtistModal] = useState(false)
   const supabase = createClient()
 
@@ -28,6 +26,7 @@ export default function ArtworkPage() {
     if (!data) return
     setArtwork(data)
     setArtist(data.profiles)
+    if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[0])
     const { data: rel } = await supabase
       .from('artworks')
       .select('*, profiles:artist_id(full_name)')
@@ -42,21 +41,23 @@ export default function ArtworkPage() {
     <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
   )
 
-  const prices = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery')
+  const availableSizes = artwork.sizes || SIZES
+  const prices = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize)
   const orderSKU = buildOrderSKU(artwork.sku, selectedSize)
 
   function goToCheckout() {
     localStorage.setItem('fp_checkout', JSON.stringify({
-      artworkId: artwork.id,
-      artworkSku: artwork.sku,
+      artworkId:    artwork.id,
+      artworkSku:   artwork.sku,
       artworkTitle: artwork.title,
-      artistName: artist?.full_name,
-      artistId: artwork.artist_id,
-      printSize: selectedSize,
-      originalPrice: artwork.price,
-      offerLabel: artwork.offer_label,
-      offerPct: artwork.offer_pct,
-      previewUrl: artwork.preview_url,
+      artistName:   artist?.full_name,
+      artistId:     artwork.artist_id,
+      printSize:    selectedSize,
+      artistPrice:  artwork.price,
+      printingFee:  PRINTING_FEES[selectedSize] || PRINTING_FEES['A4'],
+      offerLabel:   artwork.offer_label,
+      offerPct:     artwork.offer_pct,
+      previewUrl:   artwork.preview_url,
     }))
     router.push('/checkout')
   }
@@ -77,48 +78,28 @@ export default function ArtworkPage() {
         </Link>
 
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
-          {/* Artwork image */}
           <div style={{ position: 'relative' }}>
-            <div style={{
-              borderRadius: 'var(--radius-lg)',
-              overflow: 'hidden',
-              background: 'var(--color-background-secondary)',
-              position: 'relative',
-            }}>
+            <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-background-secondary)', position: 'relative' }}>
               {artwork.preview_url ? (
                 <img
                   src={artwork.preview_url}
                   alt={artwork.title}
-                  style={{
-                    width: '100%',
-                    display: 'block',
-                    pointerEvents: 'none',
-                    userSelect: 'none',
-                    objectFit: 'contain',
-                    maxHeight: 520,
-                  }}
+                  style={{ width: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none', objectFit: 'contain', maxHeight: 520 }}
                 />
               ) : (
                 <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
                   No preview available
                 </div>
               )}
-              {/* Transparent overlay to block right-click */}
               <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
             </div>
             {artwork.offer_pct ? (
-              <div style={{
-                position: 'absolute', top: 14, left: 14,
-                background: 'var(--color-red)', color: '#fff',
-                fontSize: 12, fontWeight: 500, padding: '4px 10px',
-                borderRadius: 20, zIndex: 20, pointerEvents: 'none'
-              }}>
+              <div style={{ position: 'absolute', top: 14, left: 14, background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, zIndex: 20, pointerEvents: 'none' }}>
                 {artwork.offer_pct}% off
               </div>
             ) : null}
           </div>
 
-          {/* Details */}
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>
               {artwork.title}
@@ -138,34 +119,11 @@ export default function ArtworkPage() {
               {artwork.description}
             </p>
 
-            <div style={{ marginBottom: 4 }}>
-              {artwork.offer_pct ? (
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontSize: 16, color: 'var(--color-text-hint)', textDecoration: 'line-through' }}>
-                    {formatMVR(artwork.price)}
-                  </span>
-                  <span style={{ fontSize: 24, fontWeight: 500 }}>
-                    {formatMVR(prices.printPrice)}
-                  </span>
-                </div>
-              ) : (
-                <span style={{ fontSize: 24, fontWeight: 500 }}>{formatMVR(artwork.price)}</span>
-              )}
-            </div>
-            {artwork.offer_label && (
-              <span className="offer-tag" style={{ marginBottom: 16, display: 'inline-flex' }}>
-                {artwork.offer_label}
-              </span>
-            )}
-            <p style={{ fontSize: 12, color: 'var(--color-text-hint)', marginBottom: 20 }}>
-              Artist receives 75% · FinePrint Studio fulfils
-            </p>
-
             <div className="divider" />
 
             <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Select print size</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-              {SIZES.map(size => (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+              {availableSizes.map((size: string) => (
                 <button
                   key={size}
                   onClick={() => setSelectedSize(size)}
@@ -177,11 +135,41 @@ export default function ArtworkPage() {
               ))}
             </div>
 
+            <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px', marginBottom: 16 }}>
+              {artwork.offer_pct ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                    <span>Original artwork price</span>
+                    <span style={{ textDecoration: 'line-through' }}>{formatMVR(artwork.price)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-red)', marginBottom: 4 }}>
+                    <span>{artwork.offer_label} (−{artwork.offer_pct}%)</span>
+                    <span>− {formatMVR(prices.discountAmount)}</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                  <span>Artwork price</span>
+                  <span>{formatMVR(artwork.price)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+                <span>{selectedSize} giclée printing</span>
+                <span>{formatMVR(prices.printingFee)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
+                <span>Print price</span>
+                <span>{formatMVR(prices.artworkLineItem)}</span>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
+                + MVR 100 delivery fee at checkout · or free pickup from Malé studio
+              </p>
+            </div>
+
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6 }}>Order SKU</p>
             <span className="sku-tag" style={{ marginBottom: 20, display: 'inline-block', fontSize: 13 }}>
               {orderSKU}
             </span>
-
             <br /><br />
             <button className="btn btn-primary btn-full" onClick={goToCheckout}>
               Order this print
@@ -189,7 +177,6 @@ export default function ArtworkPage() {
           </div>
         </div>
 
-        {/* More by artist */}
         {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 20 }}>
@@ -199,17 +186,11 @@ export default function ArtworkPage() {
               {related.map((rel: any) => (
                 <Link key={rel.id} href={`/artwork/${rel.id}`} style={{ textDecoration: 'none' }}>
                   <div className="artwork-card">
-                    <div style={{ background: 'var(--color-background-secondary)', position: 'relative' }}>
+                    <div style={{ background: 'var(--color-background-secondary)' }}>
                       {rel.preview_url ? (
-                        <img
-                          src={rel.preview_url}
-                          alt={rel.title}
-                          style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
-                        />
+                        <img src={rel.preview_url} alt={rel.title} style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                       ) : (
-                        <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-text-hint)' }}>
-                          No preview
-                        </div>
+                        <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-text-hint)' }}>No preview</div>
                       )}
                     </div>
                     <div style={{ padding: '10px 12px' }}>
@@ -251,9 +232,7 @@ function ArtistModal({ artist, onClose, artworks }: any) {
               <p style={{ fontSize: 18, fontWeight: 500 }}>{artist.full_name}</p>
               <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{artist.location}</p>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.6 }}>{artist.bio}</p>
-              {artist.instagram && (
-                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>{artist.instagram}</p>
-              )}
+              {artist.instagram && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>{artist.instagram}</p>}
             </div>
           </div>
         </div>
