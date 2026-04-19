@@ -45,6 +45,10 @@ export default function CheckoutPage() {
 
   async function handleSubmit() {
     if (!form.name || !form.email || !form.phone) { toast.error('Please fill in your name, email and phone'); return }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(form.email)) { toast.error('Please enter a valid email address'); return }
+    const phoneRegex = /^[+]?[\d\s\-()]{7,15}$/
+    if (!phoneRegex.test(form.phone)) { toast.error('Please enter a valid phone number'); return }
     if (deliveryMethod === 'delivery' && (!form.island || !form.atoll)) { toast.error('Please enter your island and atoll'); return }
     if (!slipFile) { toast.error('Please upload your BML transfer slip'); return }
     setSubmitting(true)
@@ -118,17 +122,18 @@ export default function CheckoutPage() {
           <div>
             <div className="card" style={{ marginBottom: 16 }}>
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Your details</p>
-              {['name', 'email', 'phone'].map(f => (
-                <div key={f} className="form-group">
-                  <label className="form-label">{f === 'name' ? 'Full name' : f.charAt(0).toUpperCase() + f.slice(1)}</label>
-                  <input
-                    className="form-input"
-                    value={(form as any)[f]}
-                    onChange={e => setForm({ ...form, [f]: e.target.value })}
-                    placeholder={f === 'name' ? 'Ahmed Ali' : f === 'email' ? 'you@example.com' : '+960 xxx xxxx'}
-                  />
-                </div>
-              ))}
+              <div className="form-group">
+                <label className="form-label">Full name</label>
+                <input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ahmed Ali" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input className="form-input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Phone</label>
+                <input className="form-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+960 xxx xxxx" />
+              </div>
             </div>
 
             <div className="card">
@@ -136,7 +141,7 @@ export default function CheckoutPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
                   { id: 'delivery', icon: '📦', title: 'Deliver to me', desc: 'Anywhere in the Maldives', price: '+ MVR 100', priceColor: 'var(--color-text)' },
-                  { id: 'pickup',   icon: '🏪', title: 'Pick up',       desc: 'Collect from our Malé studio', price: 'Free', priceColor: 'var(--color-teal)' },
+                  { id: 'pickup', icon: '🏪', title: 'Pick up', desc: 'Collect from our Malé studio', price: 'Free', priceColor: 'var(--color-teal)' },
                 ].map(opt => (
                   <div
                     key={opt.id}
@@ -209,10 +214,13 @@ export default function CheckoutPage() {
               ) : null}
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                <span>{checkoutData.printSize} giclée print</span>
-                <span>{formatMVR(prices.artworkLineItem)}</span>
+                <span>Artwork price</span>
+                <span>{formatMVR(checkoutData.artistPrice)}</span>
               </div>
-
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                <span>{checkoutData.printSize} giclée printing</span>
+                <span>{formatMVR(prices.printingFee)}</span>
+              </div>
               {deliveryMethod === 'delivery' ? (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
                   <span>Handling & delivery</span><span>{formatMVR(prices.handlingFee)}</span>
@@ -222,7 +230,6 @@ export default function CheckoutPage() {
                   <span>Pickup</span><span>Free</span>
                 </div>
               )}
-
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', marginTop: 8, paddingTop: 10 }}>
                 <span>Total to transfer</span>
                 <span>{formatMVR(prices.totalPaid)}</span>
