@@ -48,6 +48,9 @@ export default function LoginPage() {
               {loading ? 'Logging in...' : 'Log in'}
             </button>
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 14, textAlign: 'center' }}>
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 10, textAlign: 'center' }}>
+  <Link href="/auth/forgot-password" style={{ color: 'var(--color-teal)' }}>Forgot password?</Link>
+</p>
               Don't have an account?{' '}
               <Link href="/auth/signup" style={{ color: 'var(--color-teal)' }}>Sign up</Link>
             </p>
