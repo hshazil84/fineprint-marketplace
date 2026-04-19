@@ -143,3 +143,13 @@ export async function notifyNewArtwork(artwork: {
     ]]
   })
 }
+export async function notifyPayoutRequest(payout: {
+  artistName: string
+  amount: number
+  bankName: string
+  accountName: string
+  accountNumber: string
+}) {
+  const text = `💸 <b>Payout request</b>\n\n<b>${payout.artistName}</b> has requested a payout.\n\n💰 Amount: <b>MVR ${payout.amount.toLocaleString()}</b>\n\n🏦 <b>Bank:</b> ${payout.bankName}\n👤 <b>Account name:</b> ${payout.accountName}\n🔢 <b>Account number:</b> <code>${payout.accountNumber}</code>`
+  await sendTelegram(text, { inline_keyboard: [[{ text: '💸 View payout requests', url: `${APP_URL}/admin/dashboard?tab=artists` }]] })
+}
