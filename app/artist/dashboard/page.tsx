@@ -490,11 +490,7 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
 
   const now = new Date()
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const alreadyRequested = payouts.some((p: any) => {
-    const d = new Date(p.created_at)
-    const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    return m === thisMonth && p.status !== 'rejected'
-  })
+  const alreadyRequested = false
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
