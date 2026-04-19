@@ -733,9 +733,7 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh, onViewRemitt
     }
   }, [payouts])
 
-  const now = new Date()
   const alreadyRequested = false
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   async function submitRequest() {
     if (!form.bankName || !form.accountName || !form.accountNumber) { toast.error('Please fill in all bank details'); return }
@@ -884,12 +882,23 @@ function ProfileTab({ profile, onSave }: any) {
       if (avatarFile) {
         const ext = avatarFile.name.split('.').pop()
         const path = `${profile.id}.${ext}`
-        await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true, contentType: avatarFile.type })
+        const { error: uploadError } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true, contentType: avatarFile.type })
+        if (uploadError) throw new Error(`Avatar upload failed: ${uploadError.message}`)
         const { data } = supabase.storage.from('avatars').getPublicUrl(path)
         avatarUrl = data.publicUrl
       }
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true, contentType: avatarFile.type })
-if (uploadError) throw new Error(`Avatar upload failed: ${uploadError.message}`)
+      const { error: updateError } = await supabase.from('profiles').update({
+        bio: form.bio,
+        location: form.location,
+        instagram: form.instagram,
+        linkedin: form.linkedin,
+        facebook: form.facebook,
+        tiktok: form.tiktok,
+        website: form.website,
+        avatar_url: avatarUrl,
+      }).eq('id', profile.id)
+      if (updateError) throw updateError
+      onSave({ ...form, avatar_url: avatarUrl })
       toast.success('Profile saved!')
     } catch (err: any) { toast.error(err.message) } finally { setSaving(false) }
   }
