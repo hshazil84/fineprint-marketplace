@@ -22,7 +22,6 @@ function TrackOrderContent() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Auto-fill and search from URL param
   useEffect(() => {
     const invoice = searchParams.get('invoice')
     if (invoice) {
@@ -39,7 +38,6 @@ function TrackOrderContent() {
     setOrders([])
     setSearched(true)
 
-    // Determine if it's an invoice number, email or phone
     const isInvoice = q.startsWith('INV-')
     const isEmail = q.includes('@')
 
@@ -53,7 +51,6 @@ function TrackOrderContent() {
     } else if (isEmail) {
       queryBuilder = queryBuilder.eq('buyer_email', q.toLowerCase())
     } else {
-      // Phone number
       queryBuilder = queryBuilder.eq('buyer_phone', q)
     }
 
@@ -132,7 +129,6 @@ function TrackOrderContent() {
 
               return (
                 <div key={order.id} className="card" style={{ marginBottom: 12, padding: 0, overflow: 'hidden' }}>
-                  {/* Order summary row — always visible */}
                   <div
                     style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', cursor: 'pointer' }}
                     onClick={() => setExpandedId(isExpanded ? null : order.id)}
@@ -156,11 +152,9 @@ function TrackOrderContent() {
                     </div>
                   </div>
 
-                  {/* Expanded details */}
                   {isExpanded && (
                     <div style={{ borderTop: '0.5px solid var(--color-border)', padding: '20px 20px' }}>
 
-                      {/* Status tracker */}
                       <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 16, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Order status</p>
                       <div style={{ position: 'relative', marginBottom: 24 }}>
                         <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: 'var(--color-border)' }} />
@@ -194,7 +188,6 @@ function TrackOrderContent() {
                         )}
                       </div>
 
-                      {/* Order details */}
                       <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Order details</p>
                       <div style={{ marginBottom: 16 }}>
                         {[
@@ -212,7 +205,6 @@ function TrackOrderContent() {
                         ))}
                       </div>
 
-                      {/* Delivery info */}
                       {order.delivery_method === 'pickup' ? (
                         <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 8, padding: '12px 14px' }}>
                           <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-teal-dark)', marginBottom: 4 }}>🏪 Pickup at FinePrint Studio</p>
