@@ -8,6 +8,110 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 
 const TABS = ['orders', 'artists', 'listings', 'offers', 'export']
+const ORDER_STATUSES = ['pending', 'approved', 'printing', 'ready', 'completed', 'rejected']
+
+// ─── Order Row ────────────────────────────────────────────────────────────────
+function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }: any) {
+  const [updating, setUpdating] = useState(false)
+  const [sendEmail, setSendEmail] = useState(true)
+
+  async function updateStatus(newStatus: string) {
+    if (newStatus === order.status) return
+    setUpdating(true)
+    const shouldSendEmail = sendEmail && newStatus === 'ready'
+    const res = await fetch('/api/orders/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoiceNumber: order.invoice_number, status: newStatus, sendEmail: shouldSendEmail }),
+    })
+    const data = await res.json()
+    if (data.success) {
+      toast.success(shouldSendEmail ? 'Status updated — buyer notified!' : 'Status updated')
+      onStatusChange()
+    } else {
+      toast.error(data.error)
+    }
+    setUpdating(false)
+  }
+
+  return (
+    <div style={{ padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+      {/* Top row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+            <p style={{ fontSize: 14, fontWeight: 500 }}>{order.invoice_number}</p>
+            <span className="sku-tag">{order.order_sku}</span>
+            <span className={`badge badge-${order.status}`}>{order.status}</span>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{order.artworks?.title} by {order.artworks?.profiles?.full_name}</p>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+            {order.buyer_name} · {new Date(order.created_at).toLocaleDateString()} · {formatMVR(order.total_paid)}
+            {' · '}{order.delivery_method === 'pickup' ? '🏪 Pickup' : `📦 Deliver → ${order.delivery_island}`}
+          </p>
+        </div>
+      </div>
+
+      {/* Controls row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {/* Status dropdown */}
+        <select
+          className="form-input"
+          style={{ fontSize: 12, padding: '5px 10px', maxWidth: 150, height: 'auto', cursor: 'pointer' }}
+          value={order.status}
+          onChange={e => updateStatus(e.target.value)}
+          disabled={updating}
+        >
+          {ORDER_STATUSES.map(s => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+
+        {/* Email notify toggle */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
+          <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} style={{ cursor: 'pointer' }} />
+          Notify buyer
+        </label>
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+          {order.slip_url && (
+            <button
+              className="btn btn-sm"
+              style={{ fontSize: 11, padding: '3px 10px', background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }}
+              onClick={onViewSlip}
+            >
+              📎 Slip
+            </button>
+          )}
+          {order.status !== 'pending' && order.status !== 'rejected' && (
+            <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 10px' }} onClick={onViewInvoice}>
+              📄 Invoice
+            </button>
+          )}
+          {order.status === 'pending' && !order.slip_url && (
+            <>
+              <button className="btn btn-sm btn-success" style={{ fontSize: 11 }} onClick={() => onAction(order.invoice_number, 'approve')}>Approve</button>
+              <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => onAction(order.invoice_number, 'reject')}>Reject</button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Context hint */}
+      {order.status === 'ready' && order.delivery_method === 'pickup' && (
+        <p style={{ fontSize: 11, color: 'var(--color-teal-dark)', marginTop: 8, background: 'var(--color-teal-light)', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>
+          📞 Pickup email tells buyer to call 9998124 to arrange collection
+        </p>
+      )}
+      {order.status === 'ready' && order.delivery_method === 'delivery' && (
+        <p style={{ fontSize: 11, color: 'var(--color-teal-dark)', marginTop: 8, background: 'var(--color-teal-light)', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>
+          📦 Delivery email tells buyer to expect a call from 9998124
+        </p>
+      )}
+    </div>
+  )
+}
 
 // ─── Invoice Modal ────────────────────────────────────────────────────────────
 function InvoiceModal({ order, onClose }: { order: any, onClose: () => void }) {
@@ -38,9 +142,7 @@ function InvoiceModal({ order, onClose }: { order: any, onClose: () => void }) {
             <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>✕ Close</button>
           </div>
         </div>
-
         <div style={{ overflowY: 'auto', padding: 28 }}>
-          {/* Header */}
           <div style={{ background: '#1a1a1a', borderRadius: 12, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Fine<span style={{ color: '#9FE1CB' }}>Print</span> Studio</div>
@@ -54,8 +156,6 @@ function InvoiceModal({ order, onClose }: { order: any, onClose: () => void }) {
               <div style={{ marginTop: 6, display: 'inline-block', background: '#EAF3DE', color: '#3B6D11', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20 }}>Approved</div>
             </div>
           </div>
-
-          {/* Addresses */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
             <div>
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 6 }}>Billed to</p>
@@ -68,8 +168,6 @@ function InvoiceModal({ order, onClose }: { order: any, onClose: () => void }) {
               <p style={{ fontSize: 12, color: '#555', lineHeight: 1.7 }}>hello@fineprintmv.com<br />fineprintmv.com<br />Malé, Maldives</p>
             </div>
           </div>
-
-          {/* Order table */}
           <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 8 }}>Order details</p>
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
             <thead>
@@ -95,8 +193,6 @@ function InvoiceModal({ order, onClose }: { order: any, onClose: () => void }) {
               </tr>
             </tbody>
           </table>
-
-          {/* Totals */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <table style={{ width: 240, borderCollapse: 'collapse' }}>
               {hasOffer ? (
@@ -119,16 +215,12 @@ function InvoiceModal({ order, onClose }: { order: any, onClose: () => void }) {
               </tr>
             </table>
           </div>
-
           <div style={{ borderTop: '1px solid #f0f0ec', marginBottom: 12 }} />
-
-          {/* Internal note for admin */}
           <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 8, padding: '10px 14px', marginBottom: 12 }}>
             <p style={{ fontSize: 11, color: '#888', margin: 0 }}>
               <strong>Admin note:</strong> Artist earnings = {formatMVR(order.artist_earnings)} · Platform commission = {formatMVR(order.fp_commission)} · Payout status = {order.payout_status || 'unpaid'}
             </p>
           </div>
-
           <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.6, margin: 0 }}>
             Paid via BML bank transfer to account 7703230358101 (Hasan Shazil).
             {order.delivery_method === 'pickup' ? ' Print ready for pickup at FinePrint Studio, Malé.' : ' Print will be dispatched to buyer address.'}
@@ -286,14 +378,11 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
       const slipPath = `payout-${payout.id}.${slipFile.name.split('.').pop()}`
       const { error: uploadError } = await supabase.storage.from('order-slips').upload(slipPath, slipFile, { contentType: slipFile.type })
       if (uploadError) throw uploadError
-
       const paidAt = new Date().toISOString()
       const { error } = await supabase.from('payouts').update({ status: 'paid', slip_url: slipPath, paid_at: paidAt }).eq('id', payout.id)
       if (error) throw error
-
       await supabase.from('orders').update({ payout_status: 'paid' })
         .eq('artist_id', payout.artist_id).eq('payout_status', 'unpaid').eq('status', 'approved')
-
       await fetch('/api/notify/payout-paid', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -306,7 +395,6 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
           paidAt: new Date(paidAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
         }),
       })
-
       toast.success('Payout marked as paid — artist notified!')
       onPaid()
       onClose()
@@ -433,9 +521,7 @@ function RemittanceModal({ payout, onClose }: { payout: any, onClose: () => void
               </tr>
             ))}
           </table>
-          <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.6, margin: 0 }}>
-            This remittance advice confirms payment has been processed by FinePrint Studio.
-          </p>
+          <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.6, margin: 0 }}>This remittance advice confirms payment has been processed by FinePrint Studio.</p>
         </div>
       </div>
     </div>
@@ -565,38 +651,14 @@ function AdminDashboard() {
             {orders.length === 0 ? (
               <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No orders yet.</p>
             ) : orders.map(o => (
-              <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                    <p style={{ fontSize: 14, fontWeight: 500 }}>{o.invoice_number}</p>
-                    <span className="sku-tag">{o.order_sku}</span>
-                    <span className={`badge badge-${o.status}`}>{o.status}</span>
-                  </div>
-                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{o.artworks?.title} by {o.artworks?.profiles?.full_name}</p>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    {o.buyer_name} · {new Date(o.created_at).toLocaleDateString()} · {formatMVR(o.total_paid)}
-                    {' · '}{o.delivery_method === 'pickup' ? 'Pickup' : `Deliver → ${o.delivery_island}`}
-                  </p>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                    {o.slip_url && (
-                      <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 10px', background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={() => setSelectedOrder(o)}>
-                        📎 View slip & action
-                      </button>
-                    )}
-                    {o.status === 'approved' && (
-                      <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 10px' }} onClick={() => setInvoiceOrder(o)}>
-                        📄 View invoice
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {o.status === 'pending' && !o.slip_url && (
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                    <button className="btn btn-sm btn-success" onClick={() => handleOrderAction(o.invoice_number, 'approve')}>Approve</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleOrderAction(o.invoice_number, 'reject')}>Reject</button>
-                  </div>
-                )}
-              </div>
+              <OrderRow
+                key={o.id}
+                order={o}
+                onAction={handleOrderAction}
+                onStatusChange={fetchOrders}
+                onViewInvoice={() => setInvoiceOrder(o)}
+                onViewSlip={() => setSelectedOrder(o)}
+              />
             ))}
           </div>
         )}
@@ -641,9 +703,7 @@ function AdminDashboard() {
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{p.profiles?.full_name} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)' }}>FP-{p.profiles?.artist_code}</span></p>
                         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_number}</p>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          {p.paid_at ? `Paid ${new Date(p.paid_at).toLocaleDateString()}` : ''}
-                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.paid_at ? `Paid ${new Date(p.paid_at).toLocaleDateString()}` : ''}</p>
                         <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11 }} onClick={() => setRemittancePayout(p)}>📄 View remittance</button>
                       </div>
                       <div style={{ textAlign: 'right' }}>
