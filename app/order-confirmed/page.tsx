@@ -44,6 +44,9 @@ export default function OrderConfirmedPage() {
           Your order is pending payment verification. We'll email you once your transfer slip is reviewed and your print is being prepared.
         </p>
         <Link href="/storefront" className="btn btn-primary">Continue browsing</Link>
+        <Link href="/orders/track" className="btn btn-sm" style={{ marginTop: 12, display: 'inline-block' }}>
+  Track your order →
+</Link>
       </div>
     </div>
   )
