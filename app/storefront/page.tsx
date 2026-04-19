@@ -43,6 +43,7 @@ export default function StorefrontPage() {
       <nav className="nav">
         <Link href="/" className="nav-logo">Fine<span>Print</span> Studio</Link>
         <div className="nav-links">
+          <Link href="/orders/track" style={{ fontSize: 13, color: 'var(--color-text-muted)', textDecoration: 'none' }}>Track order</Link>
           <Link href="/auth/login" className="btn">Log in</Link>
           <Link href="/auth/signup" className="btn btn-primary">Sign up</Link>
         </div>
@@ -61,6 +62,10 @@ export default function StorefrontPage() {
         {loading ? (
           <div style={{ color: 'var(--color-text-hint)', padding: '60px 0', textAlign: 'center' }}>
             Loading artworks...
+          </div>
+        ) : artworks.length === 0 ? (
+          <div style={{ color: 'var(--color-text-hint)', padding: '60px 0', textAlign: 'center' }}>
+            No artworks available yet. Check back soon!
           </div>
         ) : (
           <div className="grid-3">
@@ -92,19 +97,19 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
       <div className="artwork-card">
-       <div className="artwork-protected" style={{ height: 220, background: 'var(--color-background-secondary)' }}>
-  {artwork.preview_url ? (
-    <img
-      src={artwork.preview_url}
-      alt={artwork.title}
-      style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
-    />
-  ) : (
-    <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
-      No preview
-    </div>
-  )}
-  <div className="protect-overlay" />
+        <div className="artwork-protected" style={{ height: 220, background: 'var(--color-background-secondary)' }}>
+          {artwork.preview_url ? (
+            <img
+              src={artwork.preview_url}
+              alt={artwork.title}
+              style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
+            />
+          ) : (
+            <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
+              No preview
+            </div>
+          )}
+          <div className="protect-overlay" />
           {artwork.offer_pct ? (
             <div style={{
               position: 'absolute', top: 10, left: 10,
