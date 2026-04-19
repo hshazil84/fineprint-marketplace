@@ -11,16 +11,282 @@ const SIZES = ['A4', 'A3']
 const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile']
 const PLATFORM_FEE = 5
 const CATEGORIES = [
-  'Photography',
-  'Fine Art',
-  'Abstract',
-  'Illustration',
-  'Digital Art',
-  'Mixed Media',
-  'Watercolour',
-  'Charcoal & Sketch',
+  'Photography', 'Fine Art', 'Abstract', 'Illustration',
+  'Digital Art', 'Mixed Media', 'Watercolour', 'Charcoal & Sketch',
 ]
 
+// ─── Invoice Modal ───────────────────────────────────────────────────────────
+function InvoiceModal({ order, profile, onClose }: { order: any, profile: any, onClose: () => void }) {
+  const printingFee = order.printing_fee || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4']
+  const hasOffer = order.offer_pct && order.offer_pct > 0
+  const date = new Date(order.approved_at || order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+  const buyerAddress = order.delivery_method === 'pickup'
+    ? 'Pickup — FinePrint Studio, Malé'
+    : `${order.delivery_island || ''}, ${order.delivery_atoll || ''}, Maldives`
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, overflowY: 'auto' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 600, overflow: 'hidden' }}>
+
+        {/* Toolbar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: '#1a1a1a' }}>
+          <p style={{ fontSize: 13, color: '#fff', fontFamily: 'monospace' }}>{order.invoice_number}</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => {
+                const printWindow = window.open('', '_blank')
+                if (!printWindow) return
+                printWindow.document.write(getInvoiceHTML({ order, printingFee, hasOffer, date, buyerAddress }))
+                printWindow.document.close()
+                printWindow.focus()
+                setTimeout(() => { printWindow.print() }, 500)
+              }}
+              style={{ background: '#9FE1CB', color: '#085041', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}
+            >
+              🖨 Print / Save PDF
+            </button>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>✕ Close</button>
+          </div>
+        </div>
+
+        {/* Invoice body */}
+        <div style={{ padding: 28, maxHeight: '80vh', overflowY: 'auto' }}>
+          {/* Header */}
+          <div style={{ background: '#1a1a1a', borderRadius: 12, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Fine<span style={{ color: '#9FE1CB' }}>Print</span> Studio</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>fineprintmv.com · hello@fineprintmv.com</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Malé, Maldives</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Invoice</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', fontFamily: 'monospace' }}>{order.invoice_number}</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>{date}</div>
+              <div style={{ marginTop: 6, display: 'inline-block', background: '#EAF3DE', color: '#3B6D11', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20 }}>Approved</div>
+            </div>
+          </div>
+
+          {/* Addresses */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+            <div>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 6 }}>Billed to</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#111', marginBottom: 2 }}>{order.buyer_name}</p>
+              <p style={{ fontSize: 12, color: '#555', lineHeight: 1.7 }}>{order.buyer_email}<br />{order.buyer_phone}<br />{buyerAddress}</p>
+            </div>
+            <div>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 6 }}>Fulfilled by</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#111', marginBottom: 2 }}>FinePrint Studio</p>
+              <p style={{ fontSize: 12, color: '#555', lineHeight: 1.7 }}>hello@fineprintmv.com<br />fineprintmv.com<br />Malé, Maldives</p>
+            </div>
+          </div>
+
+          {/* Order table */}
+          <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 8 }}>Order details</p>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #e8e8e4' }}>
+                {['Artwork', 'Artist', 'Size', 'Amount'].map((h, i) => (
+                  <th key={h} style={{ fontSize: 10, textTransform: 'uppercase', color: '#aaa', padding: '6px 0', textAlign: i === 3 ? 'right' : 'left', fontWeight: 500 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid #f4f4f0' }}>
+                <td style={{ padding: '12px 0', verticalAlign: 'top' }}>
+                  <p style={{ fontSize: 13, color: '#222', fontWeight: 500 }}>{order.artworks?.title}</p>
+                  <p style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace', marginTop: 2 }}>{order.order_sku}</p>
+                  {hasOffer && <p style={{ fontSize: 11, color: '#c05030', marginTop: 2 }}>{order.offer_label} −{order.offer_pct}%</p>}
+                </td>
+                <td style={{ padding: '12px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{order.artworks?.profiles?.full_name || profile?.full_name}</td>
+                <td style={{ padding: '12px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{order.print_size}</td>
+                <td style={{ padding: '12px 0', textAlign: 'right', verticalAlign: 'top' }}>
+                  {hasOffer && <p style={{ fontSize: 12, color: '#aaa', textDecoration: 'line-through' }}>MVR {order.original_price}</p>}
+                  <p style={{ fontSize: 13, color: '#222', fontWeight: 500 }}>MVR {order.print_price}</p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* Totals */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+            <table style={{ width: 240, borderCollapse: 'collapse' }}>
+              {hasOffer ? (
+                <>
+                  <tr><td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>Original price</td><td style={{ textAlign: 'right', fontSize: 13 }}>MVR {order.original_price}</td></tr>
+                  <tr><td style={{ color: '#c05030', padding: '3px 0', fontSize: 13 }}>{order.offer_label} (−{order.offer_pct}%)</td><td style={{ textAlign: 'right', fontSize: 13, color: '#c05030' }}>− MVR {order.discount_amount}</td></tr>
+                </>
+              ) : (
+                <tr><td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>Artwork price</td><td style={{ textAlign: 'right', fontSize: 13 }}>MVR {order.original_price}</td></tr>
+              )}
+              <tr><td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>{order.print_size} giclée printing</td><td style={{ textAlign: 'right', fontSize: 13 }}>MVR {printingFee}</td></tr>
+              {order.delivery_method === 'delivery' ? (
+                <tr><td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>Handling & delivery</td><td style={{ textAlign: 'right', fontSize: 13 }}>MVR {order.handling_fee}</td></tr>
+              ) : (
+                <tr><td style={{ color: '#1D9E75', padding: '3px 0', fontSize: 13 }}>Pickup</td><td style={{ textAlign: 'right', fontSize: 13, color: '#1D9E75' }}>Free</td></tr>
+              )}
+              <tr style={{ borderTop: '1px solid #e8e8e4' }}>
+                <td style={{ padding: '8px 0 4px', fontSize: 15, fontWeight: 600, color: '#111' }}>Total paid</td>
+                <td style={{ textAlign: 'right', padding: '8px 0 4px', fontSize: 15, fontWeight: 600, color: '#111' }}>MVR {order.total_paid}</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style={{ borderTop: '1px solid #f0f0ec', marginBottom: 12 }} />
+          <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.6, margin: 0 }}>
+            Paid via BML bank transfer to account 7703230358101 (Hasan Shazil).
+            {order.delivery_method === 'pickup' ? ' Your print will be ready for pickup at FinePrint Studio, Malé.' : ' Your print will be dispatched to your address.'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getInvoiceHTML({ order, printingFee, hasOffer, date, buyerAddress }: any) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${order.invoice_number}</title>
+  <style>body{margin:0;padding:24px;font-family:-apple-system,sans-serif;background:#f0f0ec}
+  .wrap{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0ddd6}
+  @media print{body{background:#fff}.wrap{border:none;border-radius:0}}</style></head>
+  <body><div class="wrap">
+  <div style="background:#1a1a1a;padding:24px 32px;display:flex;justify-content:space-between">
+  <div><div style="font-size:18px;font-weight:600;color:#fff">Fine<span style="color:#9FE1CB">Print</span> Studio</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px">fineprintmv.com · hello@fineprintmv.com</div></div>
+  <div style="text-align:right"><div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase">Invoice</div>
+  <div style="font-size:14px;font-weight:600;color:#fff;font-family:monospace">${order.invoice_number}</div>
+  <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px">${date}</div>
+  <div style="margin-top:6px;display:inline-block;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px">Approved</div></div></div>
+  <div style="padding:24px 32px">
+  <table style="width:100%;margin-bottom:20px"><tr>
+  <td style="width:50%;vertical-align:top;padding-right:12px">
+  <div style="font-size:10px;text-transform:uppercase;color:#aaa;margin-bottom:6px">Billed to</div>
+  <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:3px">${order.buyer_name}</div>
+  <div style="font-size:12px;color:#555;line-height:1.7">${order.buyer_email}<br>${order.buyer_phone}<br>${buyerAddress}</div></td>
+  <td style="width:50%;vertical-align:top">
+  <div style="font-size:10px;text-transform:uppercase;color:#aaa;margin-bottom:6px">Fulfilled by</div>
+  <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:3px">FinePrint Studio</div>
+  <div style="font-size:12px;color:#555;line-height:1.7">hello@fineprintmv.com<br>fineprintmv.com<br>Malé, Maldives</div></td></tr></table>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+  <tr style="border-bottom:1px solid #e8e8e4">
+  <th style="font-size:10px;text-transform:uppercase;color:#aaa;padding:6px 0;text-align:left;font-weight:500">Artwork</th>
+  <th style="font-size:10px;text-transform:uppercase;color:#aaa;padding:6px 0;text-align:left;font-weight:500">Artist</th>
+  <th style="font-size:10px;text-transform:uppercase;color:#aaa;padding:6px 0;text-align:left;font-weight:500">Size</th>
+  <th style="font-size:10px;text-transform:uppercase;color:#aaa;padding:6px 0;text-align:right;font-weight:500">Amount</th></tr>
+  <tr style="border-bottom:1px solid #f4f4f0">
+  <td style="padding:12px 0;vertical-align:top"><div style="font-size:13px;font-weight:500;color:#222">${order.artworks?.title}</div>
+  <div style="font-size:11px;color:#aaa;font-family:monospace;margin-top:2px">${order.order_sku}</div>
+  ${hasOffer ? `<div style="font-size:11px;color:#c05030;margin-top:2px">${order.offer_label} −${order.offer_pct}%</div>` : ''}</td>
+  <td style="padding:12px 0;font-size:13px;color:#444;vertical-align:top">${order.artworks?.profiles?.full_name || ''}</td>
+  <td style="padding:12px 0;font-size:13px;color:#444;vertical-align:top">${order.print_size}</td>
+  <td style="padding:12px 0;text-align:right;vertical-align:top">
+  ${hasOffer ? `<div style="font-size:12px;color:#aaa;text-decoration:line-through">MVR ${order.original_price}</div>` : ''}
+  <div style="font-size:13px;font-weight:500;color:#222">MVR ${order.print_price}</div></td></tr></table>
+  <table style="width:220px;margin-left:auto;border-collapse:collapse">
+  ${hasOffer ? `<tr><td style="color:#888;padding:3px 0;font-size:13px">Original price</td><td style="text-align:right;font-size:13px">MVR ${order.original_price}</td></tr>
+  <tr><td style="color:#c05030;padding:3px 0;font-size:13px">${order.offer_label} (−${order.offer_pct}%)</td><td style="text-align:right;font-size:13px;color:#c05030">− MVR ${order.discount_amount}</td></tr>` :
+  `<tr><td style="color:#888;padding:3px 0;font-size:13px">Artwork price</td><td style="text-align:right;font-size:13px">MVR ${order.original_price}</td></tr>`}
+  <tr><td style="color:#888;padding:3px 0;font-size:13px">${order.print_size} giclée printing</td><td style="text-align:right;font-size:13px">MVR ${printingFee}</td></tr>
+  ${order.delivery_method === 'delivery' ?
+    `<tr><td style="color:#888;padding:3px 0;font-size:13px">Handling & delivery</td><td style="text-align:right;font-size:13px">MVR ${order.handling_fee}</td></tr>` :
+    `<tr><td style="color:#1D9E75;padding:3px 0;font-size:13px">Pickup</td><td style="text-align:right;font-size:13px;color:#1D9E75">Free</td></tr>`}
+  <tr style="border-top:1px solid #e8e8e4">
+  <td style="padding:8px 0 4px;font-size:15px;font-weight:600;color:#111">Total paid</td>
+  <td style="text-align:right;padding:8px 0 4px;font-size:15px;font-weight:600;color:#111">MVR ${order.total_paid}</td></tr></table>
+  <div style="border-top:1px solid #f0f0ec;margin:16px 0"></div>
+  <p style="font-size:11px;color:#aaa;line-height:1.6;margin:0">Paid via BML bank transfer to account 7703230358101 (Hasan Shazil).
+  ${order.delivery_method === 'pickup' ? 'Your print will be ready for pickup at FinePrint Studio, Malé.' : 'Your print will be dispatched to your address.'}</p>
+  </div><div style="background:#f7f7f5;padding:12px 32px;display:flex;justify-content:space-between;border-top:1px solid #e8e8e4">
+  <span style="font-size:11px;color:#aaa">FinePrint Studio · Malé, Maldives</span>
+  <span style="font-size:11px;color:#1D9E75">fineprintmv.com</span></div></div></body></html>`
+}
+
+// ─── Remittance Modal ────────────────────────────────────────────────────────
+function RemittanceModal({ payout, profile, onClose }: { payout: any, profile: any, onClose: () => void }) {
+  const paidAt = payout.paid_at
+    ? new Date(payout.paid_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    : '—'
+
+  function printRemittance() {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Remittance Advice</title>
+    <style>body{margin:0;padding:24px;font-family:-apple-system,sans-serif;background:#f0f0ec}
+    .wrap{max-width:520px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0ddd6}
+    @media print{body{background:#fff}.wrap{border:none;border-radius:0}}</style></head>
+    <body><div class="wrap">
+    <div style="background:#1a1a1a;padding:24px 32px;display:flex;justify-content:space-between">
+    <div><div style="font-size:18px;font-weight:600;color:#fff">Fine<span style="color:#9FE1CB">Print</span> Studio</div>
+    <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px">fineprintmv.com</div></div>
+    <div style="text-align:right"><div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase">Remittance Advice</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px">${paidAt}</div>
+    <div style="margin-top:6px;display:inline-block;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px">Paid</div></div></div>
+    <div style="padding:24px 32px">
+    <div style="background:#f0faf6;border:1px solid #9FE1CB;border-radius:10px;padding:18px;text-align:center;margin-bottom:20px">
+    <div style="font-size:11px;color:#1D9E75;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px">Amount paid</div>
+    <div style="font-size:30px;font-weight:600;color:#111">MVR ${payout.amount.toLocaleString()}</div>
+    <div style="font-size:12px;color:#888;margin-top:4px">${paidAt}</div></div>
+    <table style="width:100%;border-collapse:collapse">
+    ${[['Payee', profile?.full_name], ['Artist code', `FP-${profile?.artist_code}`], ['Bank', payout.bank_name],
+      ['Account name', payout.account_name], ['Account number', payout.account_number],
+      ['Amount', `MVR ${payout.amount.toLocaleString()}`], ['Date', paidAt],
+      ['Reference', `PAYOUT-${payout.id.slice(0, 8).toUpperCase()}`]
+    ].map(([k, v]) => `<tr style="border-bottom:1px solid #f4f4f0">
+    <td style="padding:9px 0;font-size:13px;color:#888">${k}</td>
+    <td style="padding:9px 0;font-size:13px;color:#111;text-align:right;font-weight:500;font-family:${k === 'Account number' || k === 'Reference' ? 'monospace' : 'inherit'}">${v}</td></tr>`).join('')}
+    </table>
+    <p style="font-size:11px;color:#aaa;line-height:1.6;margin-top:16px">This remittance advice confirms payment has been processed by FinePrint Studio. Please retain for your records.</p>
+    </div><div style="background:#f7f7f5;padding:12px 32px;display:flex;justify-content:space-between;border-top:1px solid #e8e8e4">
+    <span style="font-size:11px;color:#aaa">FinePrint Studio · Malé, Maldives</span>
+    <span style="font-size:11px;color:#1D9E75">fineprintmv.com</span></div></div></body></html>`)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => { printWindow.print() }, 500)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 480, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: '#1a1a1a' }}>
+          <p style={{ fontSize: 13, color: '#fff' }}>Payout Remittance</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={printRemittance} style={{ background: '#9FE1CB', color: '#085041', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>🖨 Print / Save PDF</button>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>✕ Close</button>
+          </div>
+        </div>
+        <div style={{ padding: 24 }}>
+          <div style={{ background: '#f0faf6', border: '1px solid #9FE1CB', borderRadius: 12, padding: 20, textAlign: 'center', marginBottom: 20 }}>
+            <p style={{ fontSize: 12, color: '#1D9E75', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px' }}>Amount paid</p>
+            <p style={{ fontSize: 32, fontWeight: 600, color: '#111', margin: 0 }}>{formatMVR(payout.amount)}</p>
+            <p style={{ fontSize: 12, color: '#888', margin: '6px 0 0' }}>{paidAt}</p>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+            {[
+              ['Payee', profile?.full_name],
+              ['Artist code', `FP-${profile?.artist_code}`],
+              ['Bank', payout.bank_name],
+              ['Account name', payout.account_name],
+              ['Account number', payout.account_number],
+              ['Amount', formatMVR(payout.amount)],
+              ['Date', paidAt],
+              ['Reference', `PAYOUT-${payout.id.slice(0, 8).toUpperCase()}`],
+            ].map(([k, v]) => (
+              <tr key={k} style={{ borderBottom: '1px solid #f4f4f0' }}>
+                <td style={{ padding: '9px 0', fontSize: 13, color: '#888' }}>{k}</td>
+                <td style={{ padding: '9px 0', fontSize: 13, color: '#111', textAlign: 'right', fontWeight: 500, fontFamily: k === 'Account number' || k === 'Reference' ? 'monospace' : 'inherit' }}>{v}</td>
+              </tr>
+            ))}
+          </table>
+          <p style={{ fontSize: 11, color: '#aaa', lineHeight: 1.6, margin: 0 }}>
+            This remittance advice confirms payment has been processed by FinePrint Studio. Please retain for your records.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function ArtistDashboard() {
   const router = useRouter()
   const [tab, setTab] = useState('listings')
@@ -29,6 +295,8 @@ export default function ArtistDashboard() {
   const [orders, setOrders] = useState<any[]>([])
   const [payouts, setPayouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [selectedPayout, setSelectedPayout] = useState<any>(null)
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -51,7 +319,7 @@ export default function ArtistDashboard() {
   async function fetchOrders(artistId: string) {
     const { data } = await supabase
       .from('orders')
-      .select('*, artworks!inner(title, sku, artist_id)')
+      .select('*, artworks!inner(title, sku, artist_id, profiles:artist_id(full_name))')
       .eq('artworks.artist_id', artistId)
       .order('created_at', { ascending: false })
     setOrders(data || [])
@@ -154,9 +422,7 @@ export default function ArtistDashboard() {
                       {a.category && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{a.category}</span>}
                       {a.offer_label && <span className="offer-tag">{a.offer_label} −{a.offer_pct}%</span>}
                     </div>
-                    {a.painting_by && (
-                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Painting by {a.painting_by}</p>
-                    )}
+                    {a.painting_by && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Painting by {a.painting_by}</p>}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(artistEarns)}</p>
@@ -187,7 +453,7 @@ export default function ArtistDashboard() {
                     <button
                       className="btn btn-sm"
                       style={{ marginTop: 6, fontSize: 11, display: 'block' }}
-                      onClick={() => window.open(`/invoice/${o.invoice_number}`, '_blank')}
+                      onClick={() => setSelectedOrder(o)}
                     >
                       📄 View invoice
                     </button>
@@ -208,31 +474,32 @@ export default function ArtistDashboard() {
             pendingEarnings={pendingEarnings}
             payouts={payouts}
             onRefresh={() => profile && fetchPayouts(profile.id)}
+            onViewRemittance={(p: any) => setSelectedPayout(p)}
           />
         )}
 
         {tab === 'export' && <ExportTab onExport={handleExport} orders={orders} />}
         {tab === 'profile' && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
       </div>
+
+      {selectedOrder && (
+        <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />
+      )}
+      {selectedPayout && (
+        <RemittanceModal payout={selectedPayout} profile={profile} onClose={() => setSelectedPayout(null)} />
+      )}
     </div>
   )
 }
 
 function UploadTab({ profile, nextSeq, onSuccess }: any) {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    price: '',
-    category: 'Photography',
-    paintingBy: '',
-  })
+  const [form, setForm] = useState({ title: '', description: '', price: '', category: 'Photography', paintingBy: '' })
   const [hiresFile, setHiresFile] = useState<File | null>(null)
   const [hiresThumb, setHiresThumb] = useState<string | null>(null)
   const [previewFile, setPreviewFile] = useState<File | null>(null)
   const [previewThumb, setPreviewThumb] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const nextSku = `FP-${profile?.artist_code}-${String(nextSeq).padStart(3, '0')}`
-
   const price = parseInt(form.price) || 0
   const platformFeeAmt = Math.round(price * PLATFORM_FEE / 100)
   const artistEarns = price - platformFeeAmt
@@ -275,7 +542,6 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       if (previewError) throw previewError
 
       const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
-
       toast.loading('Saving listing...', { id: 'upload' })
       const { error: dbError } = await supabase.from('artworks').insert({
         sku, artist_id: user.id, title: form.title, description: form.description,
@@ -290,7 +556,6 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sku, title: form.title, artistName: prof.full_name, price, sizes: SIZES }),
       })
-
       toast.success(`Artwork submitted! SKU: ${sku}`, { id: 'upload' })
       onSuccess()
     } catch (err: any) {
@@ -321,14 +586,8 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </div>
       <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files?.[0] || null, setPreviewFile, setPreviewThumb)} />
 
-      <div className="form-group">
-        <label className="form-label">Title</label>
-        <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Name your artwork" />
-      </div>
-      <div className="form-group">
-        <label className="form-label">Description</label>
-        <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about this piece..." />
-      </div>
+      <div className="form-group"><label className="form-label">Title</label><input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Name your artwork" /></div>
+      <div className="form-group"><label className="form-label">Description</label><textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about this piece..." /></div>
       <div className="form-group">
         <label className="form-label">Category</label>
         <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
@@ -374,7 +633,6 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>SKU assigned on approval</p>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, marginTop: 2 }}>{nextSku} ← next available</p>
       </div>
-
       <button className="btn btn-primary btn-full" onClick={handleUpload} disabled={uploading}>
         {uploading ? 'Uploading...' : 'Submit for review'}
       </button>
@@ -387,7 +645,6 @@ function OffersTab({ artworks, onRefresh }: any) {
   const [pct, setPct] = useState(15)
   const [target, setTarget] = useState('all')
   const supabase = createClient()
-
   const previewPrice = artworks[0]?.price || 800
   const discount = Math.round(previewPrice * pct / 100)
   const discountedPrice = previewPrice - discount
@@ -396,19 +653,13 @@ function OffersTab({ artworks, onRefresh }: any) {
 
   async function activate() {
     const updates = target === 'all' ? artworks.map((a: any) => a.id) : [parseInt(target)]
-    for (const id of updates) {
-      await supabase.from('artworks').update({ offer_label: label, offer_pct: pct }).eq('id', id)
-    }
-    toast.success('Offer activated!')
-    onRefresh()
+    for (const id of updates) await supabase.from('artworks').update({ offer_label: label, offer_pct: pct }).eq('id', id)
+    toast.success('Offer activated!'); onRefresh()
   }
-
   async function removeOffer(id: number) {
     await supabase.from('artworks').update({ offer_label: null, offer_pct: null }).eq('id', id)
-    toast.success('Offer removed')
-    onRefresh()
+    toast.success('Offer removed'); onRefresh()
   }
-
   const activeOffers = artworks.filter((a: any) => a.offer_pct)
 
   return (
@@ -416,29 +667,19 @@ function OffersTab({ artworks, onRefresh }: any) {
       <div className="card" style={{ maxWidth: 520, marginBottom: 20 }}>
         <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Create an offer</p>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>Discounts come entirely out of your share. Platform fee (5%) is applied after discount.</p>
-        <div className="form-group">
-          <label className="form-label">Apply to</label>
+        <div className="form-group"><label className="form-label">Apply to</label>
           <select className="form-input" value={target} onChange={e => setTarget(e.target.value)}>
             <option value="all">All my artworks</option>
             {artworks.map((a: any) => <option key={a.id} value={a.id}>{a.sku} — {a.title}</option>)}
           </select>
         </div>
-        <div className="form-group">
-          <label className="form-label">Offer label</label>
-          <input className="form-input" value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Eid Special" />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Discount: {pct}%</label>
-          <input type="range" min={5} max={50} step={5} value={pct} onChange={e => setPct(parseInt(e.target.value))} style={{ width: '100%' }} />
-        </div>
+        <div className="form-group"><label className="form-label">Offer label</label><input className="form-input" value={label} onChange={e => setLabel(e.target.value)} placeholder="e.g. Eid Special" /></div>
+        <div className="form-group"><label className="form-label">Discount: {pct}%</label><input type="range" min={5} max={50} step={5} value={pct} onChange={e => setPct(parseInt(e.target.value))} style={{ width: '100%' }} /></div>
         <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: 14, marginTop: 4 }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>Payout preview — artwork price at {formatMVR(previewPrice)}</p>
-          {[
-            ['Your artwork price', formatMVR(previewPrice), ''],
-            [`Discount (${pct}%)`, `− ${formatMVR(discount)}`, 'var(--color-red)'],
-            ['Discounted price', formatMVR(discountedPrice), ''],
-            ['Platform fee (5%)', `− ${formatMVR(platformFee)}`, 'var(--color-text-muted)'],
-            ['Your earnings', formatMVR(artistEarns), 'var(--color-teal)'],
+          {[['Your artwork price', formatMVR(previewPrice), ''], [`Discount (${pct}%)`, `− ${formatMVR(discount)}`, 'var(--color-red)'],
+            ['Discounted price', formatMVR(discountedPrice), ''], ['Platform fee (5%)', `− ${formatMVR(platformFee)}`, 'var(--color-text-muted)'],
+            ['Your earnings', formatMVR(artistEarns), 'var(--color-teal)']
           ].map(([k, v, c]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0', color: (c as string) || 'var(--color-text)' }}>
               <span>{k}</span><span style={{ fontWeight: k === 'Your earnings' ? 500 : 400 }}>{v}</span>
@@ -447,7 +688,6 @@ function OffersTab({ artworks, onRefresh }: any) {
         </div>
         <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={activate}>Activate offer</button>
       </div>
-
       {activeOffers.length > 0 && (
         <div>
           <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Active offers</p>
@@ -470,7 +710,7 @@ function OffersTab({ artworks, onRefresh }: any) {
   )
 }
 
-function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
+function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh, onViewRemittance }: any) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ bankName: '', accountName: '', accountNumber: '' })
   const [submitting, setSubmitting] = useState(false)
@@ -494,10 +734,8 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
   }, [payouts])
 
   const now = new Date()
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const alreadyRequested = false
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
   async function submitRequest() {
     if (!form.bankName || !form.accountName || !form.accountNumber) { toast.error('Please fill in all bank details'); return }
@@ -506,28 +744,19 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const { error } = await supabase.from('payouts').insert({
-        artist_id: user!.id,
-        amount: pendingEarnings,
-        bank_name: form.bankName,
-        account_name: form.accountName,
-        account_number: form.accountNumber,
-        status: 'pending',
+        artist_id: user!.id, amount: pendingEarnings,
+        bank_name: form.bankName, account_name: form.accountName, account_number: form.accountNumber, status: 'pending',
       })
       if (error) throw error
       await fetch('/api/notify/payout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ artistName: profile.full_name, amount: pendingEarnings, bankName: form.bankName, accountName: form.accountName, accountNumber: form.accountNumber }),
       })
       toast.success('Payout request submitted!')
       setShowForm(false)
       setForm({ bankName: '', accountName: '', accountNumber: '' })
       onRefresh()
-    } catch (err: any) {
-      toast.error(err.message)
-    } finally {
-      setSubmitting(false)
-    }
+    } catch (err: any) { toast.error(err.message) } finally { setSubmitting(false) }
   }
 
   const paidPayouts = payouts.filter((p: any) => p.status === 'paid')
@@ -535,13 +764,7 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
 
   return (
     <div>
-      <style>{`
-        @keyframes badgePop {
-          0% { transform: scale(0); opacity: 0; }
-          60% { transform: scale(1.25); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
-        }
-      `}</style>
+      <style>{`@keyframes badgePop{0%{transform:scale(0);opacity:0}60%{transform:scale(1.25);opacity:1}100%{transform:scale(1);opacity:1}}`}</style>
 
       <div className="card" style={{ maxWidth: 520, marginBottom: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -550,44 +773,17 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
             <p style={{ fontSize: 28, fontWeight: 500, marginTop: 4, fontFamily: 'var(--font-display)' }}>{formatMVR(pendingEarnings)}</p>
           </div>
           {!alreadyRequested && pendingEarnings > 0 && (
-            <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
-              {showForm ? 'Cancel' : 'Request payout'}
-            </button>
+            <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : 'Request payout'}</button>
           )}
         </div>
-
-        {alreadyRequested && (
-          <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 8, padding: '10px 14px' }}>
-            <p style={{ fontSize: 13, color: 'var(--color-teal-dark)' }}>
-              ✓ Payout request submitted for this month. Next request available in <strong>{nextMonth}</strong>.
-            </p>
-          </div>
-        )}
-
-        {pendingEarnings <= 0 && !alreadyRequested && (
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No pending earnings to request.</p>
-        )}
-
+        {pendingEarnings <= 0 && <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No pending earnings to request.</p>}
         {showForm && (
           <div style={{ marginTop: 16, borderTop: '0.5px solid var(--color-border)', paddingTop: 16 }}>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 14 }}>
-              Enter your bank details for this payout of <strong>{formatMVR(pendingEarnings)}</strong>.
-            </p>
-            <div className="form-group">
-              <label className="form-label">Bank name</label>
-              <input className="form-input" placeholder="e.g. Bank of Maldives" value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Account holder name</label>
-              <input className="form-input" placeholder="Full name as on account" value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Account number</label>
-              <input className="form-input" placeholder="Your account number" value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
-            </div>
-            <button className="btn btn-primary btn-full" onClick={submitRequest} disabled={submitting}>
-              {submitting ? 'Submitting...' : `Request payout of ${formatMVR(pendingEarnings)}`}
-            </button>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 14 }}>Enter your bank details for this payout of <strong>{formatMVR(pendingEarnings)}</strong>.</p>
+            <div className="form-group"><label className="form-label">Bank name</label><input className="form-input" placeholder="e.g. Bank of Maldives" value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} /></div>
+            <div className="form-group"><label className="form-label">Account holder name</label><input className="form-input" placeholder="Full name as on account" value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} /></div>
+            <div className="form-group"><label className="form-label">Account number</label><input className="form-input" placeholder="Your account number" value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} /></div>
+            <button className="btn btn-primary btn-full" onClick={submitRequest} disabled={submitting}>{submitting ? 'Submitting...' : `Request payout of ${formatMVR(pendingEarnings)}`}</button>
           </div>
         )}
       </div>
@@ -617,12 +813,7 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
             {paidPayouts.map((p: any) => {
               const isNew = !celebrated.includes(p.id)
               return (
-                <div key={p.id} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12,
-                  background: isNew ? 'rgba(95, 202, 165, 0.06)' : 'transparent',
-                  transition: 'background 1s ease',
-                }}>
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12, background: isNew ? 'rgba(95,202,165,0.06)' : 'transparent', transition: 'background 1s ease' }}>
                   <div>
                     <p style={{ fontSize: 14, fontWeight: 500 }}>{formatMVR(p.amount)}</p>
                     <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_number}</p>
@@ -630,24 +821,9 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
                       Requested {new Date(p.created_at).toLocaleDateString()}
                       {p.paid_at ? ` · Paid ${new Date(p.paid_at).toLocaleDateString()}` : ''}
                     </p>
-                    {p.status === 'paid' && (
-                      <button
-                        className="btn btn-sm"
-                        style={{ marginTop: 6, fontSize: 11 }}
-                        onClick={() => window.open(`/payout/${p.id}`, '_blank')}
-                      >
-                        📄 View remittance
-                      </button>
-                    )}
+                    <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11 }} onClick={() => onViewRemittance(p)}>📄 View remittance</button>
                   </div>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)',
-                    fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 20,
-                    animation: isNew ? 'badgePop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
-                  }}>
-                    ✓ paid
-                  </span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', fontSize: 12, fontWeight: 500, padding: '4px 12px', borderRadius: 20, animation: isNew ? 'badgePop 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none' }}>✓ paid</span>
                 </div>
               )
             })}
@@ -663,7 +839,6 @@ function ExportTab({ onExport, orders }: any) {
   const yearStart = `${new Date().getFullYear()}-01-01`
   const [from, setFrom] = useState(yearStart)
   const [to, setTo] = useState(today)
-
   const filtered = orders.filter((o: any) => o.created_at >= from && o.created_at <= to + 'T23:59:59' && o.status === 'approved')
   const gross = filtered.reduce((s: number, o: any) => s + o.original_price, 0)
   const earned = filtered.reduce((s: number, o: any) => s + o.artist_earnings, 0)
@@ -687,15 +862,7 @@ function ExportTab({ onExport, orders }: any) {
 }
 
 function ProfileTab({ profile, onSave }: any) {
-  const [form, setForm] = useState({
-    bio: profile.bio || '',
-    location: profile.location || '',
-    instagram: profile.instagram || '',
-    linkedin: profile.linkedin || '',
-    facebook: profile.facebook || '',
-    tiktok: profile.tiktok || '',
-    website: profile.website || '',
-  })
+  const [form, setForm] = useState({ bio: profile.bio || '', location: profile.location || '', instagram: profile.instagram || '', linkedin: profile.linkedin || '', facebook: profile.facebook || '', tiktok: profile.tiktok || '', website: profile.website || '' })
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatar_url || null)
   const [saving, setSaving] = useState(false)
@@ -724,48 +891,28 @@ function ProfileTab({ profile, onSave }: any) {
       await supabase.from('profiles').update({ ...form, avatar_url: avatarUrl }).eq('id', profile.id)
       onSave({ ...form, avatar_url: avatarUrl })
       toast.success('Profile saved!')
-    } catch (err: any) {
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
-    }
+    } catch (err: any) { toast.error(err.message) } finally { setSaving(false) }
   }
 
   return (
     <div className="card" style={{ maxWidth: 520 }}>
       <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>Your public profile</p>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
-        <div
-          style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-background-secondary)', flexShrink: 0, cursor: 'pointer', border: '2px dashed var(--color-border)' }}
-          onClick={() => document.getElementById('avatar-input')?.click()}
-        >
-          {avatarPreview ? (
-            <img src={avatarPreview} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>👤</div>
-          )}
+        <div style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-background-secondary)', flexShrink: 0, cursor: 'pointer', border: '2px dashed var(--color-border)' }} onClick={() => document.getElementById('avatar-input')?.click()}>
+          {avatarPreview ? <img src={avatarPreview} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>👤</div>}
         </div>
-        <div>
-          <p style={{ fontSize: 13, fontWeight: 500 }}>Profile picture</p>
-          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Tap to upload · JPG or PNG · shown on storefront</p>
-        </div>
+        <div><p style={{ fontSize: 13, fontWeight: 500 }}>Profile picture</p><p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Tap to upload · JPG or PNG · shown on storefront</p></div>
       </div>
       <input type="file" id="avatar-input" accept="image/*" style={{ display: 'none' }} onChange={handleAvatar} />
-
       <div className="form-group"><label className="form-label">Bio</label><textarea className="form-input" value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} placeholder="Tell buyers about yourself and your art..." /></div>
       <div className="form-group"><label className="form-label">Island / Location</label><input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="e.g. Malé, Kaafu Atoll" /></div>
-
       <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4, marginBottom: 10 }}>Social links</p>
       <div className="form-group"><label className="form-label">Instagram</label><input className="form-input" value={form.instagram} onChange={e => setForm({ ...form, instagram: e.target.value })} placeholder="@yourusername" /></div>
       <div className="form-group"><label className="form-label">TikTok</label><input className="form-input" value={form.tiktok} onChange={e => setForm({ ...form, tiktok: e.target.value })} placeholder="@yourusername" /></div>
       <div className="form-group"><label className="form-label">Facebook</label><input className="form-input" value={form.facebook} onChange={e => setForm({ ...form, facebook: e.target.value })} placeholder="facebook.com/yourpage" /></div>
       <div className="form-group"><label className="form-label">LinkedIn</label><input className="form-input" value={form.linkedin} onChange={e => setForm({ ...form, linkedin: e.target.value })} placeholder="linkedin.com/in/yourprofile" /></div>
       <div className="form-group"><label className="form-label">Website</label><input className="form-input" value={form.website} onChange={e => setForm({ ...form, website: e.target.value })} placeholder="https://yoursite.com" /></div>
-
-      <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>
-        {saving ? 'Saving...' : 'Save profile'}
-      </button>
+      <button className="btn btn-primary btn-full" onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save profile'}</button>
     </div>
   )
 }
