@@ -154,8 +154,25 @@ function AdminDashboard() {
                     {o.offer_label ? ` · ${o.offer_label} −${o.offer_pct}%` : ''}
                     {' · '}{o.delivery_method === 'pickup' ? 'Pickup' : `Deliver → ${o.delivery_island}`}
                   </p>
-                  {o.slip_url && <p style={{ fontSize: 12, color: 'var(--color-teal)', marginTop: 2 }}>✓ Slip uploaded</p>}
-                </div>
+{o.slip_url && (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+    <p style={{ fontSize: 12, color: 'var(--color-teal)' }}>✓ Slip uploaded</p>
+    <button
+      className="btn btn-sm"
+      style={{ fontSize: 11, padding: '2px 8px' }}
+      onClick={async () => {
+        const supabase = createClient()
+        const { data } = await supabase.storage
+          .from('order-slips')
+          .createSignedUrl(o.slip_url, 60)
+        if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+        else toast.error('Could not load slip')
+      }}
+    >
+      View slip
+    </button>
+  </div>
+)}                </div>
                 {o.status === 'pending' && (
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                     <button className="btn btn-sm btn-success" onClick={() => handleOrderAction(o.invoice_number, 'approve')}>Approve</button>
