@@ -93,7 +93,16 @@ export default function ArtistDashboard() {
           )}
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
-            <span className="sku-tag">{profile?.artist_code ? `FP-${profile.artist_code}` : ''}</span>
+            <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+{o.status === 'approved' && (
+  <button
+    className="btn btn-sm"
+    style={{ marginTop: 6, fontSize: 11, display: 'block' }}
+    onClick={() => window.open(`/invoice/${o.invoice_number}`, '_blank')}
+  >
+    📄 View invoice
+  </button>
+)}
           </div>
         </div>
 
