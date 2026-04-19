@@ -248,4 +248,8 @@ function TrackOrderContent() {
 
 export default function TrackOrderPage() {
   return (
-    <Suspense fallback={<div style={{ padding: 60, textAlig
+    <Suspense fallback={<div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading...</div>}>
+      <TrackOrderContent />
+    </Suspense>
+  )
+}
