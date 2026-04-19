@@ -136,6 +136,10 @@ function buildInvoiceHTML(d: InvoiceData): string {
           : 'Your print will be prepared and dispatched to your address.'}
       </p>
 
+      <p style="font-size:12px;color:#888;line-height:1.6;margin:0 0 16px">
+        Questions? Reply to this email or contact us at <a href="mailto:hello@fineprintmv.com" style="color:#1D9E75">hello@fineprintmv.com</a>
+      </p>
+
       <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0">
         All artwork is protected by copyright and remains the intellectual property of the respective artist.
         Prints are produced and fulfilled exclusively by FinePrint Studio.
@@ -157,6 +161,7 @@ export async function sendInvoiceEmail(data: InvoiceData) {
   try {
     await resend.emails.send({
       from: 'FinePrint Studio <hello@fineprintmv.com>',
+      reply_to: 'hello@fineprintmv.com',
       to: data.buyerEmail,
       subject: `Your FinePrint Studio order — ${data.invoiceNumber}`,
       html,
@@ -186,8 +191,6 @@ export async function sendPayoutEmail(data: PayoutData) {
 </head>
 <body style="margin:0;padding:0;background:#f0f0ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
   <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e0ddd6">
-
-    <!-- Header -->
     <div style="background:#1a1a1a;padding:28px 32px 24px">
       <div style="font-size:20px;font-weight:600;color:#ffffff;letter-spacing:0.02em">
         Fine<span style="color:#9FE1CB">Print</span> Studio
@@ -196,53 +199,33 @@ export async function sendPayoutEmail(data: PayoutData) {
         fineprintmv.com · hello@fineprintmv.com
       </div>
     </div>
-
-    <!-- Body -->
     <div style="padding:28px 32px">
       <div style="text-align:center;margin-bottom:24px">
         <div style="font-size:40px;margin-bottom:8px">🎉</div>
         <h1 style="font-size:22px;font-weight:600;color:#111;margin:0 0 6px">Your payout is on its way!</h1>
         <p style="font-size:14px;color:#888;margin:0">Hi ${data.artistName}, we've processed your payout.</p>
       </div>
-
       <div style="background:#f0faf6;border:1px solid #9FE1CB;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
         <p style="font-size:12px;color:#1D9E75;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px">Amount transferred</p>
         <p style="font-size:32px;font-weight:600;color:#111;margin:0">MVR ${data.amount.toLocaleString()}</p>
         <p style="font-size:12px;color:#888;margin:6px 0 0">${data.paidAt}</p>
       </div>
-
       <div style="margin-bottom:24px">
         <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#aaa;margin:0 0 10px">Transfer details</p>
         <table style="width:100%;border-collapse:collapse">
-          <tr style="border-bottom:1px solid #f4f4f0">
-            <td style="padding:10px 0;font-size:13px;color:#888">Bank</td>
-            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">${data.bankName}</td>
-          </tr>
-          <tr style="border-bottom:1px solid #f4f4f0">
-            <td style="padding:10px 0;font-size:13px;color:#888">Account number</td>
-            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500;font-family:monospace">${data.accountNumber}</td>
-          </tr>
-          <tr style="border-bottom:1px solid #f4f4f0">
-            <td style="padding:10px 0;font-size:13px;color:#888">Amount</td>
-            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">MVR ${data.amount.toLocaleString()}</td>
-          </tr>
-          <tr>
-            <td style="padding:10px 0;font-size:13px;color:#888">Date</td>
-            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">${data.paidAt}</td>
-          </tr>
+          <tr style="border-bottom:1px solid #f4f4f0"><td style="padding:10px 0;font-size:13px;color:#888">Bank</td><td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">${data.bankName}</td></tr>
+          <tr style="border-bottom:1px solid #f4f4f0"><td style="padding:10px 0;font-size:13px;color:#888">Account number</td><td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500;font-family:monospace">${data.accountNumber}</td></tr>
+          <tr style="border-bottom:1px solid #f4f4f0"><td style="padding:10px 0;font-size:13px;color:#888">Amount</td><td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">MVR ${data.amount.toLocaleString()}</td></tr>
+          <tr><td style="padding:10px 0;font-size:13px;color:#888">Date</td><td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">${data.paidAt}</td></tr>
         </table>
       </div>
-
       <p style="font-size:13px;color:#888;line-height:1.6;margin:0 0 16px">
-        Please allow 1–2 business days for the transfer to appear in your account. If you have any questions, reply to this email.
+        Please allow 1–2 business days for the transfer to appear in your account. Questions? Reply to this email.
       </p>
-
       <p style="font-size:13px;color:#888;line-height:1.6;margin:0">
         Thank you for being part of FinePrint Studio. We look forward to many more sales together! 🎨
       </p>
     </div>
-
-    <!-- Footer -->
     <div style="background:#f7f7f5;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e4">
       <span style="font-size:11px;color:#aaa">FinePrint Studio · Malé, Maldives</span>
       <a href="https://shop.fineprintmv.com" style="font-size:11px;color:#1D9E75;text-decoration:none">shop.fineprintmv.com</a>
@@ -254,6 +237,7 @@ export async function sendPayoutEmail(data: PayoutData) {
   try {
     await resend.emails.send({
       from: 'FinePrint Studio <hello@fineprintmv.com>',
+      reply_to: 'hello@fineprintmv.com',
       to: data.artistEmail,
       subject: `Your payout of MVR ${data.amount.toLocaleString()} has been processed 🎉`,
       html,
@@ -262,6 +246,7 @@ export async function sendPayoutEmail(data: PayoutData) {
     console.error('Failed to send payout email:', err)
   }
 }
+
 interface OrderStatusData {
   buyerName: string
   buyerEmail: string
@@ -298,8 +283,11 @@ export async function sendReadyForPickupEmail(data: OrderStatusData) {
     <a href="tel:9998124" style="font-size:20px;font-weight:600;color:#1a1a1a;text-decoration:none;display:block;margin:8px 0">📞 9998124</a>
     <p style="font-size:12px;color:#888;margin:8px 0 0">Studio hours: Sun – Thu, 9am – 6pm</p>
   </div>
-  <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0">
+  <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0 0 12px">
     Please bring your invoice number <strong style="font-family:monospace">${data.invoiceNumber}</strong> when you collect your print.
+  </p>
+  <p style="font-size:12px;color:#888;line-height:1.6;margin:0">
+    Questions? Reply to this email or call us at <a href="tel:9998124" style="color:#1D9E75">9998124</a>.
   </p>
 </div>
 <div style="background:#f7f7f5;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e4">
@@ -311,6 +299,7 @@ export async function sendReadyForPickupEmail(data: OrderStatusData) {
   try {
     await resend.emails.send({
       from: 'FinePrint Studio <hello@fineprintmv.com>',
+      reply_to: 'hello@fineprintmv.com',
       to: data.buyerEmail,
       subject: `Your print is ready for pickup! — ${data.invoiceNumber}`,
       html,
@@ -343,9 +332,11 @@ export async function sendOutForDeliveryEmail(data: OrderStatusData) {
     <p style="font-size:13px;color:#555;margin:0 0 10px">${data.deliveryIsland || ''}, ${data.deliveryAtoll || ''}, Maldives</p>
     <p style="font-size:13px;color:#555;margin:0">Please expect a call from us on <strong>9998124</strong> to arrange delivery at your convenience.</p>
   </div>
-  <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0">
+  <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0 0 12px">
     Your invoice number is <strong style="font-family:monospace">${data.invoiceNumber}</strong>.
-    If you have any questions, reply to this email or call us at 9998124.
+  </p>
+  <p style="font-size:12px;color:#888;line-height:1.6;margin:0">
+    Questions? Reply to this email or call us at <a href="tel:9998124" style="color:#1D9E75">9998124</a>.
   </p>
 </div>
 <div style="background:#f7f7f5;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e4">
@@ -357,6 +348,7 @@ export async function sendOutForDeliveryEmail(data: OrderStatusData) {
   try {
     await resend.emails.send({
       from: 'FinePrint Studio <hello@fineprintmv.com>',
+      reply_to: 'hello@fineprintmv.com',
       to: data.buyerEmail,
       subject: `Your print is on its way! — ${data.invoiceNumber}`,
       html,
