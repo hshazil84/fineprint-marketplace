@@ -633,6 +633,15 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
                     <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
                       Requested {new Date(p.created_at).toLocaleDateString()}
                       {p.paid_at ? ` · Paid ${new Date(p.paid_at).toLocaleDateString()}` : ''}
+                      {p.status === 'paid' && (
+  <button
+    className="btn btn-sm"
+    style={{ marginTop: 6, fontSize: 11, display: 'block' }}
+    onClick={() => window.open(`/payout/${p.id}`, '_blank')}
+  >
+    📄 View remittance
+  </button>
+)}
                     </p>
                   </div>
                   <span style={{
