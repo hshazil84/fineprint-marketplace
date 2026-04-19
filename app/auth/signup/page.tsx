@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { notifyNewArtist } from '@/lib/telegram'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -12,27 +11,43 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
+  function generateArtistCode(name: string): string {
+    const words = name.trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return 'FP'
+    if (words.length === 1) return words[0].slice(0, 3).toUpperCase()
+    return words.map(w => w[0].toUpperCase()).join('').slice(0, 4)
+  }
+
+  async function ensureUniqueCode(baseCode: string): Promise<string> {
+    let code = baseCode
+    let attempt = 0
+    while (true) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('artist_code', code)
+        .maybeSingle()
+      if (!data) return code
+      attempt++
+      code = baseCode + attempt
+    }
+  }
+
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return }
     setLoading(true)
 
-    // Create auth user
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    })
+    const { data, error } = await supabase.auth.signUp({ email: form.email, password: form.password })
     if (error) { toast.error(error.message); setLoading(false); return }
     if (!data.user) { toast.error('Something went wrong'); setLoading(false); return }
 
-    // Generate artist code if needed
-    let artistCode = null
+    let artistCode: string | null = null
     if (form.role === 'artist') {
-      const { data: codeData } = await supabase.rpc('generate_artist_code', { full_name: form.name })
-      artistCode = codeData
+      const base = generateArtistCode(form.name)
+      artistCode = await ensureUniqueCode(base)
     }
 
-    // Create profile
     const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       full_name: form.name,
@@ -44,12 +59,17 @@ export default function SignupPage() {
 
     if (profileError) { toast.error(profileError.message); setLoading(false); return }
 
-    // Notify admin if new artist
     if (form.role === 'artist') {
-      await notifyNewArtist({ name: form.name, email: form.email, location: form.location })
+      try {
+        await fetch('/api/notify/artist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: form.name, email: form.email, location: form.location }),
+        })
+      } catch {}
     }
 
-    toast.success('Account created! Check your email to verify.')
+    toast.success('Account created!')
     if (form.role === 'artist') router.push('/artist/dashboard')
     else router.push('/storefront')
   }
@@ -89,6 +109,21 @@ export default function SignupPage() {
                 <input className="form-input" placeholder="e.g. Malé, Kaafu Atoll" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
               </div>
             )}
+            {form.role === 'artist' && form.name && (
+              <div style={{ background: 'var(--color-teal-light)', borderRadius: 8, padding: '8px 12px', marginBottom: 8 }}>
+                <p style={{ fontSize: 12, color: 'var(--color-teal-dark)' }}>
+                  Your artist code will be: <strong>FP-{generateArtistCode(form.name)}</strong>
+                </p>
+              </div>
+            )}
+            <div className="form-group" style={{ marginTop: 8 }}>
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
+                <input type="checkbox" required style={{ marginTop: 2, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
+                  I agree to the <a href="/terms" style={{ color: 'var(--color-teal)' }}>Terms & Conditions</a> and understand that pricing structure and platform fees are confidential between me and FinePrint Studio.
+                </span>
+              </label>
+            </div>
             <button type="submit" className="btn btn-primary btn-full" style={{ marginTop: 8 }} disabled={loading}>
               {loading ? 'Creating account...' : 'Create account'}
             </button>
