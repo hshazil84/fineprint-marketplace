@@ -888,8 +888,8 @@ function ProfileTab({ profile, onSave }: any) {
         const { data } = supabase.storage.from('avatars').getPublicUrl(path)
         avatarUrl = data.publicUrl
       }
-      await supabase.from('profiles').update({ ...form, avatar_url: avatarUrl }).eq('id', profile.id)
-      onSave({ ...form, avatar_url: avatarUrl })
+      const { error: uploadError } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true, contentType: avatarFile.type })
+if (uploadError) throw new Error(`Avatar upload failed: ${uploadError.message}`)
       toast.success('Profile saved!')
     } catch (err: any) { toast.error(err.message) } finally { setSaving(false) }
   }
