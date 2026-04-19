@@ -14,6 +14,7 @@ interface InvoiceData {
   artistName: string
   printSize: string
   originalPrice: number
+  printingFee: number
   offerLabel?: string
   offerPct?: number
   discountAmount?: number
@@ -109,9 +110,14 @@ function buildInvoiceHTML(d: InvoiceData): string {
       </table>
 
       <!-- Totals -->
-      <table style="width:200px;margin-left:auto;border-collapse:collapse">
-        ${hasOffer ? `<tr><td style="color:#888;padding:4px 0;font-size:13px">Original price</td><td style="text-align:right;padding:4px 0;font-size:13px">MVR ${d.originalPrice}</td></tr>
-        <tr><td style="color:#c05030;padding:4px 0;font-size:13px">${d.offerLabel} (−${d.offerPct}%)</td><td style="text-align:right;padding:4px 0;font-size:13px;color:#c05030">− MVR ${d.discountAmount}</td></tr>` : ''}
+      <table style="width:220px;margin-left:auto;border-collapse:collapse">
+        ${hasOffer ? `
+        <tr><td style="color:#888;padding:4px 0;font-size:13px">Original price</td><td style="text-align:right;padding:4px 0;font-size:13px">MVR ${d.originalPrice}</td></tr>
+        <tr><td style="color:#c05030;padding:4px 0;font-size:13px">${d.offerLabel} (−${d.offerPct}%)</td><td style="text-align:right;padding:4px 0;font-size:13px;color:#c05030">− MVR ${d.discountAmount}</td></tr>
+        ` : `
+        <tr><td style="color:#888;padding:4px 0;font-size:13px">Artwork price</td><td style="text-align:right;padding:4px 0;font-size:13px">MVR ${d.originalPrice}</td></tr>
+        `}
+        <tr><td style="color:#888;padding:4px 0;font-size:13px">${d.printSize} giclée printing</td><td style="text-align:right;padding:4px 0;font-size:13px">MVR ${d.printingFee}</td></tr>
         ${deliveryRow}
         <tr style="border-top:1px solid #e8e8e4">
           <td style="padding:10px 0 4px;font-size:15px;font-weight:600;color:#111">Total paid</td>
@@ -157,5 +163,102 @@ export async function sendInvoiceEmail(data: InvoiceData) {
     })
   } catch (err) {
     console.error('Failed to send invoice email:', err)
+  }
+}
+
+interface PayoutData {
+  artistName: string
+  artistEmail: string
+  amount: number
+  bankName: string
+  accountNumber: string
+  paidAt: string
+}
+
+export async function sendPayoutEmail(data: PayoutData) {
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Payout Confirmation</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f0ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <div style="max-width:520px;margin:32px auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e0ddd6">
+
+    <!-- Header -->
+    <div style="background:#1a1a1a;padding:28px 32px 24px">
+      <div style="font-size:20px;font-weight:600;color:#ffffff;letter-spacing:0.02em">
+        Fine<span style="color:#9FE1CB">Print</span> Studio
+      </div>
+      <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px">
+        fineprintmv.com · hello@fineprintmv.com
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:28px 32px">
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="font-size:40px;margin-bottom:8px">🎉</div>
+        <h1 style="font-size:22px;font-weight:600;color:#111;margin:0 0 6px">Your payout is on its way!</h1>
+        <p style="font-size:14px;color:#888;margin:0">Hi ${data.artistName}, we've processed your payout.</p>
+      </div>
+
+      <div style="background:#f0faf6;border:1px solid #9FE1CB;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px">
+        <p style="font-size:12px;color:#1D9E75;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 6px">Amount transferred</p>
+        <p style="font-size:32px;font-weight:600;color:#111;margin:0">MVR ${data.amount.toLocaleString()}</p>
+        <p style="font-size:12px;color:#888;margin:6px 0 0">${data.paidAt}</p>
+      </div>
+
+      <div style="margin-bottom:24px">
+        <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#aaa;margin:0 0 10px">Transfer details</p>
+        <table style="width:100%;border-collapse:collapse">
+          <tr style="border-bottom:1px solid #f4f4f0">
+            <td style="padding:10px 0;font-size:13px;color:#888">Bank</td>
+            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">${data.bankName}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f4f4f0">
+            <td style="padding:10px 0;font-size:13px;color:#888">Account number</td>
+            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500;font-family:monospace">${data.accountNumber}</td>
+          </tr>
+          <tr style="border-bottom:1px solid #f4f4f0">
+            <td style="padding:10px 0;font-size:13px;color:#888">Amount</td>
+            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">MVR ${data.amount.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 0;font-size:13px;color:#888">Date</td>
+            <td style="padding:10px 0;font-size:13px;color:#111;text-align:right;font-weight:500">${data.paidAt}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="font-size:13px;color:#888;line-height:1.6;margin:0 0 16px">
+        Please allow 1–2 business days for the transfer to appear in your account. If you have any questions, reply to this email.
+      </p>
+
+      <p style="font-size:13px;color:#888;line-height:1.6;margin:0">
+        Thank you for being part of FinePrint Studio. We look forward to many more sales together! 🎨
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background:#f7f7f5;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e4">
+      <span style="font-size:11px;color:#aaa">FinePrint Studio · Malé, Maldives</span>
+      <a href="https://shop.fineprintmv.com" style="font-size:11px;color:#1D9E75;text-decoration:none">shop.fineprintmv.com</a>
+    </div>
+  </div>
+</body>
+</html>`
+
+  try {
+    await resend.emails.send({
+      from: 'FinePrint Studio <hello@fineprintmv.com>',
+      to: data.artistEmail,
+      subject: `Your payout of MVR ${data.amount.toLocaleString()} has been processed 🎉`,
+      html,
+    })
+  } catch (err) {
+    console.error('Failed to send payout email:', err)
   }
 }
