@@ -100,13 +100,14 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
         .upload(slipPath, slipFile, { contentType: slipFile.type })
       if (uploadError) throw uploadError
 
+      const paidAt = new Date().toISOString()
+
       const { error } = await supabase
         .from('payouts')
-        .update({ status: 'paid', slip_url: slipPath, paid_at: new Date().toISOString() })
+        .update({ status: 'paid', slip_url: slipPath, paid_at: paidAt })
         .eq('id', payout.id)
       if (error) throw error
 
-      // Update all unpaid orders for this artist to paid
       await supabase
         .from('orders')
         .update({ payout_status: 'paid' })
@@ -114,7 +115,21 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
         .eq('payout_status', 'unpaid')
         .eq('status', 'approved')
 
-      toast.success('Payout marked as paid!')
+      // Send payout confirmation email to artist
+      await fetch('/api/notify/payout-paid', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artistName:    payout.profiles?.full_name,
+          artistEmail:   payout.profiles?.email,
+          amount:        payout.amount,
+          bankName:      payout.bank_name,
+          accountNumber: payout.account_number,
+          paidAt:        new Date(paidAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+        }),
+      })
+
+      toast.success('Payout marked as paid — artist notified!')
       onPaid()
       onClose()
     } catch (err: any) {
@@ -136,7 +151,6 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
         </div>
         <div style={{ padding: 20 }}>
-          {/* Bank details */}
           <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
             <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 10 }}>Bank transfer details</p>
             {[
@@ -150,11 +164,8 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: k === 'Amount' ? 500 : 400, fontFamily: k === 'Account number' ? 'var(--font-mono)' : 'inherit' }}>{v}</span>
                   {k === 'Account number' && (
-                    <button
-                      className="btn btn-sm"
-                      style={{ fontSize: 11, padding: '2px 8px' }}
-                      onClick={() => { navigator.clipboard.writeText(v as string); toast.success('Copied!') }}
-                    >
+                    <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={() => { navigator.clipboard.writeText(v as string); toast.success('Copied!') }}>
                       Copy
                     </button>
                   )}
@@ -163,7 +174,6 @@ function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => 
             ))}
           </div>
 
-          {/* Upload slip */}
           <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Upload payment confirmation slip</p>
           <div className="upload-zone" onClick={() => document.getElementById('payout-slip-input')?.click()} style={{ marginBottom: 12 }}>
             {slipPreview ? (
@@ -232,7 +242,7 @@ function AdminDashboard() {
   async function fetchPayouts() {
     const { data } = await supabase
       .from('payouts')
-      .select('*, profiles:artist_id(full_name, artist_code)')
+      .select('*, profiles:artist_id(full_name, artist_code, email)')
       .order('created_at', { ascending: false })
     setPayouts(data || [])
   }
@@ -361,7 +371,6 @@ function AdminDashboard() {
         {/* ARTISTS */}
         {tab === 'artists' && (
           <div>
-            {/* Pending payout requests */}
             {pendingPayouts.length > 0 && (
               <div style={{ marginBottom: 24 }}>
                 <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
@@ -373,31 +382,19 @@ function AdminDashboard() {
                     <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{p.profiles?.full_name} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)' }}>FP-{p.profiles?.artist_code}</span></p>
-                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          {p.bank_name} · {p.account_name}
-                        </p>
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_name}</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{p.account_number}</span>
-                          <button
-                            className="btn btn-sm"
-                            style={{ fontSize: 11, padding: '2px 8px' }}
-                            onClick={() => { navigator.clipboard.writeText(p.account_number); toast.success('Account number copied!') }}
-                          >
+                          <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px' }}
+                            onClick={() => { navigator.clipboard.writeText(p.account_number); toast.success('Account number copied!') }}>
                             Copy
                           </button>
                         </div>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                          Requested {new Date(p.created_at).toLocaleDateString()}
-                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Requested {new Date(p.created_at).toLocaleDateString()}</p>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>{formatMVR(p.amount)}</p>
-                        <button
-                          className="btn btn-sm btn-success"
-                          onClick={() => setSelectedPayout(p)}
-                        >
-                          Pay & confirm
-                        </button>
+                        <button className="btn btn-sm btn-success" onClick={() => setSelectedPayout(p)}>Pay & confirm</button>
                       </div>
                     </div>
                   ))}
@@ -405,7 +402,6 @@ function AdminDashboard() {
               </div>
             )}
 
-            {/* All artists */}
             <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>All artists</p>
             <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
               {artists.length === 0 ? (
