@@ -1,10 +1,9 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import Link from 'next/link'
-import { Suspense } from 'react'
 
 const STATUS_STEPS = [
   { key: 'pending', label: 'Order received', desc: 'Your order has been placed and is awaiting payment verification.' },
