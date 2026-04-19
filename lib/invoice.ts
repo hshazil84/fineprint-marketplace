@@ -262,3 +262,106 @@ export async function sendPayoutEmail(data: PayoutData) {
     console.error('Failed to send payout email:', err)
   }
 }
+interface OrderStatusData {
+  buyerName: string
+  buyerEmail: string
+  invoiceNumber: string
+  orderSku: string
+  artworkTitle: string
+  printSize: string
+  deliveryMethod: 'delivery' | 'pickup'
+  deliveryIsland?: string
+  deliveryAtoll?: string
+}
+
+export async function sendReadyForPickupEmail(data: OrderStatusData) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Your print is ready!</title></head>
+<body style="margin:0;padding:0;background:#f0f0ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div style="max-width:520px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e0ddd6">
+<div style="background:#1a1a1a;padding:28px 32px">
+  <div style="font-size:20px;font-weight:600;color:#fff">Fine<span style="color:#9FE1CB">Print</span> Studio</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px">fineprintmv.com · hello@fineprintmv.com</div>
+</div>
+<div style="padding:28px 32px">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:40px;margin-bottom:8px">🎨</div>
+    <h1 style="font-size:22px;font-weight:600;color:#111;margin:0 0 6px">Your print is ready!</h1>
+    <p style="font-size:14px;color:#888;margin:0">Hi ${data.buyerName}, your print is ready for collection.</p>
+  </div>
+  <div style="background:#f0faf6;border:1px solid #9FE1CB;border-radius:12px;padding:20px;margin-bottom:24px">
+    <p style="font-size:13px;font-weight:500;color:#111;margin:0 0 8px">${data.artworkTitle} — ${data.printSize}</p>
+    <p style="font-size:12px;color:#888;font-family:monospace;margin:0">${data.orderSku}</p>
+  </div>
+  <div style="background:#f7f7f5;border-radius:12px;padding:20px;margin-bottom:24px">
+    <p style="font-size:13px;font-weight:500;color:#111;margin:0 0 10px">🏪 Pickup at FinePrint Studio</p>
+    <p style="font-size:13px;color:#555;margin:0 0 6px">Please call us to arrange a convenient pickup time:</p>
+    <a href="tel:9998124" style="font-size:20px;font-weight:600;color:#1a1a1a;text-decoration:none;display:block;margin:8px 0">📞 9998124</a>
+    <p style="font-size:12px;color:#888;margin:8px 0 0">Studio hours: Sun – Thu, 9am – 6pm</p>
+  </div>
+  <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0">
+    Please bring your invoice number <strong style="font-family:monospace">${data.invoiceNumber}</strong> when you collect your print.
+  </p>
+</div>
+<div style="background:#f7f7f5;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e4">
+  <span style="font-size:11px;color:#aaa">FinePrint Studio · Malé, Maldives</span>
+  <a href="https://fineprintmv.com" style="font-size:11px;color:#1D9E75;text-decoration:none">fineprintmv.com</a>
+</div>
+</div></body></html>`
+
+  try {
+    await resend.emails.send({
+      from: 'FinePrint Studio <hello@fineprintmv.com>',
+      to: data.buyerEmail,
+      subject: `Your print is ready for pickup! — ${data.invoiceNumber}`,
+      html,
+    })
+  } catch (err) {
+    console.error('Failed to send ready for pickup email:', err)
+  }
+}
+
+export async function sendOutForDeliveryEmail(data: OrderStatusData) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Your print is on its way!</title></head>
+<body style="margin:0;padding:0;background:#f0f0ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+<div style="max-width:520px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e0ddd6">
+<div style="background:#1a1a1a;padding:28px 32px">
+  <div style="font-size:20px;font-weight:600;color:#fff">Fine<span style="color:#9FE1CB">Print</span> Studio</div>
+  <div style="font-size:11px;color:rgba(255,255,255,0.45);margin-top:3px">fineprintmv.com · hello@fineprintmv.com</div>
+</div>
+<div style="padding:28px 32px">
+  <div style="text-align:center;margin-bottom:24px">
+    <div style="font-size:40px;margin-bottom:8px">📦</div>
+    <h1 style="font-size:22px;font-weight:600;color:#111;margin:0 0 6px">Your print is on its way!</h1>
+    <p style="font-size:14px;color:#888;margin:0">Hi ${data.buyerName}, your order has been dispatched.</p>
+  </div>
+  <div style="background:#f0faf6;border:1px solid #9FE1CB;border-radius:12px;padding:20px;margin-bottom:24px">
+    <p style="font-size:13px;font-weight:500;color:#111;margin:0 0 8px">${data.artworkTitle} — ${data.printSize}</p>
+    <p style="font-size:12px;color:#888;font-family:monospace;margin:0">${data.orderSku}</p>
+  </div>
+  <div style="background:#f7f7f5;border-radius:12px;padding:20px;margin-bottom:24px">
+    <p style="font-size:13px;font-weight:500;color:#111;margin:0 0 10px">📍 Delivering to</p>
+    <p style="font-size:13px;color:#555;margin:0 0 10px">${data.deliveryIsland || ''}, ${data.deliveryAtoll || ''}, Maldives</p>
+    <p style="font-size:13px;color:#555;margin:0">Please expect a call from us on <strong>9998124</strong> to arrange delivery at your convenience.</p>
+  </div>
+  <p style="font-size:12px;color:#aaa;line-height:1.6;margin:0">
+    Your invoice number is <strong style="font-family:monospace">${data.invoiceNumber}</strong>.
+    If you have any questions, reply to this email or call us at 9998124.
+  </p>
+</div>
+<div style="background:#f7f7f5;padding:14px 32px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e8e8e4">
+  <span style="font-size:11px;color:#aaa">FinePrint Studio · Malé, Maldives</span>
+  <a href="https://fineprintmv.com" style="font-size:11px;color:#1D9E75;text-decoration:none">fineprintmv.com</a>
+</div>
+</div></body></html>`
+
+  try {
+    await resend.emails.send({
+      from: 'FinePrint Studio <hello@fineprintmv.com>',
+      to: data.buyerEmail,
+      subject: `Your print is on its way! — ${data.invoiceNumber}`,
+      html,
+    })
+  } catch (err) {
+    console.error('Failed to send out for delivery email:', err)
+  }
+}
