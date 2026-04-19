@@ -17,9 +17,7 @@ function SlipModal({ order, onClose, onAction }: { order: any, onClose: () => vo
   useEffect(() => {
     async function load() {
       if (order.slip_url) {
-        const { data } = await supabase.storage
-          .from('order-slips')
-          .createSignedUrl(order.slip_url, 120)
+        const { data } = await supabase.storage.from('order-slips').createSignedUrl(order.slip_url, 120)
         if (data?.signedUrl) setSlipUrl(data.signedUrl)
       }
       setLoading(false)
@@ -28,41 +26,24 @@ function SlipModal({ order, onClose, onAction }: { order: any, onClose: () => vo
   }, [order])
 
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 520, overflow: 'hidden', position: 'relative' }}>
-        {/* Header */}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 520, overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
           <div>
             <p style={{ fontSize: 14, fontWeight: 500 }}>{order.invoice_number}</p>
-            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-              {order.artworks?.title} · {order.buyer_name} · {formatMVR(order.total_paid)}
-            </p>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{order.artworks?.title} · {order.buyer_name} · {formatMVR(order.total_paid)}</p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)', padding: '0 4px' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
         </div>
-
-        {/* Slip image */}
         <div style={{ padding: 20 }}>
           {loading ? (
-            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
-              Loading slip...
-            </div>
+            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>Loading slip...</div>
           ) : slipUrl ? (
-            <img
-              src={slipUrl}
-              alt="Transfer slip"
-              style={{ width: '100%', maxHeight: 340, objectFit: 'contain', borderRadius: 8, border: '0.5px solid var(--color-border)', background: '#f9f9f9' }}
-            />
+            <img src={slipUrl} alt="Transfer slip" style={{ width: '100%', maxHeight: 340, objectFit: 'contain', borderRadius: 8, border: '0.5px solid var(--color-border)', background: '#f9f9f9' }} />
           ) : (
-            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13, background: 'var(--color-background-secondary)', borderRadius: 8 }}>
-              No slip image found
-            </div>
+            <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13, background: 'var(--color-background-secondary)', borderRadius: 8 }}>No slip image found</div>
           )}
-
-          {/* Order details */}
           <div style={{ marginTop: 16, background: 'var(--color-background-secondary)', borderRadius: 8, padding: '12px 14px' }}>
             {[
               ['Artwork', `${order.artworks?.title} — ${order.print_size}`],
@@ -77,29 +58,129 @@ function SlipModal({ order, onClose, onAction }: { order: any, onClose: () => vo
               </div>
             ))}
           </div>
-
-          {/* Actions */}
           {order.status === 'pending' && (
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <button
-                className="btn btn-danger btn-full"
-                onClick={() => { onAction(order.invoice_number, 'reject'); onClose() }}
-              >
-                ✕ Reject order
-              </button>
-              <button
-                className="btn btn-success btn-full"
-                onClick={() => { onAction(order.invoice_number, 'approve'); onClose() }}
-              >
-                ✓ Approve & send invoice
-              </button>
+              <button className="btn btn-danger btn-full" onClick={() => { onAction(order.invoice_number, 'reject'); onClose() }}>✕ Reject order</button>
+              <button className="btn btn-success btn-full" onClick={() => { onAction(order.invoice_number, 'approve'); onClose() }}>✓ Approve & send invoice</button>
             </div>
           )}
           {order.status !== 'pending' && (
-            <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)', marginTop: 16 }}>
-              This order has already been <strong>{order.status}</strong>.
-            </p>
+            <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)', marginTop: 16 }}>This order has already been <strong>{order.status}</strong>.</p>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PayoutModal({ payout, onClose, onPaid }: { payout: any, onClose: () => void, onPaid: () => void }) {
+  const [slipFile, setSlipFile] = useState<File | null>(null)
+  const [slipPreview, setSlipPreview] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const supabase = createClient()
+
+  function handleSlip(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSlipFile(file)
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader()
+      reader.onload = ev => setSlipPreview(ev.target?.result as string)
+      reader.readAsDataURL(file)
+    }
+  }
+
+  async function markAsPaid() {
+    if (!slipFile) { toast.error('Please upload payment slip first'); return }
+    setSubmitting(true)
+    try {
+      const slipPath = `payout-${payout.id}.${slipFile.name.split('.').pop()}`
+      const { error: uploadError } = await supabase.storage
+        .from('order-slips')
+        .upload(slipPath, slipFile, { contentType: slipFile.type })
+      if (uploadError) throw uploadError
+
+      const { error } = await supabase
+        .from('payouts')
+        .update({ status: 'paid', slip_url: slipPath, paid_at: new Date().toISOString() })
+        .eq('id', payout.id)
+      if (error) throw error
+
+      // Update all unpaid orders for this artist to paid
+      await supabase
+        .from('orders')
+        .update({ payout_status: 'paid' })
+        .eq('artist_id', payout.artist_id)
+        .eq('payout_status', 'unpaid')
+        .eq('status', 'approved')
+
+      toast.success('Payout marked as paid!')
+      onPaid()
+      onClose()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 480, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 500 }}>Payout — {payout.profiles?.full_name}</p>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{formatMVR(payout.amount)} · Requested {new Date(payout.created_at).toLocaleDateString()}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
+        </div>
+        <div style={{ padding: 20 }}>
+          {/* Bank details */}
+          <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 10 }}>Bank transfer details</p>
+            {[
+              ['Bank', payout.bank_name],
+              ['Account name', payout.account_name],
+              ['Account number', payout.account_number],
+              ['Amount', formatMVR(payout.amount)],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '4px 0' }}>
+                <span style={{ color: 'var(--color-text-muted)' }}>{k}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: k === 'Amount' ? 500 : 400, fontFamily: k === 'Account number' ? 'var(--font-mono)' : 'inherit' }}>{v}</span>
+                  {k === 'Account number' && (
+                    <button
+                      className="btn btn-sm"
+                      style={{ fontSize: 11, padding: '2px 8px' }}
+                      onClick={() => { navigator.clipboard.writeText(v as string); toast.success('Copied!') }}
+                    >
+                      Copy
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Upload slip */}
+          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Upload payment confirmation slip</p>
+          <div className="upload-zone" onClick={() => document.getElementById('payout-slip-input')?.click()} style={{ marginBottom: 12 }}>
+            {slipPreview ? (
+              <img src={slipPreview} alt="slip" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 8 }} />
+            ) : (
+              <>
+                <p style={{ fontSize: 20, marginBottom: 6 }}>📎</p>
+                <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{slipFile ? slipFile.name : 'Tap to upload payment slip'}</p>
+                <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG, PNG or PDF</p>
+              </>
+            )}
+          </div>
+          <input type="file" id="payout-slip-input" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleSlip} />
+
+          <button className="btn btn-success btn-full" onClick={markAsPaid} disabled={submitting || !slipFile}>
+            {submitting ? 'Processing...' : `✓ Mark as paid — ${formatMVR(payout.amount)}`}
+          </button>
         </div>
       </div>
     </div>
@@ -113,8 +194,10 @@ function AdminDashboard() {
   const [orders, setOrders] = useState<any[]>([])
   const [artists, setArtists] = useState<any[]>([])
   const [artworks, setArtworks] = useState<any[]>([])
+  const [payouts, setPayouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [selectedPayout, setSelectedPayout] = useState<any>(null)
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -124,7 +207,7 @@ function AdminDashboard() {
     if (!user) { router.push('/auth/login'); return }
     const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (!prof || prof.role !== 'admin') { router.push('/storefront'); return }
-    await Promise.all([fetchOrders(), fetchArtists(), fetchArtworks()])
+    await Promise.all([fetchOrders(), fetchArtists(), fetchArtworks(), fetchPayouts()])
     setLoading(false)
   }
 
@@ -142,11 +225,16 @@ function AdminDashboard() {
   }
 
   async function fetchArtworks() {
-    const { data } = await supabase
-      .from('artworks')
-      .select('*, profiles:artist_id(full_name)')
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('artworks').select('*, profiles:artist_id(full_name)').order('created_at', { ascending: false })
     setArtworks(data || [])
+  }
+
+  async function fetchPayouts() {
+    const { data } = await supabase
+      .from('payouts')
+      .select('*, profiles:artist_id(full_name, artist_code)')
+      .order('created_at', { ascending: false })
+    setPayouts(data || [])
   }
 
   async function handleOrderAction(invoiceNumber: string, action: 'approve' | 'reject') {
@@ -171,9 +259,7 @@ function AdminDashboard() {
   }
 
   async function downloadHires(hiresPath: string) {
-    const { data } = await supabase.storage
-      .from('artwork-hires')
-      .createSignedUrl(hiresPath, 60)
+    const { data } = await supabase.storage.from('artwork-hires').createSignedUrl(hiresPath, 60)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
     else toast.error('Could not generate download link')
   }
@@ -188,6 +274,7 @@ function AdminDashboard() {
   if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
 
   const pendingOrders = orders.filter(o => o.status === 'pending')
+  const pendingPayouts = payouts.filter(p => p.status === 'pending')
   const aprRevenue = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.original_price, 0)
   const aprComm = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
 
@@ -223,9 +310,10 @@ function AdminDashboard() {
             <button key={t} className={`tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
               {t === 'orders' && pendingOrders.length > 0 && (
-                <span style={{ marginLeft: 6, background: 'var(--color-red)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
-                  {pendingOrders.length}
-                </span>
+                <span style={{ marginLeft: 6, background: 'var(--color-red)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{pendingOrders.length}</span>
+              )}
+              {t === 'artists' && pendingPayouts.length > 0 && (
+                <span style={{ marginLeft: 6, background: 'var(--color-teal)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{pendingPayouts.length}</span>
               )}
             </button>
           ))}
@@ -244,9 +332,7 @@ function AdminDashboard() {
                     <span className="sku-tag">{o.order_sku}</span>
                     <span className={`badge badge-${o.status}`}>{o.status}</span>
                   </div>
-                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-                    {o.artworks?.title} by {o.artworks?.profiles?.full_name}
-                  </p>
+                  <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{o.artworks?.title} by {o.artworks?.profiles?.full_name}</p>
                   <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
                     {o.buyer_name} · {new Date(o.created_at).toLocaleDateString()} · {formatMVR(o.total_paid)}
                     {' · '}{o.delivery_method === 'pickup' ? 'Pickup' : `Deliver → ${o.delivery_island}`}
@@ -274,28 +360,79 @@ function AdminDashboard() {
 
         {/* ARTISTS */}
         {tab === 'artists' && (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {artists.length === 0 ? (
-              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No artists yet.</p>
-            ) : artists.map(a => {
-              const artistOrders = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
-              const pending = artistOrders.filter(o => o.payout_status === 'unpaid').reduce((s: number, o: any) => s + o.artist_earnings, 0)
-              const artworkCount = artworks.filter(w => w.artist_id === a.id).length
-              return (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
-                  <div>
-                    <p style={{ fontSize: 14, fontWeight: 500 }}>{a.full_name}</p>
-                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                      FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales
-                    </p>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(pending)} pending</p>
-                    <span className="badge badge-approved" style={{ marginTop: 4, display: 'inline-block' }}>Active</span>
-                  </div>
+          <div>
+            {/* Pending payout requests */}
+            {pendingPayouts.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
+                  💸 Pending payout requests
+                  <span style={{ marginLeft: 8, background: 'var(--color-teal)', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>{pendingPayouts.length}</span>
+                </p>
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  {pendingPayouts.map(p => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 500 }}>{p.profiles?.full_name} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)' }}>FP-{p.profiles?.artist_code}</span></p>
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                          {p.bank_name} · {p.account_name}
+                        </p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{p.account_number}</span>
+                          <button
+                            className="btn btn-sm"
+                            style={{ fontSize: 11, padding: '2px 8px' }}
+                            onClick={() => { navigator.clipboard.writeText(p.account_number); toast.success('Account number copied!') }}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                          Requested {new Date(p.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>{formatMVR(p.amount)}</p>
+                        <button
+                          className="btn btn-sm btn-success"
+                          onClick={() => setSelectedPayout(p)}
+                        >
+                          Pay & confirm
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )
-            })}
+              </div>
+            )}
+
+            {/* All artists */}
+            <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>All artists</p>
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              {artists.length === 0 ? (
+                <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No artists yet.</p>
+              ) : artists.map(a => {
+                const artistOrders = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
+                const artistPayouts = payouts.filter(p => p.artist_id === a.id && p.status === 'paid')
+                const totalEarned = artistOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+                const totalPaid = artistPayouts.reduce((s: number, p: any) => s + p.amount, 0)
+                const pendingAmount = totalEarned - totalPaid
+                const artworkCount = artworks.filter(w => w.artist_id === a.id).length
+                return (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 500 }}>{a.full_name}</p>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                        FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(pendingAmount)} pending</p>
+                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{formatMVR(totalPaid)} paid out</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 
@@ -322,9 +459,7 @@ function AdminDashboard() {
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
                   {a.hires_path && (
-                    <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>
-                      ⬇ Hi-res
-                    </button>
+                    <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>⬇ Hi-res</button>
                   )}
                   {a.status === 'pending' && (
                     <>
@@ -364,15 +499,19 @@ function AdminDashboard() {
         {tab === 'export' && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
       </div>
 
-      {/* Slip Modal */}
       {selectedOrder && (
         <SlipModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onAction={(invoiceNumber, action) => {
-            handleOrderAction(invoiceNumber, action)
-            setSelectedOrder(null)
-          }}
+          onAction={(invoiceNumber, action) => { handleOrderAction(invoiceNumber, action); setSelectedOrder(null) }}
+        />
+      )}
+
+      {selectedPayout && (
+        <PayoutModal
+          payout={selectedPayout}
+          onClose={() => setSelectedPayout(null)}
+          onPaid={() => { fetchPayouts(); fetchOrders() }}
         />
       )}
     </div>
@@ -426,9 +565,7 @@ function AdminExportTab({ artists, onExport, orders }: any) {
           <label className="form-label">Artist</label>
           <select className="form-input" value={artist} onChange={e => setArtist(e.target.value)}>
             <option value="all">All artists</option>
-            {artists.map((a: any) => (
-              <option key={a.id} value={a.artist_code}>FP-{a.artist_code} — {a.full_name}</option>
-            ))}
+            {artists.map((a: any) => <option key={a.id} value={a.artist_code}>FP-{a.artist_code} — {a.full_name}</option>)}
           </select>
         </div>
         <div className="form-group">
