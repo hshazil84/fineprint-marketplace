@@ -8,7 +8,7 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 
 const SIZES = ['A4', 'A3']
-const TABS = ['listings', 'offers', 'upload', 'orders', 'export', 'profile']
+const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile']
 const PLATFORM_FEE = 5
 
 export default function ArtistDashboard() {
@@ -17,6 +17,7 @@ export default function ArtistDashboard() {
   const [profile, setProfile] = useState<any>(null)
   const [artworks, setArtworks] = useState<any[]>([])
   const [orders, setOrders] = useState<any[]>([])
+  const [payouts, setPayouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -28,7 +29,7 @@ export default function ArtistDashboard() {
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (!prof || prof.role !== 'artist') { router.push('/storefront'); return }
     setProfile(prof)
-    await Promise.all([fetchArtworks(user.id), fetchOrders(user.id)])
+    await Promise.all([fetchArtworks(user.id), fetchOrders(user.id), fetchPayouts(user.id)])
     setLoading(false)
   }
 
@@ -46,6 +47,15 @@ export default function ArtistDashboard() {
     setOrders(data || [])
   }
 
+  async function fetchPayouts(artistId: string) {
+    const { data } = await supabase
+      .from('payouts')
+      .select('*')
+      .eq('artist_id', artistId)
+      .order('created_at', { ascending: false })
+    setPayouts(data || [])
+  }
+
   async function handleExport(from: string, to: string) {
     const res = await fetch(`/api/export?type=artist&from=${from}&to=${to}`)
     const text = await res.text()
@@ -55,8 +65,10 @@ export default function ArtistDashboard() {
 
   if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
 
-  const totalEarnings = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.artist_earnings, 0)
-  const pendingEarnings = orders.filter(o => o.status === 'approved' && o.payout_status === 'unpaid').reduce((s: number, o: any) => s + o.artist_earnings, 0)
+  const approvedOrders = orders.filter(o => o.status === 'approved')
+  const totalEarnings = approvedOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+  const paidOut = payouts.filter(p => p.status === 'paid').reduce((s: number, p: any) => s + p.amount, 0)
+  const pendingEarnings = totalEarnings - paidOut
 
   return (
     <div>
@@ -82,13 +94,17 @@ export default function ArtistDashboard() {
         <div className="grid-4" style={{ marginBottom: 24 }}>
           {[
             ['Total listings', artworks.length],
-            ['Orders received', orders.length],
+            ['Orders received', approvedOrders.length],
             ['Pending payout', formatMVR(pendingEarnings)],
             ['Total earned', formatMVR(totalEarnings)],
           ].map(([label, value]) => (
-            <div key={label as string} className="stat-card">
+            <div key={label as string} className="stat-card" style={{ cursor: label === 'Pending payout' ? 'pointer' : 'default' }}
+              onClick={() => label === 'Pending payout' && setTab('payouts')}>
               <p className="stat-label">{label}</p>
               <p className="stat-value">{value}</p>
+              {label === 'Pending payout' && pendingEarnings > 0 && (
+                <p style={{ fontSize: 11, color: 'var(--color-teal)', marginTop: 4 }}>Tap to request →</p>
+              )}
             </div>
           ))}
         </div>
@@ -97,6 +113,11 @@ export default function ArtistDashboard() {
           {TABS.map(t => (
             <button key={t} className={`tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === 'payouts' && payouts.filter(p => p.status === 'pending').length > 0 && (
+                <span style={{ marginLeft: 6, background: 'var(--color-teal)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
+                  {payouts.filter(p => p.status === 'pending').length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -128,7 +149,7 @@ export default function ArtistDashboard() {
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(artistEarns)}</p>
-                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>your cut</p>
+                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>your earnings</p>
                   </div>
                 </div>
               )
@@ -161,6 +182,15 @@ export default function ArtistDashboard() {
           </div>
         )}
 
+        {tab === 'payouts' && (
+          <PayoutsTab
+            profile={profile}
+            pendingEarnings={pendingEarnings}
+            payouts={payouts}
+            onRefresh={() => profile && fetchPayouts(profile.id)}
+          />
+        )}
+
         {tab === 'export' && <ExportTab onExport={handleExport} orders={orders} />}
         {tab === 'profile' && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
       </div>
@@ -168,12 +198,148 @@ export default function ArtistDashboard() {
   )
 }
 
-function UploadTab({ profile, nextSeq, onSuccess }: any) {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    price: '',
+function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ bankName: '', accountName: '', accountNumber: '' })
+  const [submitting, setSubmitting] = useState(false)
+  const supabase = createClient()
+
+  // Check if already requested this month
+  const now = new Date()
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const alreadyRequested = payouts.some(p => {
+    const d = new Date(p.created_at)
+    const m = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    return m === thisMonth && p.status !== 'rejected'
   })
+
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+  async function submitRequest() {
+    if (!form.bankName || !form.accountName || !form.accountNumber) {
+      toast.error('Please fill in all bank details'); return
+    }
+    if (pendingEarnings <= 0) {
+      toast.error('No pending earnings to request'); return
+    }
+    setSubmitting(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase.from('payouts').insert({
+        artist_id: user!.id,
+        amount: pendingEarnings,
+        bank_name: form.bankName,
+        account_name: form.accountName,
+        account_number: form.accountNumber,
+        status: 'pending',
+      })
+      if (error) throw error
+
+      await fetch('/api/notify/payout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artistName: profile.full_name,
+          amount: pendingEarnings,
+          bankName: form.bankName,
+          accountName: form.accountName,
+          accountNumber: form.accountNumber,
+        }),
+      })
+
+      toast.success('Payout request submitted!')
+      setShowForm(false)
+      setForm({ bankName: '', accountName: '', accountNumber: '' })
+      onRefresh()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div>
+      {/* Payout request card */}
+      <div className="card" style={{ maxWidth: 520, marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <p style={{ fontSize: 14, fontWeight: 500 }}>Pending payout</p>
+            <p style={{ fontSize: 28, fontWeight: 500, marginTop: 4, fontFamily: 'var(--font-display)' }}>{formatMVR(pendingEarnings)}</p>
+          </div>
+          {!alreadyRequested && pendingEarnings > 0 && (
+            <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+              {showForm ? 'Cancel' : 'Request payout'}
+            </button>
+          )}
+        </div>
+
+        {alreadyRequested && (
+          <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 8, padding: '10px 14px' }}>
+            <p style={{ fontSize: 13, color: 'var(--color-teal-dark)' }}>
+              ✓ Payout request submitted for this month. Next request available in <strong>{nextMonth}</strong>.
+            </p>
+          </div>
+        )}
+
+        {pendingEarnings <= 0 && !alreadyRequested && (
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>No pending earnings to request.</p>
+        )}
+
+        {showForm && (
+          <div style={{ marginTop: 16, borderTop: '0.5px solid var(--color-border)', paddingTop: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 14 }}>
+              Enter your bank details for this payout of <strong>{formatMVR(pendingEarnings)}</strong>.
+            </p>
+            <div className="form-group">
+              <label className="form-label">Bank name</label>
+              <input className="form-input" placeholder="e.g. Bank of Maldives" value={form.bankName} onChange={e => setForm({ ...form, bankName: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Account holder name</label>
+              <input className="form-input" placeholder="Full name as on account" value={form.accountName} onChange={e => setForm({ ...form, accountName: e.target.value })} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Account number</label>
+              <input className="form-input" placeholder="Your account number" value={form.accountNumber} onChange={e => setForm({ ...form, accountNumber: e.target.value })} />
+            </div>
+            <button className="btn btn-primary btn-full" onClick={submitRequest} disabled={submitting}>
+              {submitting ? 'Submitting...' : `Request payout of ${formatMVR(pendingEarnings)}`}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Payout history */}
+      {payouts.length > 0 && (
+        <div>
+          <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Payout history</p>
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {payouts.map(p => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 500 }}>{formatMVR(p.amount)}</p>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                    {p.bank_name} · {p.account_number}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                    Requested {new Date(p.created_at).toLocaleDateString()}
+                    {p.paid_at ? ` · Paid ${new Date(p.paid_at).toLocaleDateString()}` : ''}
+                  </p>
+                </div>
+                <span className={`badge badge-${p.status}`}>{p.status}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function UploadTab({ profile, nextSeq, onSuccess }: any) {
+  const [form, setForm] = useState({ title: '', description: '', price: '' })
   const [hiresFile, setHiresFile] = useState<File | null>(null)
   const [hiresThumb, setHiresThumb] = useState<string | null>(null)
   const [previewFile, setPreviewFile] = useState<File | null>(null)
@@ -204,28 +370,22 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not logged in')
-
-      const { data: prof } = await supabase
-        .from('profiles').select('artist_code, full_name').eq('id', user.id).single()
+      const { data: prof } = await supabase.from('profiles').select('artist_code, full_name').eq('id', user.id).single()
       if (!prof?.artist_code) throw new Error('Artist code not found — please contact support')
-
-      const { count } = await supabase
-        .from('artworks').select('*', { count: 'exact', head: true }).eq('artist_id', user.id)
+      const { count } = await supabase.from('artworks').select('*', { count: 'exact', head: true }).eq('artist_id', user.id)
       const seq = String((count || 0) + 1).padStart(3, '0')
       const sku = `FP-${prof.artist_code}-${seq}`
 
       toast.loading('Uploading hi-res file...', { id: 'upload' })
       const hiresExt = hiresFile.name.split('.').pop()
       const hiresPath = `${sku}-hires.${hiresExt}`
-      const { error: hiresError } = await supabase.storage
-        .from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type })
+      const { error: hiresError } = await supabase.storage.from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type })
       if (hiresError) throw hiresError
 
       toast.loading('Uploading preview image...', { id: 'upload' })
       const previewExt = previewFile.name.split('.').pop()
       const previewPath = `${sku}-preview.${previewExt}`
-      const { error: previewError } = await supabase.storage
-        .from('artwork-previews').upload(previewPath, previewFile, { contentType: previewFile.type })
+      const { error: previewError } = await supabase.storage.from('artwork-previews').upload(previewPath, previewFile, { contentType: previewFile.type })
       if (previewError) throw previewError
 
       const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
@@ -256,56 +416,32 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
   return (
     <div className="card" style={{ maxWidth: 560 }}>
       <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Upload new artwork</p>
-      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 20 }}>
-        Upload both your hi-res print file and a watermarked preview for buyers.
-      </p>
+      <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 20 }}>Upload both your hi-res print file and a watermarked preview for buyers.</p>
 
-      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
-        Hi-res print file <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— private, for printing only</span>
-      </p>
-      <div className="upload-zone" style={{ marginBottom: 20, padding: hiresThumb ? 0 : undefined, overflow: 'hidden' }}
-        onClick={() => document.getElementById('hires-input')?.click()}>
-        {hiresThumb ? (
-          <img src={hiresThumb} alt="hi-res" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-        ) : (
-          <>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>🖨</div>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload hi-res file</p>
-            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · min 200dpi · up to 35MB</p>
-          </>
+      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Hi-res print file <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— private, for printing only</span></p>
+      <div className="upload-zone" style={{ marginBottom: 20, padding: hiresThumb ? 0 : undefined, overflow: 'hidden' }} onClick={() => document.getElementById('hires-input')?.click()}>
+        {hiresThumb ? <img src={hiresThumb} alt="hi-res" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} /> : (
+          <><div style={{ fontSize: 24, marginBottom: 6 }}>🖨</div><p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload hi-res file</p><p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · min 200dpi · up to 35MB</p></>
         )}
       </div>
-      <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }}
-        onChange={e => handleFileSelect(e.target.files?.[0] || null, setHiresFile, setHiresThumb)} />
+      <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files?.[0] || null, setHiresFile, setHiresThumb)} />
 
-      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
-        Preview image <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— shown to buyers, add your watermark first</span>
-      </p>
-      <div className="upload-zone" style={{ marginBottom: 20, padding: previewThumb ? 0 : undefined, overflow: 'hidden' }}
-        onClick={() => document.getElementById('preview-input')?.click()}>
-        {previewThumb ? (
-          <img src={previewThumb} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-        ) : (
-          <>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload preview image</p>
-            <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · 800–1200px · watermark before uploading</p>
-          </>
+      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>Preview image <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— shown to buyers, add your watermark first</span></p>
+      <div className="upload-zone" style={{ marginBottom: 20, padding: previewThumb ? 0 : undefined, overflow: 'hidden' }} onClick={() => document.getElementById('preview-input')?.click()}>
+        {previewThumb ? <img src={previewThumb} alt="preview" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} /> : (
+          <><div style={{ fontSize: 24, marginBottom: 6 }}>🖼</div><p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload preview image</p><p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 3 }}>JPG or PNG · 800–1200px · watermark before uploading</p></>
         )}
       </div>
-      <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }}
-        onChange={e => handleFileSelect(e.target.files?.[0] || null, setPreviewFile, setPreviewThumb)} />
+      <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files?.[0] || null, setPreviewFile, setPreviewThumb)} />
 
       <div className="form-group">
         <label className="form-label">Title</label>
         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Name your artwork" />
       </div>
-
       <div className="form-group">
         <label className="form-label">Description</label>
         <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about this piece..." />
       </div>
-
       <div className="form-group">
         <label className="form-label">Your artwork price (MVR)</label>
         <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="e.g. 800" style={{ maxWidth: 160 }} />
@@ -324,16 +460,13 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
             ))}
             <div style={{ borderTop: '0.5px solid var(--color-border)', marginTop: 8, paddingTop: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
-                <span>Buyer pays for A4 (delivery)</span>
-                <span>{formatMVR(price + PRINTING_FEES['A4'] + 100)}</span>
+                <span>Buyer pays for A4 (delivery)</span><span>{formatMVR(price + PRINTING_FEES['A4'] + 100)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-                <span>Buyer pays for A3 (delivery)</span>
-                <span>{formatMVR(price + PRINTING_FEES['A3'] + 100)}</span>
+                <span>Buyer pays for A3 (delivery)</span><span>{formatMVR(price + PRINTING_FEES['A3'] + 100)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, color: 'var(--color-teal)' }}>
-                <span>You earn (after 5% platform fee)</span>
-                <span>{formatMVR(artistEarns)}</span>
+                <span>You earn (after 5% platform fee)</span><span>{formatMVR(artistEarns)}</span>
               </div>
             </div>
           </div>
@@ -428,9 +561,7 @@ function OffersTab({ artworks, onRefresh }: any) {
               <div key={a.id} style={{ border: '0.5px solid var(--color-red)', background: 'var(--color-red-light)', borderRadius: 'var(--border-radius-lg)', padding: 16, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.offer_pct}% off</p>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    {a.sku} · You earn {formatMVR(earn)} after platform fee
-                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{a.sku} · You earn {formatMVR(earn)} after platform fee</p>
                 </div>
                 <button className="btn btn-sm btn-danger" onClick={() => removeOffer(a.id)}>Remove</button>
               </div>
