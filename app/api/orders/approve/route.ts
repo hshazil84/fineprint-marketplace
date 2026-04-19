@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase'
 import { sendInvoiceEmail } from '@/lib/invoice'
+import { PRINTING_FEES } from '@/lib/pricing'
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,26 +35,29 @@ export async function POST(req: NextRequest) {
         ? 'Pickup — FinePrint Studio, Malé'
         : `${order.delivery_island || ''}, ${order.delivery_atoll || ''}, Maldives`
 
+      const printingFee = order.printing_fee || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4']
+
       await sendInvoiceEmail({
-        invoiceNumber: order.invoice_number,
-        orderSku:      order.order_sku,
-        date:          new Date(approvedAt).toLocaleDateString('en-GB', {
-                         day: 'numeric', month: 'long', year: 'numeric'
-                       }),
-        buyerName:     order.buyer_name,
-        buyerEmail:    order.buyer_email,
-        buyerPhone:    order.buyer_phone || '',
+        invoiceNumber:  order.invoice_number,
+        orderSku:       order.order_sku,
+        date:           new Date(approvedAt).toLocaleDateString('en-GB', {
+                          day: 'numeric', month: 'long', year: 'numeric'
+                        }),
+        buyerName:      order.buyer_name,
+        buyerEmail:     order.buyer_email,
+        buyerPhone:     order.buyer_phone || '',
         buyerAddress,
-        artworkTitle:  order.artworks.title,
-        artistName:    order.artworks.profiles.full_name,
-        printSize:     order.print_size,
-        originalPrice: order.original_price,
-        offerLabel:    order.offer_label,
-        offerPct:      order.offer_pct,
+        artworkTitle:   order.artworks.title,
+        artistName:     order.artworks.profiles.full_name,
+        printSize:      order.print_size,
+        originalPrice:  order.original_price,
+        printingFee,
+        offerLabel:     order.offer_label,
+        offerPct:       order.offer_pct,
         discountAmount: order.discount_amount,
-        printPrice:    order.print_price,
-        handlingFee:   order.handling_fee,
-        totalPaid:     order.total_paid,
+        printPrice:     order.print_price,
+        handlingFee:    order.handling_fee,
+        totalPaid:      order.total_paid,
         deliveryMethod: order.delivery_method,
       })
     }
