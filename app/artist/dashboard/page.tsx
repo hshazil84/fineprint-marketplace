@@ -93,16 +93,7 @@ export default function ArtistDashboard() {
           )}
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
-            <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
-{o.status === 'approved' && (
-  <button
-    className="btn btn-sm"
-    style={{ marginTop: 6, fontSize: 11, display: 'block' }}
-    onClick={() => window.open(`/invoice/${o.invoice_number}`, '_blank')}
-  >
-    📄 View invoice
-  </button>
-)}
+            <span className="sku-tag">{profile?.artist_code ? `FP-${profile.artist_code}` : ''}</span>
           </div>
         </div>
 
@@ -192,6 +183,15 @@ export default function ArtistDashboard() {
                     {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
                   </p>
                   <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                  {o.status === 'approved' && (
+                    <button
+                      className="btn btn-sm"
+                      style={{ marginTop: 6, fontSize: 11, display: 'block' }}
+                      onClick={() => window.open(`/invoice/${o.invoice_number}`, '_blank')}
+                    >
+                      📄 View invoice
+                    </button>
+                  )}
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <span className={`badge badge-${o.status}`}>{o.status}</span>
@@ -325,24 +325,20 @@ function UploadTab({ profile, nextSeq, onSuccess }: any) {
         <label className="form-label">Title</label>
         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="Name your artwork" />
       </div>
-
       <div className="form-group">
         <label className="form-label">Description</label>
         <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Tell buyers about this piece..." />
       </div>
-
       <div className="form-group">
         <label className="form-label">Category</label>
         <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-
       <div className="form-group">
         <label className="form-label">Painting by <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>— optional, if you represent another artist</span></label>
         <input className="form-input" value={form.paintingBy} onChange={e => setForm({ ...form, paintingBy: e.target.value })} placeholder="e.g. Ahmed Naif" />
       </div>
-
       <div className="form-group">
         <label className="form-label">Your artwork price (MVR)</label>
         <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="e.g. 800" style={{ maxWidth: 160 }} />
@@ -633,16 +629,16 @@ function PayoutsTab({ profile, pendingEarnings, payouts, onRefresh }: any) {
                     <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
                       Requested {new Date(p.created_at).toLocaleDateString()}
                       {p.paid_at ? ` · Paid ${new Date(p.paid_at).toLocaleDateString()}` : ''}
-                      {p.status === 'paid' && (
-  <button
-    className="btn btn-sm"
-    style={{ marginTop: 6, fontSize: 11, display: 'block' }}
-    onClick={() => window.open(`/payout/${p.id}`, '_blank')}
-  >
-    📄 View remittance
-  </button>
-)}
                     </p>
+                    {p.status === 'paid' && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ marginTop: 6, fontSize: 11 }}
+                        onClick={() => window.open(`/payout/${p.id}`, '_blank')}
+                      >
+                        📄 View remittance
+                      </button>
+                    )}
                   </div>
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -739,7 +735,6 @@ function ProfileTab({ profile, onSave }: any) {
     <div className="card" style={{ maxWidth: 520 }}>
       <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>Your public profile</p>
 
-      {/* Avatar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
         <div
           style={{ width: 72, height: 72, borderRadius: '50%', overflow: 'hidden', background: 'var(--color-background-secondary)', flexShrink: 0, cursor: 'pointer', border: '2px dashed var(--color-border)' }}
