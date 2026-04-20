@@ -4,11 +4,12 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import Link from 'next/link'
+import Header from '@/app/components/Header'
 
 const STATUS_STEPS = [
   { key: 'pending', label: 'Order received', desc: 'Your order has been placed and is awaiting payment verification.' },
   { key: 'approved', label: 'Payment verified', desc: 'Your payment has been confirmed and your print is being prepared.' },
-  { key: 'printing', label: 'Printing', desc: 'Your artwork is being printed on premium Hahnemühle paper.' },
+  { key: 'printing', label: 'Printing', desc: 'Your artwork is being printed on premium Hahnemuhle paper.' },
   { key: 'ready', label: 'Ready', desc: 'Your print is ready for pickup or has been dispatched.' },
 ]
 
@@ -37,15 +38,12 @@ function TrackOrderContent() {
     setNotFound(false)
     setOrders([])
     setSearched(true)
-
     const isInvoice = q.startsWith('INV-')
     const isEmail = q.includes('@')
-
     let queryBuilder = supabase
       .from('orders')
       .select('*, artworks(title, sku, preview_url, profiles:artist_id(full_name))')
       .order('created_at', { ascending: false })
-
     if (isInvoice) {
       queryBuilder = queryBuilder.eq('invoice_number', q)
     } else if (isEmail) {
@@ -53,7 +51,6 @@ function TrackOrderContent() {
     } else {
       queryBuilder = queryBuilder.eq('buyer_phone', q)
     }
-
     const { data } = await queryBuilder
     if (!data || data.length === 0) setNotFound(true)
     else {
@@ -69,20 +66,13 @@ function TrackOrderContent() {
   }
 
   return (
-    <div>
-      <nav className="nav">
-        <Link href="/storefront" className="nav-logo">Fine<span>Print</span> Studio</Link>
-        <div className="nav-links">
-          <Link href="/storefront" className="btn btn-sm">Browse prints</Link>
-        </div>
-      </nav>
-
+    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+      <Header />
       <div className="container" style={{ paddingTop: 48, paddingBottom: 60, maxWidth: 600 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Track your order</h1>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: 32 }}>
           Enter your email address, phone number, or invoice number to find your orders.
         </p>
-
         <form onSubmit={handleSubmit} className="card" style={{ marginBottom: 24 }}>
           <div className="form-group" style={{ marginBottom: 12 }}>
             <label className="form-label">Email, phone or invoice number</label>
@@ -107,7 +97,7 @@ function TrackOrderContent() {
             <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
             <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>No orders found</p>
             <p style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-              We couldn't find any orders matching that details. Please check and try again.
+              We could not find any orders matching those details. Please check and try again.
               <br />Need help? Email us at{' '}
               <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a>
             </p>
@@ -126,7 +116,6 @@ function TrackOrderContent() {
               const printingFee = order.printing_fee || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4']
               const currentStep = STATUS_STEPS.findIndex(s => s.key === order.status)
               const displayStep = currentStep === -1 ? 0 : currentStep
-
               return (
                 <div key={order.id} className="card" style={{ marginBottom: 12, padding: 0, overflow: 'hidden' }}>
                   <div
@@ -142,7 +131,7 @@ function TrackOrderContent() {
                         {new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                       <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
-                        <span className={`badge badge-${order.status}`}>{order.status}</span>
+                        <span className={'badge badge-' + order.status}>{order.status}</span>
                         <span className="sku-tag">{order.order_sku}</span>
                       </div>
                     </div>
@@ -151,14 +140,12 @@ function TrackOrderContent() {
                       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>{isExpanded ? '▲' : '▼'}</p>
                     </div>
                   </div>
-
                   {isExpanded && (
                     <div style={{ borderTop: '0.5px solid var(--color-border)', padding: '20px 20px' }}>
-
                       <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 16, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Order status</p>
                       <div style={{ position: 'relative', marginBottom: 24 }}>
                         <div style={{ position: 'absolute', left: 15, top: 0, bottom: 0, width: 2, background: 'var(--color-border)' }} />
-                        <div style={{ position: 'absolute', left: 15, top: 0, width: 2, background: 'var(--color-teal)', height: `${(displayStep / (STATUS_STEPS.length - 1)) * 100}%`, transition: 'height 0.5s ease' }} />
+                        <div style={{ position: 'absolute', left: 15, top: 0, width: 2, background: 'var(--color-teal)', height: (displayStep / (STATUS_STEPS.length - 1) * 100) + '%', transition: 'height 0.5s ease' }} />
                         {STATUS_STEPS.map((step, i) => {
                           const done = i < displayStep
                           const active = i === displayStep
@@ -180,22 +167,23 @@ function TrackOrderContent() {
                             </div>
                           )
                         })}
-
                         {order.status === 'rejected' && (
                           <div style={{ marginTop: 16, background: 'var(--color-red-light)', border: '0.5px solid var(--color-red)', borderRadius: 8, padding: '10px 14px' }}>
-                            <p style={{ fontSize: 13, color: '#A32D2D' }}>Your order was not approved. Please contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a></p>
+                            <p style={{ fontSize: 13, color: '#A32D2D' }}>
+                              Your order was not approved. Please contact us at{' '}
+                              <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a>
+                            </p>
                           </div>
                         )}
                       </div>
-
                       <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Order details</p>
                       <div style={{ marginBottom: 16 }}>
                         {[
                           ['Invoice', order.invoice_number],
                           ['Print size', order.print_size],
                           ['Artwork price', formatMVR(order.original_price)],
-                          [`${order.print_size} printing`, formatMVR(printingFee)],
-                          ['Delivery', order.delivery_method === 'pickup' ? 'Pickup — Free' : `${order.delivery_island}, ${order.delivery_atoll} — ${formatMVR(order.handling_fee)}`],
+                          [order.print_size + ' printing', formatMVR(printingFee)],
+                          ['Delivery', order.delivery_method === 'pickup' ? 'Pickup — Free' : order.delivery_island + ', ' + order.delivery_atoll + ' — ' + formatMVR(order.handling_fee)],
                           ['Total paid', formatMVR(order.total_paid)],
                         ].map(([k, v]) => (
                           <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', borderBottom: '0.5px solid var(--color-border)' }}>
@@ -204,17 +192,16 @@ function TrackOrderContent() {
                           </div>
                         ))}
                       </div>
-
                       {order.delivery_method === 'pickup' ? (
                         <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 8, padding: '12px 14px' }}>
-                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-teal-dark)', marginBottom: 4 }}>🏪 Pickup at FinePrint Studio</p>
+                          <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-teal-dark)', marginBottom: 4 }}>Pickup at FinePrint Studio</p>
                           <p style={{ fontSize: 12, color: 'var(--color-teal-dark)', lineHeight: 1.6 }}>
-                            We will email you when your print is ready for collection. Studio hours: Sun – Thu, 9am – 6pm.
+                            We will email you when your print is ready for collection. Studio hours: Sun - Thu, 9am - 6pm.
                           </p>
                         </div>
                       ) : (
                         <div style={{ background: 'rgba(0,0,0,0.02)', border: '0.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px' }}>
-                          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>📦 Delivery to</p>
+                          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Delivery to</p>
                           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
                             {order.delivery_island}, {order.delivery_atoll}, Maldives
                             {order.delivery_notes && <><br />{order.delivery_notes}</>}
@@ -226,7 +213,6 @@ function TrackOrderContent() {
                 </div>
               )
             })}
-
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', marginTop: 16 }}>
               Questions? Email us at{' '}
               <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a>
