@@ -27,6 +27,17 @@ function StarIcon() {
   )
 }
 
+function SkeletonShimmer({ style }: { style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: 'linear-gradient(90deg, var(--color-background-secondary) 25%, var(--color-border) 50%, var(--color-background-secondary) 75%)',
+      backgroundSize: '800px 100%',
+      animation: 'shimmer 1.4s infinite',
+      ...style,
+    }} />
+  )
+}
+
 export default function ArtistProfilePage() {
   const params = useParams()
   const artistCode = params.artistCode as string
@@ -109,11 +120,11 @@ export default function ArtistProfilePage() {
   const isClosed = profile.shop_status === 'closed'
 
   const socialLinks = [
-    { label: 'Instagram', value: profile.instagram, prefix: 'https://instagram.com/' },
-    { label: 'TikTok', value: profile.tiktok, prefix: 'https://tiktok.com/@' },
-    { label: 'Facebook', value: profile.facebook, prefix: '' },
-    { label: 'LinkedIn', value: profile.linkedin, prefix: '' },
-    { label: 'Website', value: profile.website, prefix: '' },
+    { label: 'Instagram', value: profile.instagram, href: profile.instagram ? (profile.instagram.startsWith('http') ? profile.instagram : 'https://instagram.com/' + profile.instagram.replace('@', '')) : '' },
+    { label: 'TikTok', value: profile.tiktok, href: profile.tiktok ? (profile.tiktok.startsWith('http') ? profile.tiktok : 'https://tiktok.com/@' + profile.tiktok.replace('@', '')) : '' },
+    { label: 'Facebook', value: profile.facebook, href: profile.facebook ? (profile.facebook.startsWith('http') ? profile.facebook : 'https://' + profile.facebook) : '' },
+    { label: 'LinkedIn', value: profile.linkedin, href: profile.linkedin ? (profile.linkedin.startsWith('http') ? profile.linkedin : 'https://' + profile.linkedin) : '' },
+    { label: 'Website', value: profile.website, href: profile.website ? (profile.website.startsWith('http') ? profile.website : 'https://' + profile.website) : '' },
   ].filter(s => s.value)
 
   return (
@@ -132,12 +143,10 @@ export default function ArtistProfilePage() {
 
       <Header />
 
-      {/* Profile header */}
       <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
 
-            {/* Avatar */}
             <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--color-border)' }}>
               {profile.avatar_url ? (
                 <img src={profile.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -148,7 +157,6 @@ export default function ArtistProfilePage() {
               )}
             </div>
 
-            {/* Info */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
                 <h1 style={{ fontSize: '1.4rem', fontWeight: 500, fontFamily: 'var(--font-display)' }}>{displayName}</h1>
@@ -174,39 +182,31 @@ export default function ArtistProfilePage() {
                 </p>
               )}
 
-              {/* Social links */}
               {socialLinks.length > 0 && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {socialLinks.map(s => {
-                    const href = s.value.startsWith('http') ? s.value : s.prefix + s.value.replace('@', '')
-                    return (
-                      
-                        key={s.label}
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}
-                      >
-                        {s.label}
-                      </a>
-                    )
-                  })}
+                  {socialLinks.map(s => (
+                    
+                      key={s.label}
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      {s.label}
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Stats */}
-            <div style={{ display: 'flex', gap: 24, flexShrink: 0 }}>
-              <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 22, fontWeight: 500, fontFamily: 'var(--font-display)' }}>{artworks.length}</p>
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>artworks</p>
-              </div>
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <p style={{ fontSize: 22, fontWeight: 500, fontFamily: 'var(--font-display)' }}>{artworks.length}</p>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>artworks</p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Artworks */}
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 24px 80px' }}>
         {isClosed ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -231,14 +231,12 @@ export default function ArtistProfilePage() {
               </span>
             </p>
 
-            {/* Desktop 4 col */}
             <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 14 }}>
               {artworks.map(artwork => (
                 <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
               ))}
             </div>
 
-            {/* Mobile 2 col */}
             <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
               {artworks.map(artwork => (
                 <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
@@ -266,12 +264,7 @@ function ArtworkCard({ artwork, isTopSeller }: { artwork: any, isTopSeller: bool
       >
         <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(90deg, var(--color-background-secondary) 25%, var(--color-border) 50%, var(--color-background-secondary) 75%)',
-              backgroundSize: '800px 100%',
-              animation: 'shimmer 1.4s infinite',
-            }} />
+            <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />
           )}
           {artwork.preview_url && (
             <img
