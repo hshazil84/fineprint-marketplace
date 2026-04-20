@@ -260,14 +260,12 @@ function AdminDashboard() {
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
       <Header />
-      <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem' }}>Admin dashboard</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>Admin</span>
-            <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>Log out</button>
-          </div>
-        </div>
+      <Header minimal rightContent={
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>Admin</span>
+    <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>Log out</button>
+  </div>
+} />
 
         <div className="grid-4" style={{ marginBottom: 24 }}>
           {[['Pending orders', pendingOrders.length], ['Total orders', orders.length], ['Gross revenue', formatMVR(aprRevenue)], ['Total commission', formatMVR(aprComm)]].map(([label, value]) => (
