@@ -145,6 +145,7 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
             )}
           </div>
         </div>
+        <Footer />
       </div>
     </Link>
   )
