@@ -146,9 +146,9 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
             {artwork.offer_label && (
               <span className="offer-tag">{artwork.offer_label}</span>
             )}
-            <Footer />
           </div>
         </div>
+        <Footer />
       </div>
     </Link>
   )
