@@ -1,5 +1,4 @@
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!
-
 const CHAT_ID   = process.env.TELEGRAM_CHAT_ID!
 const APP_URL   = process.env.NEXT_PUBLIC_APP_URL || 'https://fineprintmv.com'
 
@@ -15,7 +14,7 @@ async function sendTelegram(text: string, keyboard?: object) {
   }
   if (keyboard) body.reply_markup = keyboard
   try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -38,13 +37,17 @@ export async function notifyNewOrder(order: {
   totalPaid: number
   offerLabel?: string
   offerPct?: number
+  paymentMethod?: string
 }) {
   const delivery = order.deliveryMethod === 'pickup'
-    ? '🏪 Pickup — Malé studio'
+    ? '🏪 Pickup — Male studio'
     : '📦 Deliver to ' + order.deliveryIsland + ', ' + order.deliveryAtoll
   const offer = order.offerPct
     ? '\n🏷 <b>Offer:</b> ' + order.offerLabel + ' ' + order.offerPct + '% off'
     : ''
+  const payment = order.paymentMethod === 'swipe'
+    ? '💳 <b>Payment:</b> Swipe — verify in your Swipe app'
+    : '🏦 <b>Payment:</b> BML bank transfer — awaiting slip'
   const text =
     '🖼 <b>New order</b>\n\n' +
     '<b>' + order.invoiceNumber + '</b> · <code>' + order.orderSku + '</code>\n\n' +
@@ -54,7 +57,7 @@ export async function notifyNewOrder(order: {
     '📞 ' + order.buyerPhone + '\n' +
     delivery + '\n\n' +
     '💰 <b>Total:</b> MVR ' + order.totalPaid + '\n' +
-    '📎 <i>Awaiting transfer slip...</i>'
+    payment
   await sendTelegram(text, {
     inline_keyboard: [[
       { text: '📋 View in dashboard', url: APP_URL + '/admin/dashboard' }
