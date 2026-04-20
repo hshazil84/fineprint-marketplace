@@ -8,7 +8,6 @@ export function createClient() {
 }
 
 export function createAdminClient() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { createClient: c } = require('@supabase/supabase-js')
   return c(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { autoRefreshToken: false, persistSession: false }
