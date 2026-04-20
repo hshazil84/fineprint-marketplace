@@ -61,7 +61,7 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
   }
 
   return (
-    <div style={{ maxWidth: 520 }}>
+    <div style={{ maxWidth: 520, margin: '0 auto' }}>
 
       {/* Close shop */}
       <div className="card" style={{ marginBottom: 16 }}>
