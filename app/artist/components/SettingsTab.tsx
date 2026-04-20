@@ -23,6 +23,15 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
       if (error) throw error
       onProfileUpdate({ shop_status: newStatus })
       toast.success(newStatus === 'closed' ? 'Shop closed — your artworks are hidden from the storefront' : 'Shop is open — your artworks are visible again')
+      await fetch('/api/notify/shop-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          artistName: profile.display_name || profile.full_name,
+          artistCode: profile.artist_code,
+          status: newStatus,
+        }),
+      })
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -39,7 +48,6 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
         .update({ withdraw_requested: true, withdraw_reason: withdrawReason })
         .eq('id', profile.id)
       if (error) throw error
-
       await fetch('/api/notify/withdraw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -49,7 +57,6 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
           reason: withdrawReason,
         }),
       })
-
       onProfileUpdate({ withdraw_requested: true, withdraw_reason: withdrawReason })
       toast.success('Withdrawal request submitted — we will be in touch.')
       setShowWithdrawForm(false)
@@ -104,14 +111,13 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
       <div className="card">
         <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Withdraw from platform</p>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
-          Request to permanently remove your account and artworks from FinePrint Studio. We will process any outstanding payouts before closing your account.
+          Request to permanently remove your account and artworks from FinePrint Studio. We will process any outstanding payouts before closing your account. 
         </p>
-
         {profile?.withdraw_requested ? (
           <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px' }}>
             <p style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, marginBottom: 4 }}>Withdrawal requested</p>
             <p style={{ fontSize: 12, color: '#A32D2D' }}>
-              Your request has been submitted. Our team will be in touch shortly to process your account closure.
+              Your request has been submitted. Our team will be in touch shortly to process your account closure. Will miss you 💔
             </p>
             {profile?.withdraw_reason && (
               <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 6, fontStyle: 'italic' }}>
