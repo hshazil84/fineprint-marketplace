@@ -366,19 +366,7 @@ export default function CheckoutPage() {
                     <img src="/swipe-logo.svg" alt="Swipe" style={{ height: 35, width: 'auto', display: 'block' }} />
                   </div>
                 </div>
-                {paymentMethod === 'swipe' && (
-                  <div style={{ paddingLeft: 24 }}>
-                    <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
-                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>Swipe ID</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <p style={{ fontSize: 16, fontWeight: 500, fontFamily: 'var(--font-mono)' }}>hasan@swipe</p>
-                        <button
-                          onClick={e => { e.stopPropagation(); navigator.clipboard.writeText('hasan@swipe'); toast.success('Copied!') }}
-                          style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--color-border)', background: 'var(--color-background-secondary)', color: 'var(--color-text-muted)', cursor: 'pointer' }}
-                        >
-                          Copy
-                        </button>
-                      </div>
+
                       <p style={{ fontSize: 12, fontWeight: 500, marginTop: 8, color: 'var(--color-text)' }}>
                         Amount: {formatMVR(prices.totalPaid)}
                       </p>
