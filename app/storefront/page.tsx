@@ -76,8 +76,8 @@ export default function StorefrontPage() {
           </div>
         )}
       </div>
-      <Footer />
     </div>
+    <Footer />
   )
 }
 
