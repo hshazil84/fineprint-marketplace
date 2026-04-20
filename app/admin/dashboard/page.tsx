@@ -47,6 +47,11 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }
             <p style={{ fontSize: 14, fontWeight: 500 }}>{order.invoice_number}</p>
             <span className="sku-tag">{order.order_sku}</span>
             <span className={'badge badge-' + order.status}>{order.status}</span>
+            {order.payment_method === 'swipe' && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#6A0AF2', color: '#fff', whiteSpace: 'nowrap' }}>
+                Swipe
+              </span>
+            )}
           </div>
           <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{order.artworks?.title} by {artistDisplay}</p>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
@@ -210,21 +215,13 @@ function AdminDashboard() {
   const [remittancePayout, setRemittancePayout] = useState<any>(null)
   const supabase = createClient()
 
-  useEffect(() => {
-    init()
-  }, [])
+  useEffect(() => { init() }, [])
 
   async function init() {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      router.push('/auth/login')
-      return
-    }
+    if (!user) { router.push('/auth/login'); return }
     const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (!prof || prof.role !== 'admin') {
-      router.push('/storefront')
-      return
-    }
+    if (!prof || prof.role !== 'admin') { router.push('/storefront'); return }
     await Promise.all([fetchOrders(), fetchArtists(), fetchArtworks(), fetchPayouts()])
     setLoading(false)
   }
@@ -301,9 +298,7 @@ function AdminDashboard() {
 
   if (loading) {
     return (
-      <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>
-        Loading...
-      </div>
+      <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
     )
   }
 
@@ -326,10 +321,7 @@ function AdminDashboard() {
             </span>
             <button
               className="btn btn-sm"
-              onClick={async () => {
-                await supabase.auth.signOut()
-                router.push('/auth/login')
-              }}
+              onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}
             >
               Log out
             </button>
@@ -338,9 +330,7 @@ function AdminDashboard() {
       />
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 24 }}>
-          Admin dashboard
-        </h1>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 24 }}>Admin dashboard</h1>
 
         <div className="grid-4" style={{ marginBottom: 24 }}>
           {[
@@ -370,11 +360,7 @@ function AdminDashboard() {
 
         <div className="tab-bar">
           {TABS.map(t => (
-            <button
-              key={t}
-              className={'tab' + (tab === t ? ' active' : '')}
-              onClick={() => setTab(t)}
-            >
+            <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
               {t === 'orders' && pendingOrders.length > 0 && (
                 <span style={{ marginLeft: 6, background: 'var(--color-red)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
@@ -458,9 +444,7 @@ function AdminDashboard() {
 
             {withdrawRequests.length > 0 && (
               <div style={{ marginBottom: 24 }}>
-                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: '#A32D2D' }}>
-                  Withdrawal requests
-                </p>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: '#A32D2D' }}>Withdrawal requests</p>
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {withdrawRequests.map(a => (
                     <div key={a.id} style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: '#FCEBEB' }}>
@@ -499,11 +483,7 @@ function AdminDashboard() {
                         <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
                           {p.paid_at ? 'Paid ' + new Date(p.paid_at).toLocaleDateString() : ''}
                         </p>
-                        <button
-                          className="btn btn-sm"
-                          style={{ marginTop: 6, fontSize: 11 }}
-                          onClick={() => setRemittancePayout(p)}
-                        >
+                        <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11 }} onClick={() => setRemittancePayout(p)}>
                           View remittance
                         </button>
                       </div>
@@ -632,33 +612,21 @@ function AdminDashboard() {
         <SlipModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onAction={(inv, action) => {
-            handleOrderAction(inv, action)
-            setSelectedOrder(null)
-          }}
+          onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }}
         />
       )}
       {selectedPayout && (
         <PayoutModal
           payout={selectedPayout}
           onClose={() => setSelectedPayout(null)}
-          onPaid={() => {
-            fetchPayouts()
-            fetchOrders()
-          }}
+          onPaid={() => { fetchPayouts(); fetchOrders() }}
         />
       )}
       {invoiceOrder && (
-        <InvoiceModal
-          order={invoiceOrder}
-          onClose={() => setInvoiceOrder(null)}
-        />
+        <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />
       )}
       {remittancePayout && (
-        <RemittanceModal
-          payout={remittancePayout}
-          onClose={() => setRemittancePayout(null)}
-        />
+        <RemittanceModal payout={remittancePayout} onClose={() => setRemittancePayout(null)} />
       )}
     </div>
   )
