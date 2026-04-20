@@ -91,7 +91,7 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }
               Invoice
             </button>
           )}
-          {order.status === 'pending' && !order.slip_url && (
+          {order.status === 'pending' && (order.payment_method === 'swipe' || !order.slip_url) && (
             <>
               <button className="btn btn-sm btn-success" style={{ fontSize: 11 }} onClick={() => onAction(order.invoice_number, 'approve')}>Approve</button>
               <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => onAction(order.invoice_number, 'reject')}>Reject</button>
