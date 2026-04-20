@@ -124,8 +124,12 @@ function AdminExportTab({ artists, onExport, orders }: any) {
 
   const months: { label: string; value: string }[] = []
   for (let i = 0; i < 6; i++) {
-    const d = new Date(); d.setMonth(d.getMonth() - i)
-    months.push({ value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleString('default', { month: 'long', year: 'numeric' }) })
+    const d = new Date()
+    d.setMonth(d.getMonth() - i)
+    months.push({
+      value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      label: d.toLocaleString('default', { month: 'long', year: 'numeric' }),
+    })
   }
 
   return (
@@ -134,7 +138,10 @@ function AdminExportTab({ artists, onExport, orders }: any) {
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>Filter by artist and date range, then download the full CSV.</p>
       <div className="grid-3" style={{ marginBottom: 16 }}>
         {[['Orders', filtered.length], ['Gross', `MVR ${gross.toLocaleString()}`], ['Commission', `MVR ${comm.toLocaleString()}`]].map(([l, v]) => (
-          <div key={l as string} className="stat-card"><p className="stat-label">{l}</p><p className="stat-value" style={{ fontSize: 16 }}>{v}</p></div>
+          <div key={l as string} className="stat-card">
+            <p className="stat-label">{l}</p>
+            <p className="stat-value" style={{ fontSize: 16 }}>{v}</p>
+          </div>
         ))}
       </div>
       <div className="grid-2" style={{ marginBottom: 12 }}>
@@ -142,7 +149,9 @@ function AdminExportTab({ artists, onExport, orders }: any) {
           <label className="form-label">Artist</label>
           <select className="form-input" value={artist} onChange={e => setArtist(e.target.value)}>
             <option value="all">All artists</option>
-            {artists.map((a: any) => <option key={a.id} value={a.artist_code}>FP-{a.artist_code} — {a.display_name || a.full_name}</option>)}
+            {artists.map((a: any) => (
+              <option key={a.id} value={a.artist_code}>FP-{a.artist_code} — {a.display_name || a.full_name}</option>
+            ))}
           </select>
         </div>
         <div className="form-group">
@@ -154,8 +163,14 @@ function AdminExportTab({ artists, onExport, orders }: any) {
         </div>
       </div>
       <div className="grid-2" style={{ marginBottom: 20 }}>
-        <div className="form-group"><label className="form-label">From</label><input type="date" className="form-input" value={from} onChange={e => setFrom(e.target.value)} /></div>
-        <div className="form-group"><label className="form-label">To</label><input type="date" className="form-input" value={to} onChange={e => setTo(e.target.value)} /></div>
+        <div className="form-group">
+          <label className="form-label">From</label>
+          <input type="date" className="form-input" value={from} onChange={e => setFrom(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="form-label">To</label>
+          <input type="date" className="form-input" value={to} onChange={e => setTo(e.target.value)} />
+        </div>
       </div>
       <button className="btn btn-primary btn-full" onClick={() => onExport(from, to, artist)}>Download CSV</button>
     </div>
@@ -189,27 +204,33 @@ function AdminDashboard() {
   }
 
   async function fetchOrders() {
-    const { data } = await supabase.from('orders')
+    const { data } = await supabase
+      .from('orders')
       .select('*, artworks(title, sku, artist_id, profiles:artist_id(full_name, display_name))')
       .order('created_at', { ascending: false })
     setOrders(data || [])
   }
 
   async function fetchArtists() {
-    const { data } = await supabase.from('profiles')
-      .select('*').eq('role', 'artist').order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'artist')
+      .order('created_at', { ascending: false })
     setArtists(data || [])
   }
 
   async function fetchArtworks() {
-    const { data } = await supabase.from('artworks')
+    const { data } = await supabase
+      .from('artworks')
       .select('*, profiles:artist_id(full_name, display_name)')
       .order('created_at', { ascending: false })
     setArtworks(data || [])
   }
 
   async function fetchPayouts() {
-    const { data } = await supabase.from('payouts')
+    const { data } = await supabase
+      .from('payouts')
       .select('*, profiles:artist_id(full_name, display_name, artist_code, email)')
       .order('created_at', { ascending: false })
     setPayouts(data || [])
@@ -225,7 +246,9 @@ function AdminDashboard() {
     if (data.success) {
       toast.success(action === 'approve' ? 'Order approved — invoice sent!' : 'Order rejected')
       fetchOrders()
-    } else toast.error(data.error)
+    } else {
+      toast.error(data.error)
+    }
   }
 
   async function handleArtworkAction(id: number, status: 'approved' | 'rejected') {
@@ -247,7 +270,9 @@ function AdminDashboard() {
     toast.success('CSV downloaded!')
   }
 
-  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
+  if (loading) {
+    return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
+  }
 
   const pendingOrders = orders.filter(o => o.status === 'pending')
   const pendingPayouts = payouts.filter(p => p.status === 'pending')
@@ -259,16 +284,26 @@ function AdminDashboard() {
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
-      <Header />
-      <Header minimal rightContent={
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>Admin</span>
-    <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>Log out</button>
-  </div>
-} />
+      <Header
+        minimal
+        rightContent={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>Admin</span>
+            <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>Log out</button>
+          </div>
+        }
+      />
+
+      <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 24 }}>Admin dashboard</h1>
 
         <div className="grid-4" style={{ marginBottom: 24 }}>
-          {[['Pending orders', pendingOrders.length], ['Total orders', orders.length], ['Gross revenue', formatMVR(aprRevenue)], ['Total commission', formatMVR(aprComm)]].map(([label, value]) => (
+          {[
+            ['Pending orders', pendingOrders.length],
+            ['Total orders', orders.length],
+            ['Gross revenue', formatMVR(aprRevenue)],
+            ['Total commission', formatMVR(aprComm)],
+          ].map(([label, value]) => (
             <div key={label as string} className="stat-card">
               <p className="stat-label">{label}</p>
               <p className="stat-value">{value}</p>
@@ -306,8 +341,14 @@ function AdminDashboard() {
             {orders.length === 0 ? (
               <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No orders yet.</p>
             ) : orders.map(o => (
-              <OrderRow key={o.id} order={o} onAction={handleOrderAction} onStatusChange={fetchOrders}
-                onViewInvoice={() => setInvoiceOrder(o)} onViewSlip={() => setSelectedOrder(o)} />
+              <OrderRow
+                key={o.id}
+                order={o}
+                onAction={handleOrderAction}
+                onStatusChange={fetchOrders}
+                onViewInvoice={() => setInvoiceOrder(o)}
+                onViewSlip={() => setSelectedOrder(o)}
+              />
             ))}
           </div>
         )}
@@ -404,10 +445,16 @@ function AdminDashboard() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{a.display_name || a.full_name}</p>
-                        {a.shop_status === 'closed' && <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>}
-                        {a.withdraw_requested && <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>}
+                        {a.shop_status === 'closed' && (
+                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>
+                        )}
+                        {a.withdraw_requested && (
+                          <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
+                        )}
                       </div>
-                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales</p>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                        FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales
+                      </p>
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(totalEarned - totalPaid)} pending</p>
@@ -426,7 +473,9 @@ function AdminDashboard() {
               <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No listings yet.</p>
             ) : artworks.map(a => (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                {a.preview_url && <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />}
+                {a.preview_url && (
+                  <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
+                )}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
                     <span className="sku-tag">{a.sku}</span>
@@ -439,7 +488,9 @@ function AdminDashboard() {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                  {a.hires_path && <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>⬇ Hi-res</button>}
+                  {a.hires_path && (
+                    <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>⬇ Hi-res</button>
+                  )}
                   {a.status === 'pending' && (
                     <>
                       <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
@@ -462,33 +513,4 @@ function AdminDashboard() {
             ) : artworks.filter(a => a.offer_pct).map(a => (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.profiles?.display_name || a.profiles?.full_name}</p>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    {a.sku} · {a.offer_pct}% off{a.offer_expires ? ` · Expires ${a.offer_expires}` : ' · No expiry'}
-                  </p>
-                </div>
-                <span className="badge" style={{ background: 'var(--color-red-light)', color: '#A32D2D' }}>Active</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {tab === 'customers' && <CustomersTab />}
-        {tab === 'export' && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
-      </div>
-
-      {selectedOrder && <SlipModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }} />}
-      {selectedPayout && <PayoutModal payout={selectedPayout} onClose={() => setSelectedPayout(null)} onPaid={() => { fetchPayouts(); fetchOrders() }} />}
-      {invoiceOrder && <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
-      {remittancePayout && <RemittanceModal payout={remittancePayout} onClose={() => setRemittancePayout(null)} />}
-    </div>
-  )
-}
-
-export default function AdminDashboardWrapper() {
-  return (
-    <Suspense fallback={<div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>}>
-      <AdminDashboard />
-    </Suspense>
-  )
-}
+                  <p sty
