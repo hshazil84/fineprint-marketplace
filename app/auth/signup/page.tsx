@@ -104,7 +104,7 @@ export default function SignupPage() {
 
             <div className="form-group">
               <label className="form-label">Display name</label>
-              <input className="form-input" placeholder="e.g. One Media, Naif Studio"
+              <input className="form-input" placeholder="e.g. Raajjethere, Azleena"
                 value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} />
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
                 Shown on your artworks and public profile. Leave blank to use your full name.
