@@ -1,142 +1,74 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
-import { formatMVR } from '@/lib/pricing'
 import Link from 'next/link'
 import Footer from '@/app/components/Footer'
 
-interface Artwork {
-  id: number
-  sku: string
-  title: string
-  price: number
-  preview_url: string
-  sizes: string[]
-  offer_label: string | null
-  offer_pct: number | null
-  profiles: { full_name: string; artist_code: string; location: string }
-}
-
-export default function StorefrontPage() {
-  const [artworks, setArtworks] = useState<Artwork[]>([])
-  const [loading, setLoading] = useState(true)
-  const supabase = createClient()
-
-  useEffect(() => {
-    supabase
-      .from('artworks')
-      .select('*, profiles:artist_id(full_name, artist_code, location)')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        setArtworks(data || [])
-        setLoading(false)
-      })
-  }, [])
-
+export default function TermsPage() {
   return (
     <div>
       <nav className="nav">
-        <Link href="/" className="nav-logo">Fine<span>Print</span> Studio</Link>
+        <Link href="/storefront" className="nav-logo">Fine<span>Print</span> Studio</Link>
         <div className="nav-links">
-          <Link href="/orders/track" style={{ fontSize: 13, color: 'var(--color-text-muted)', textDecoration: 'none' }}>Track order</Link>
-          <Link href="/auth/login" className="btn">Log in</Link>
-          <Link href="/auth/signup" className="btn btn-primary">Sign up</Link>
+          <Link href="/storefront" className="btn btn-sm">Browse prints</Link>
         </div>
       </nav>
 
-      <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: 8 }}>
-            Browse Prints
-          </h1>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: 15 }}>
-            Original artwork by Maldivian artists — printed and fulfilled by FinePrint Studio
-          </p>
+      <div className="container" style={{ maxWidth: 720, paddingTop: 48, paddingBottom: 60 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>Legal</p>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: 8 }}>Terms & Conditions</h1>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 40 }}>Last updated: April 2026</p>
+
+        <div style={{ fontSize: 14, lineHeight: 1.8 }}>
+          <Section title="1. About FinePrint Studio">
+            FinePrint Studio is a registered business in the Republic of Maldives. We operate an online marketplace at shop.fineprintmv.com that connects buyers with Maldivian artists for the sale of fine art giclée prints. All prints are produced and fulfilled by FinePrint Studio from our studio in Malé.
+          </Section>
+          <Section title="2. Acceptance of terms">
+            By accessing or using shop.fineprintmv.com, placing an order, or registering as an artist, you agree to be bound by these Terms & Conditions. If you do not agree, please do not use our platform.
+          </Section>
+          <Section title="3. For buyers">
+            <b style={{ fontWeight: 500 }}>Ordering.</b> All orders are subject to availability and payment verification. We accept payment by BML bank transfer only. Your order is confirmed once payment has been verified and you receive an approval email with your invoice.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Pricing.</b> All prices are in Maldivian Rufiyaa (MVR). A handling fee of MVR 100 applies for delivery orders. Pickup is free.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Delivery.</b> We deliver to all islands in the Maldives. You are responsible for providing a correct delivery address. Uncollected pickup orders must be collected within 7 days of notification.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Refund policy.</b> All sales are final. We do not offer refunds except in the case of a defective print. FinePrint Studio guarantees the quality of the physical print — paper, colour accuracy, and production — but does not guarantee the artistic content or style of the original artwork, which is the sole responsibility of the artist.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Defective prints.</b> If your print arrives damaged, notify us within 48 hours at hello@fineprintmv.com with your invoice number and photo evidence. If approved, we will reprint and redeliver at no cost.
+          </Section>
+          <Section title="4. For artists">
+            <b style={{ fontWeight: 500 }}>Eligibility.</b> Artists must be individuals or entities based in the Maldives. By registering, you confirm you hold full rights to the artwork you upload.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Artwork standards.</b> You must upload a high-resolution print file (minimum 200 dpi) and a watermarked preview image. FinePrint Studio reserves the right to reject artwork that does not meet quality standards.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Platform fee & confidentiality.</b> FinePrint Studio charges a platform fee on each sale. The fee structure is confidential and disclosed only to registered artists. Artists agree not to disclose this to buyers or third parties.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Payouts.</b> Earnings are paid out upon artist request, subject to a monthly payout cycle.
+            <br /><br />
+            <b style={{ fontWeight: 500 }}>Intellectual property.</b> You retain full copyright of your artwork. By listing on FinePrint Studio, you grant us a non-exclusive licence to reproduce and display your artwork solely for fulfilling orders and promoting your listings.
+          </Section>
+          <Section title="5. Intellectual property">
+            All content on shop.fineprintmv.com — including the FinePrint Studio name, logo, design, and platform software — is the property of FinePrint Studio and may not be reproduced without written permission.
+          </Section>
+          <Section title="6. Limitation of liability">
+            FinePrint Studio's liability is limited to the value of the order in question. We are not liable for any indirect or consequential damages.
+          </Section>
+          <Section title="7. Governing law">
+            These terms are governed by the laws of the Republic of Maldives.
+          </Section>
+          <Section title="8. Contact">
+            For questions, contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a> or call 9998124.
+          </Section>
         </div>
-
-        {loading ? (
-          <div style={{ color: 'var(--color-text-hint)', padding: '60px 0', textAlign: 'center' }}>
-            Loading artworks...
-          </div>
-        ) : artworks.length === 0 ? (
-          <div style={{ color: 'var(--color-text-hint)', padding: '60px 0', textAlign: 'center' }}>
-            No artworks available yet. Check back soon!
-          </div>
-        ) : (
-          <div className="grid-3">
-            {artworks.map(artwork => (
-              <ArtworkCard key={artwork.id} artwork={artwork} />
-            ))}
-          </div>
-        )}
       </div>
-
       <Footer />
     </div>
   )
 }
 
-function ArtworkCard({ artwork }: { artwork: Artwork }) {
-  const discountedPrice = artwork.offer_pct
-    ? Math.round(artwork.price * (1 - artwork.offer_pct / 100))
-    : artwork.price
-
+function Section({ title, children }: { title: string, children: React.ReactNode }) {
   return (
-    <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div className="artwork-card">
-        <div className="artwork-protected" style={{ height: 220, background: 'var(--color-background-secondary)', position: 'relative' }}>
-          {artwork.preview_url ? (
-            <img
-              src={artwork.preview_url}
-              alt={artwork.title}
-              loading="lazy"
-              style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
-            />
-          ) : (
-            <div style={{ width: '100%', height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
-              No preview
-            </div>
-          )}
-          <div className="protect-overlay" />
-          {artwork.offer_pct ? (
-            <div style={{
-              position: 'absolute', top: 10, left: 10,
-              background: 'var(--color-red)', color: '#fff',
-              fontSize: 11, fontWeight: 500, padding: '3px 8px',
-              borderRadius: 20, zIndex: 20, pointerEvents: 'none'
-            }}>
-              {artwork.offer_pct}% off
-            </div>
-          ) : null}
-        </div>
-        <div style={{ padding: '12px 14px 14px' }}>
-          <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 2 }}>{artwork.title}</p>
-          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-            by {artwork.profiles.full_name}
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            {artwork.offer_pct ? (
-              <>
-                <span style={{ fontSize: 13, color: 'var(--color-text-hint)', textDecoration: 'line-through' }}>
-                  {formatMVR(artwork.price)}
-                </span>
-                <span style={{ fontSize: 15, fontWeight: 500 }}>
-                  {formatMVR(discountedPrice)}
-                </span>
-              </>
-            ) : (
-              <span style={{ fontSize: 15, fontWeight: 500 }}>{formatMVR(artwork.price)}</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <span className="sku-tag">{artwork.sku}</span>
-            {artwork.offer_label && (
-              <span className="offer-tag">{artwork.offer_label}</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </Link>
+    <div style={{ marginBottom: 32 }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: 500, marginBottom: 10 }}>{title}</h2>
+      <div style={{ color: 'var(--color-text-muted)' }}>{children}</div>
+    </div>
   )
 }
