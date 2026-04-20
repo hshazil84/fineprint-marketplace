@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { calculatePrices, formatMVR, PRINTING_FEES } from '@/lib/pricing'
+import { calculatePrices, formatMVR, PRINTING_FEES, SIZE_DIMENSIONS } from '@/lib/pricing'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import Header from '@/app/components/Header'
 
 export default function CheckoutPage() {
   const router = useRouter()
@@ -14,6 +15,7 @@ export default function CheckoutPage() {
   const [slipFile, setSlipFile] = useState<File | null>(null)
   const [slipPreview, setSlipPreview] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -58,30 +60,33 @@ export default function CheckoutPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          artworkId:      checkoutData.artworkId,
-          artworkSku:     checkoutData.artworkSku,
-          artworkTitle:   checkoutData.artworkTitle,
-          artistName:     checkoutData.artistName,
-          artistId:       checkoutData.artistId,
-          buyerId:        user?.id,
-          buyerName:      form.name,
-          buyerEmail:     form.email,
-          buyerPhone:     form.phone,
-          printSize:      checkoutData.printSize,
+          artworkId:       checkoutData.artworkId,
+          artworkSku:      checkoutData.artworkSku,
+          artworkTitle:    checkoutData.artworkTitle,
+          artistName:      checkoutData.artistName,
+          artistId:        checkoutData.artistId,
+          buyerId:         user?.id || null,
+          buyerName:       form.name,
+          buyerEmail:      form.email,
+          buyerPhone:      form.phone,
+          printSize:       checkoutData.printSize,
           deliveryMethod,
-          deliveryIsland: form.island,
-          deliveryAtoll:  form.atoll,
-          deliveryNotes:  form.notes,
-          originalPrice:  checkoutData.artistPrice,
-          offerLabel:     checkoutData.offerLabel,
-          offerPct:       checkoutData.offerPct,
-          printingFee:    prices.printingFee,
-          handlingFee:    prices.handlingFee,
-          totalPaid:      prices.totalPaid,
-          fpCommission:   prices.platformFeeAmt,
-          artistEarnings: prices.artistEarnings,
+          deliveryIsland:  form.island,
+          deliveryAtoll:   form.atoll,
+          deliveryNotes:   form.notes,
+          originalPrice:   checkoutData.artistPrice,
+          offerLabel:      checkoutData.offerLabel,
+          offerPct:        checkoutData.offerPct,
+          printingFee:     prices.printingFee,
+          handlingFee:     prices.handlingFee,
+          totalPaid:       prices.totalPaid,
+          fpCommission:    prices.platformFeeAmt,
+          artistEarnings:  prices.artistEarnings,
+          newsletterOptIn,
+          isGuest:         !user,
         }),
       })
+
       const orderData = await res.json()
       if (!orderData.success) throw new Error(orderData.error)
 
@@ -108,34 +113,55 @@ export default function CheckoutPage() {
     }
   }
 
-  return (
-    <div>
-      <nav className="nav">
-        <Link href="/storefront" className="nav-logo">Fine<span>Print</span> Studio</Link>
-      </nav>
+  const sizeLabel = checkoutData.printSize + (SIZE_DIMENSIONS[checkoutData.printSize] ? ` (${SIZE_DIMENSIONS[checkoutData.printSize]})` : '')
 
+  return (
+    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+      <Header />
       <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Complete your order</h1>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: 32 }}>Pay via BML bank transfer and upload your slip</p>
 
         <div className="grid-2" style={{ gap: 32, alignItems: 'start' }}>
+          {/* LEFT COL */}
           <div>
+            {/* Your details */}
             <div className="card" style={{ marginBottom: 16 }}>
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Your details</p>
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 16 }}>
+                No account needed — just fill in your details below.
+              </p>
               <div className="form-group">
                 <label className="form-label">Full name</label>
-                <input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ahmed Ali" />
+                <input className="form-input" value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ahmed Ali" />
               </div>
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <input className="form-input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
+                <input className="form-input" type="email" value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                  Your invoice and order updates will be sent here
+                </p>
               </div>
               <div className="form-group">
                 <label className="form-label">Phone</label>
-                <input className="form-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+960 xxx xxxx" />
+                <input className="form-input" value={form.phone}
+                  onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="+960 xxx xxxx" />
               </div>
+
+              {/* Newsletter opt-in */}
+              <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer', marginTop: 8 }}>
+                <input type="checkbox" checked={newsletterOptIn}
+                  onChange={e => setNewsletterOptIn(e.target.checked)}
+                  style={{ marginTop: 3, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+                  Notify me about new artworks and offers from FinePrint Studio
+                </span>
+              </label>
             </div>
 
+            {/* Delivery */}
             <div className="card">
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Delivery method</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
@@ -143,15 +169,12 @@ export default function CheckoutPage() {
                   { id: 'delivery', icon: '📦', title: 'Deliver to me', desc: 'Anywhere in the Maldives', price: '+ MVR 100', priceColor: 'var(--color-text)' },
                   { id: 'pickup', icon: '🏪', title: 'Pick up', desc: 'Collect from our Malé studio', price: 'Free', priceColor: 'var(--color-teal)' },
                 ].map(opt => (
-                  <div
-                    key={opt.id}
-                    onClick={() => setDeliveryMethod(opt.id as any)}
+                  <div key={opt.id} onClick={() => setDeliveryMethod(opt.id as any)}
                     style={{
-                      border: deliveryMethod === opt.id ? '2px solid var(--color-text)' : '0.5px solid var(--color-border-md)',
+                      border: deliveryMethod === opt.id ? '2px solid var(--color-text)' : '0.5px solid var(--color-border)',
                       borderRadius: 'var(--radius-lg)', padding: 14, cursor: 'pointer',
-                      background: deliveryMethod === opt.id ? 'rgba(0,0,0,0.03)' : 'var(--color-surface)'
-                    }}
-                  >
+                      background: deliveryMethod === opt.id ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
+                    }}>
                     <div style={{ fontSize: 22, marginBottom: 8 }}>{opt.icon}</div>
                     <p style={{ fontSize: 13, fontWeight: 500 }}>{opt.title}</p>
                     <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, lineHeight: 1.5 }}>{opt.desc}</p>
@@ -162,19 +185,35 @@ export default function CheckoutPage() {
 
               {deliveryMethod === 'delivery' ? (
                 <>
-                  <div className="form-group"><label className="form-label">Island</label><input className="form-input" placeholder="e.g. Hulhumalé" value={form.island} onChange={e => setForm({ ...form, island: e.target.value })} /></div>
-                  <div className="form-group"><label className="form-label">Atoll</label><input className="form-input" placeholder="e.g. Kaafu Atoll" value={form.atoll} onChange={e => setForm({ ...form, atoll: e.target.value })} /></div>
-                  <div className="form-group"><label className="form-label">Notes (optional)</label><textarea className="form-input" placeholder="Apartment, landmark, or special instructions..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
+                  <div className="form-group">
+                    <label className="form-label">Island</label>
+                    <input className="form-input" placeholder="e.g. Hulhumalé"
+                      value={form.island} onChange={e => setForm({ ...form, island: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Atoll</label>
+                    <input className="form-input" placeholder="e.g. Kaafu Atoll"
+                      value={form.atoll} onChange={e => setForm({ ...form, atoll: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Notes (optional)</label>
+                    <textarea className="form-input" placeholder="Apartment, landmark, or special instructions..."
+                      value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                  </div>
                 </>
               ) : (
-                <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid #5DCAA5', borderRadius: 'var(--border-radius-md)', padding: '14px 16px' }}>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-teal-dark)', marginBottom: 8 }}>FinePrint Studio — Malé</p>
-                  {[['Address', 'Confirmed at order approval'], ['Hours', 'Sun – Thu, 9 am – 6 pm'], ['Contact', 'hello@fineprintmv.com']].map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--color-teal-dark)', marginBottom: 3 }}>
-                      <span style={{ minWidth: 60, opacity: 0.7 }}>{k}</span><span>{v}</span>
+                <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px' }}>
+                  <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>FinePrint Studio — Malé</p>
+                  {[
+                    ['Address', 'Confirmed at order approval'],
+                    ['Hours', 'Sun – Thu, 9 am – 6 pm'],
+                    ['Contact', 'hello@fineprintmv.com'],
+                  ].map(([k, v]) => (
+                    <div key={k} style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 3 }}>
+                      <span style={{ minWidth: 60 }}>{k}</span><span>{v}</span>
                     </div>
                   ))}
-                  <p style={{ fontSize: 11, color: 'var(--color-teal-dark)', marginTop: 8, fontStyle: 'italic', opacity: 0.8 }}>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8, fontStyle: 'italic' }}>
                     We will email you when your print is ready for collection.
                   </p>
                 </div>
@@ -182,16 +221,20 @@ export default function CheckoutPage() {
             </div>
           </div>
 
+          {/* RIGHT COL */}
           <div>
+            {/* Order summary */}
             <div className="card" style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Order summary</p>
               <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
                 {checkoutData.previewUrl && (
-                  <img src={checkoutData.previewUrl} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
+                  <img src={checkoutData.previewUrl} alt=""
+                    style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
                 )}
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 500 }}>{checkoutData.artworkTitle} — {checkoutData.printSize}</p>
+                  <p style={{ fontSize: 13, fontWeight: 500 }}>{checkoutData.artworkTitle}</p>
                   <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>by {checkoutData.artistName}</p>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>{sizeLabel}</p>
                   <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>
                     {checkoutData.artworkSku}-{checkoutData.printSize}
                   </span>
@@ -201,12 +244,12 @@ export default function CheckoutPage() {
               {checkoutData.offerPct ? (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                    <span>Original print price</span>
+                    <span>Original price</span>
                     <span style={{ textDecoration: 'line-through' }}>
                       {formatMVR(checkoutData.artistPrice + (PRINTING_FEES[checkoutData.printSize] || 200))}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-red)', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#E24B4A', marginBottom: 4 }}>
                     <span>{checkoutData.offerLabel} (−{checkoutData.offerPct}%)</span>
                     <span>− {formatMVR(prices.discountAmount)}</span>
                   </div>
@@ -218,7 +261,7 @@ export default function CheckoutPage() {
                 <span>{formatMVR(checkoutData.artistPrice)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                <span>{checkoutData.printSize} giclée printing</span>
+                <span>{sizeLabel} giclée printing</span>
                 <span>{formatMVR(prices.printingFee)}</span>
               </div>
               {deliveryMethod === 'delivery' ? (
@@ -226,7 +269,7 @@ export default function CheckoutPage() {
                   <span>Handling & delivery</span><span>{formatMVR(prices.handlingFee)}</span>
                 </div>
               ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-teal)', marginBottom: 4 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1D9E75', marginBottom: 4 }}>
                   <span>Pickup</span><span>Free</span>
                 </div>
               )}
@@ -236,9 +279,10 @@ export default function CheckoutPage() {
               </div>
             </div>
 
+            {/* Bank transfer */}
             <div className="card">
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Bank transfer</p>
-              <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px', marginBottom: 14 }}>
+              <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px', marginBottom: 14 }}>
                 {[
                   ['Bank', 'Bank of Maldives (BML)'],
                   ['Account name', 'Hasan Shazil'],
@@ -263,11 +307,17 @@ export default function CheckoutPage() {
               </div>
               <input type="file" id="slip-input" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleSlip} />
               {slipPreview && (
-                <img src={slipPreview} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, marginTop: 10, pointerEvents: 'none' }} />
+                <img src={slipPreview} alt=""
+                  style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, marginTop: 10, pointerEvents: 'none' }} />
               )}
-              <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={handleSubmit} disabled={submitting}>
+              <button className="btn btn-primary btn-full" style={{ marginTop: 16 }}
+                onClick={handleSubmit} disabled={submitting}>
                 {submitting ? 'Submitting...' : 'Submit order'}
               </button>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12, textAlign: 'center', lineHeight: 1.6 }}>
+                By submitting you agree to our{' '}
+                <Link href="/terms" style={{ color: 'var(--color-teal)' }}>Terms & Conditions</Link>
+              </p>
             </div>
           </div>
         </div>
