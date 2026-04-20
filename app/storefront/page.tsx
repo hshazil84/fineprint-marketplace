@@ -19,7 +19,7 @@ interface Artwork {
   painting_by: string | null
   artist_id: string
   created_at: string
-  profiles: { full_name: string; artist_code: string; avatar_url: string | null; display_name: string | null }
+  profiles: { full_name: string; artist_code: string; avatar_url: string | null; display_name: string | null; shop_status: string | null }
 }
 
 interface Artist {
@@ -72,7 +72,7 @@ export default function StorefrontPage() {
     const [artRes, artistRes, orderRes] = await Promise.all([
       supabase
         .from('artworks')
-        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, profiles:artist_id(full_name, artist_code, avatar_url, display_name)')
+        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, profiles:artist_id(full_name, artist_code, avatar_url, display_name, shop_status)')
         .eq('status', 'approved')
         .order('created_at', { ascending: false }),
       supabase
@@ -87,7 +87,9 @@ export default function StorefrontPage() {
         .eq('status', 'approved'),
     ])
 
-    setArtworks((artRes.data || []) as any)
+    const allArtworks = (artRes.data || []) as any
+    const filteredArtworks = allArtworks.filter((a: any) => a.profiles?.shop_status !== 'closed')
+    setArtworks(filteredArtworks)
     setArtists(artistRes.data || [])
 
     if (orderRes.data) {
@@ -207,15 +209,11 @@ export default function StorefrontPage() {
                   <h2 style={{ fontSize: 15, fontWeight: 500 }}>Recently listed</h2>
                   <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>6 newest artworks</span>
                 </div>
-
-                {/* Desktop: 3-col 4:3 grid */}
                 <div className="fp-desktop-only" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
                   {recentSix.map((artwork, i) => (
                     <ArtworkCard43 key={artwork.id} artwork={artwork} isNew={i < 2} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
-
-                {/* Mobile: horizontal swipe */}
                 <div className="fp-mobile-only" style={{ display: 'none' }}>
                   <div className="mobile-swipe" style={{
                     display: 'flex', gap: 12,
@@ -232,15 +230,13 @@ export default function StorefrontPage() {
               </div>
             )}
 
-            {/* DIVIDER */}
             {!search && activeCategory === 'All' && (
               <hr style={{ border: 'none', borderTop: '0.5px solid var(--color-border)', marginBottom: 28 }} />
             )}
 
-            {/* ALL PRINTS HEADER */}
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
               <h2 style={{ fontSize: 15, fontWeight: 500 }}>
-                {search ? `Results for "${search}"` : activeCategory !== 'All' ? activeCategory : 'All prints'}
+                {search ? 'Results for "' + search + '"' : activeCategory !== 'All' ? activeCategory : 'All prints'}
                 <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 8 }}>
                   · {filtered.length} {filtered.length === 1 ? 'print' : 'prints'}
                 </span>
@@ -248,7 +244,7 @@ export default function StorefrontPage() {
               {(search || activeCategory !== 'All') && (
                 <button onClick={() => { setSearch(''); setActiveCategory('All') }}
                   style={{ fontSize: 12, color: '#1D9E75', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  Clear ✕
+                  Clear x
                 </button>
               )}
             </div>
@@ -259,13 +255,11 @@ export default function StorefrontPage() {
               </div>
             ) : (
               <>
-                {/* Desktop: 5-col 1:1 */}
                 <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
                   {filtered.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
-                {/* Mobile: 2-col grid */}
                 <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
                   {filtered.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
@@ -288,10 +282,12 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
   const name = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
 
   return (
-    <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+    <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
+      <div
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+      >
         <div style={{ aspectRatio: '4/3', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
@@ -299,7 +295,6 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
               onLoad={() => setLoaded(true)}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }} />
           )}
-          <div className="protect-overlay" />
           {artwork.offer_pct && (
             <div style={{ position: 'absolute', top: 8, left: 8, background: '#E24B4A', color: '#FCEBEB', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
               {artwork.offer_pct}% off
@@ -322,7 +317,7 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
         <div style={{ padding: '12px 14px 14px' }}>
           <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 2, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>by {artwork.painting_by || name}</p>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
               <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>From</span>
               <span style={{ fontSize: 14, fontWeight: 500 }}>{formatMVR(fromPrice)}</span>
@@ -341,10 +336,12 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
   const name = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
 
   return (
-    <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+    <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
+      <div
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+      >
         <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
@@ -352,10 +349,9 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
               onLoad={() => setLoaded(true)}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }} />
           )}
-          <div className="protect-overlay" />
           {artwork.offer_pct && (
             <div style={{ position: 'absolute', top: 6, left: 6, background: '#E24B4A', color: '#FCEBEB', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
-              −{artwork.offer_pct}%
+              -{artwork.offer_pct}%
             </div>
           )}
           {isTopSeller && (
