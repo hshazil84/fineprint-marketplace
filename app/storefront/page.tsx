@@ -212,12 +212,8 @@ export default function StorefrontPage() {
                   <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>6 newest artworks</span>
                 </div>
 
-                {/* Desktop: 3-col grid */}
-                <div className="desktop-only" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
-                  {recentSix.map((artwork, i) => (
-                    <ArtworkCard43 key={artwork.id} artwork={artwork} isNew={i < 2} isTopSeller={topSellerIds.has(artwork.id)} />
-                  ))}
-                </div>
+               {/* Desktop: 3-col grid */}
+                <div className="desktop-only" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14, width: '100%' }}>
 
                 {/* Mobile: 1 card golden view with horizontal swipe */}
                 <div className="mobile-only" style={{ display: 'none' }}>
