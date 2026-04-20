@@ -23,16 +23,15 @@ export default function StorefrontPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    async function fetchArtworks() {
-      const { data } = await supabase
-        .from('artworks')
-        .select('*, profiles:artist_id(full_name, artist_code, location)')
-        .eq('status', 'approved')
-        .order('created_at', { ascending: false })
-      setArtworks(data || [])
-      setLoading(false)
-    }
-    fetchArtworks()
+    supabase
+      .from('artworks')
+      .select('*, profiles:artist_id(full_name, artist_code, location)')
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setArtworks(data || [])
+        setLoading(false)
+      })
   }, [])
 
   return (
