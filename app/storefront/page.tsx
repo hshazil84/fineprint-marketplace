@@ -57,7 +57,7 @@ export default function StorefrontPage() {
       .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, profiles:artist_id(full_name, artist_code, avatar_url)')
       .eq('status', 'approved')
       .order('created_at', { ascending: false })
-    setArtworks(data || [])
+    setArtworks((data || []) as any)
     setLoading(false)
   }
 
