@@ -19,10 +19,20 @@ function getColor(code: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
-function makeHref(value: string, prefix: string): string {
+function toHref(value: string, prefix: string): string {
   if (!value) return ''
   if (value.startsWith('http')) return value
   return prefix + value.replace('@', '')
+}
+
+function getSocialLinks(profile: any): Array<{ label: string; href: string }> {
+  const links: Array<{ label: string; href: string }> = []
+  if (profile.instagram) links.push({ label: 'Instagram', href: toHref(profile.instagram, 'https://instagram.com/') })
+  if (profile.tiktok) links.push({ label: 'TikTok', href: toHref(profile.tiktok, 'https://tiktok.com/@') })
+  if (profile.facebook) links.push({ label: 'Facebook', href: toHref(profile.facebook, 'https://') })
+  if (profile.linkedin) links.push({ label: 'LinkedIn', href: toHref(profile.linkedin, 'https://') })
+  if (profile.website) links.push({ label: 'Website', href: toHref(profile.website, 'https://') })
+  return links
 }
 
 function StarIcon() {
@@ -41,6 +51,170 @@ function SkeletonShimmer({ style }: { style?: React.CSSProperties }) {
       animation: 'shimmer 1.4s infinite',
       ...style,
     }} />
+  )
+}
+
+function ArtworkCard({ artwork, isTopSeller }: { artwork: any, isTopSeller: boolean }) {
+  const [loaded, setLoaded] = useState(false)
+  const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
+  return (
+    <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
+      <div
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+      >
+        <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
+          {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
+          {artwork.preview_url && (
+            <img
+              src={artwork.preview_url}
+              alt={artwork.title}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setLoaded(true)}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }}
+            />
+          )}
+          {artwork.offer_pct && (
+            <div style={{ position: 'absolute', top: 6, left: 6, background: '#E24B4A', color: '#FCEBEB', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
+              -{artwork.offer_pct}%
+            </div>
+          )}
+          {isTopSeller && (
+            <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', gap: 2, background: '#1a1a1a', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
+              <StarIcon />Top
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '10px 12px 12px' }}>
+          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 1, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
+          {artwork.painting_by && (
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>by {artwork.painting_by}</p>
+          )}
+          <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>
+            <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 400 }}>From </span>
+            {formatMVR(fromPrice)}
+          </p>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+function ProfileContent({ profile, artworks, topSellerIds }: { profile: any, artworks: any[], topSellerIds: Set<number> }) {
+  const displayName = profile.display_name || profile.full_name
+  const color = getColor(profile.artist_code || 'FP')
+  const isClosed = profile.shop_status === 'closed'
+  const socialLinks = getSocialLinks(profile)
+
+  return (
+    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+      <style>{`
+        @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
+        @media(max-width:768px) {
+          .fp-desktop-grid { display: none !important; }
+          .fp-mobile-grid { display: grid !important; }
+        }
+        @media(min-width:769px) {
+          .fp-desktop-grid { display: grid !important; }
+          .fp-mobile-grid { display: none !important; }
+        }
+      `}</style>
+
+      <Header />
+
+      <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
+        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
+
+            <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--color-border)' }}>
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#fff' }}>
+                  {getInitials(displayName)}
+                </div>
+              )}
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                <h1 style={{ fontSize: '1.4rem', fontWeight: 500, fontFamily: 'var(--font-display)' }}>{displayName}</h1>
+                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--color-text-muted)', background: 'var(--color-background-secondary)', padding: '2px 8px', borderRadius: 20 }}>
+                  FP-{profile.artist_code}
+                </span>
+                {isClosed && (
+                  <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 8px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
+                    Shop temporarily closed
+                  </span>
+                )}
+              </div>
+              {profile.location && (
+                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>{profile.location}</p>
+              )}
+              {profile.bio && (
+                <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.7, marginBottom: 12, maxWidth: 560 }}>{profile.bio}</p>
+              )}
+              {socialLinks.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {socialLinks.map(s => (
+                    <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                      {s.label}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ textAlign: 'center', flexShrink: 0 }}>
+              <p style={{ fontSize: 22, fontWeight: 500, fontFamily: 'var(--font-display)' }}>{artworks.length}</p>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>artworks</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 24px 80px' }}>
+        {isClosed ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>Shop is temporarily closed</p>
+            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 24 }}>
+              {displayName} has temporarily paused their shop. Check back soon!
+            </p>
+            <Link href="/storefront" style={{ fontSize: 14, color: '#1D9E75', textDecoration: 'none' }}>
+              Browse other artworks
+            </Link>
+          </div>
+        ) : artworks.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0' }}>
+            <p style={{ fontSize: 14, color: 'var(--color-text-muted)' }}>No artworks listed yet.</p>
+          </div>
+        ) : (
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 20 }}>
+              Artworks by {displayName}
+              <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 8 }}>
+                · {artworks.length} {artworks.length === 1 ? 'print' : 'prints'}
+              </span>
+            </p>
+            <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 14 }}>
+              {artworks.map(artwork => (
+                <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
+              ))}
+            </div>
+            <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
+              {artworks.map(artwork => (
+                <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <Footer />
+    </div>
   )
 }
 
@@ -125,188 +299,11 @@ export default function ArtistProfilePage() {
     )
   }
 
-  const displayName = profile.display_name || profile.full_name
-  const color = getColor(profile.artist_code || 'FP')
-  const isClosed = profile.shop_status === 'closed'
-
-  const socialLinks: { label: string; href: string }[] = []
-  if (profile.instagram) socialLinks.push({ label: 'Instagram', href: makeHref(profile.instagram, 'https://instagram.com/') })
-  if (profile.tiktok) socialLinks.push({ label: 'TikTok', href: makeHref(profile.tiktok, 'https://tiktok.com/@') })
-  if (profile.facebook) socialLinks.push({ label: 'Facebook', href: makeHref(profile.facebook, 'https://') })
-  if (profile.linkedin) socialLinks.push({ label: 'LinkedIn', href: makeHref(profile.linkedin, 'https://') })
-  if (profile.website) socialLinks.push({ label: 'Website', href: makeHref(profile.website, 'https://') })
-
   return (
-    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
-      <style>{`
-        @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
-        @media(max-width:768px) {
-          .fp-desktop-grid { display: none !important; }
-          .fp-mobile-grid { display: grid !important; }
-        }
-        @media(min-width:769px) {
-          .fp-desktop-grid { display: grid !important; }
-          .fp-mobile-grid { display: none !important; }
-        }
-      `}</style>
-
-      <Header />
-
-      <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
-
-            <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--color-border)' }}>
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#fff' }}>
-                  {getInitials(displayName)}
-                </div>
-              )}
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
-                <h1 style={{ fontSize: '1.4rem', fontWeight: 500, fontFamily: 'var(--font-display)' }}>{displayName}</h1>
-                <span style={{ fontSize: 11, fontFamily: 'monospace', color: 'var(--color-text-muted)', background: 'var(--color-background-secondary)', padding: '2px 8px', borderRadius: 20 }}>
-                  FP-{profile.artist_code}
-                </span>
-                {isClosed && (
-                  <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 8px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
-                    Shop temporarily closed
-                  </span>
-                )}
-              </div>
-
-              {profile.location && (
-                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-                  {profile.location}
-                </p>
-              )}
-
-              {profile.bio && (
-                <p style={{ fontSize: 14, color: 'var(--color-text)', lineHeight: 1.7, marginBottom: 12, maxWidth: 560 }}>
-                  {profile.bio}
-                </p>
-              )}
-
-              {socialLinks.length > 0 && (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {socialLinks.map(s => (
-                    
-                      key={s.label}
-                      href={s.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}
-                    >
-                      {s.label}
-                    </a>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ textAlign: 'center', flexShrink: 0 }}>
-              <p style={{ fontSize: 22, fontWeight: 500, fontFamily: 'var(--font-display)' }}>{artworks.length}</p>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>artworks</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 24px 80px' }}>
-        {isClosed ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <p style={{ fontSize: 16, fontWeight: 500, marginBottom: 8 }}>Shop is temporarily closed</p>
-            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 24 }}>
-              {displayName} has temporarily paused their shop. Check back soon!
-            </p>
-            <Link href="/storefront" style={{ fontSize: 14, color: '#1D9E75', textDecoration: 'none' }}>
-              Browse other artworks
-            </Link>
-          </div>
-        ) : artworks.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <p style={{ fontSize: 14, color: 'var(--color-text-muted)' }}>No artworks listed yet.</p>
-          </div>
-        ) : (
-          <div>
-            <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 20 }}>
-              Artworks by {displayName}
-              <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 8 }}>
-                · {artworks.length} {artworks.length === 1 ? 'print' : 'prints'}
-              </span>
-            </p>
-
-            <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 14 }}>
-              {artworks.map(artwork => (
-                <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
-              ))}
-            </div>
-
-            <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
-              {artworks.map(artwork => (
-                <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <Footer />
-    </div>
-  )
-}
-
-function ArtworkCard({ artwork, isTopSeller }: { artwork: any, isTopSeller: boolean }) {
-  const [loaded, setLoaded] = useState(false)
-  const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
-
-  return (
-    <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
-      <div
-        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
-      >
-        <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
-          {!loaded && (
-            <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />
-          )}
-          {artwork.preview_url && (
-            <img
-              src={artwork.preview_url}
-              alt={artwork.title}
-              loading="lazy"
-              decoding="async"
-              onLoad={() => setLoaded(true)}
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }}
-            />
-          )}
-          {artwork.offer_pct && (
-            <div style={{ position: 'absolute', top: 6, left: 6, background: '#E24B4A', color: '#FCEBEB', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
-              -{artwork.offer_pct}%
-            </div>
-          )}
-          {isTopSeller && (
-            <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', gap: 2, background: '#1a1a1a', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
-              <StarIcon />Top
-            </div>
-          )}
-        </div>
-        <div style={{ padding: '10px 12px 12px' }}>
-          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 1, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
-          {artwork.painting_by && (
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>by {artwork.painting_by}</p>
-          )}
-          <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>
-            <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 400 }}>From </span>
-            {formatMVR(fromPrice)}
-          </p>
-        </div>
-      </div>
-    </Link>
+    <ProfileContent
+      profile={profile}
+      artworks={artworks}
+      topSellerIds={topSellerIds}
+    />
   )
 }
