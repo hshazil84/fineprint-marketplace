@@ -76,4 +76,87 @@ export async function notifySlipUploaded(order: {
   await sendTelegram(text, {
     inline_keyboard: [[
       { text: '✅ Approve', url: `${APP_URL}/admin/dashboard?approve=${order.invoiceNumber}` },
-      { text: '❌ Reject',  url: `${APP_URL}/admin/dashbo
+      { text: '❌ Reject',  url: `${APP_URL}/admin/dashboard?reject=${order.invoiceNumber}` },
+      { text: '🖼 View slip', url: `${APP_URL}/admin/dashboard?slip=${order.invoiceNumber}` },
+    ]]
+  })
+}
+
+export async function notifyNewArtist(artist: {
+  name: string
+  email: string
+  location?: string
+}) {
+  const text =
+    `🎨 <b>New artist signed up</b>\n\n` +
+    `<b>${artist.name}</b>\n` +
+    `📧 ${artist.email}\n` +
+    `📍 ${artist.location || 'Location not set'}\n\n` +
+    `<i>No listings yet.</i>`
+  await sendTelegram(text, {
+    inline_keyboard: [[
+      { text: '👤 View profile', url: `${APP_URL}/admin/dashboard?tab=artists` }
+    ]]
+  })
+}
+
+export async function notifyNewArtwork(artwork: {
+  sku: string
+  title: string
+  artistName: string
+  price: number
+  sizes: string[]
+}) {
+  const text =
+    `🖼 <b>New artwork submitted</b>\n\n` +
+    `<code>${artwork.sku}</code>\n` +
+    `<b>${artwork.title}</b>\n` +
+    `👤 by ${artwork.artistName}\n\n` +
+    `💰 MVR ${artwork.price}\n` +
+    `📐 Sizes: ${artwork.sizes.join(', ')}\n\n` +
+    `<i>Pending your approval before going live.</i>`
+  await sendTelegram(text, {
+    inline_keyboard: [[
+      { text: '✅ Approve', url: `${APP_URL}/admin/dashboard?tab=listings&approve=${artwork.sku}` },
+      { text: '❌ Reject',  url: `${APP_URL}/admin/dashboard?tab=listings&reject=${artwork.sku}` },
+    ]]
+  })
+}
+
+export async function notifyPayoutRequest(payout: {
+  artistName: string
+  amount: number
+  bankName: string
+  accountName: string
+  accountNumber: string
+}) {
+  const text =
+    `💸 <b>Payout request</b>\n\n` +
+    `<b>${payout.artistName}</b> has requested a payout.\n\n` +
+    `💰 Amount: <b>MVR ${payout.amount.toLocaleString()}</b>\n\n` +
+    `🏦 <b>Bank:</b> ${payout.bankName}\n` +
+    `👤 <b>Account name:</b> ${payout.accountName}\n` +
+    `🔢 <b>Account number:</b> <code>${payout.accountNumber}</code>`
+  await sendTelegram(text, {
+    inline_keyboard: [[
+      { text: '💸 View payout requests', url: `${APP_URL}/admin/dashboard?tab=artists` }
+    ]]
+  })
+}
+
+export async function notifyWithdrawRequest(data: {
+  artistName: string
+  artistCode: string
+  reason: string
+}) {
+  const text =
+    `⚠️ <b>Withdrawal request</b>\n\n` +
+    `<b>${data.artistName}</b> (FP-${data.artistCode}) wants to leave the platform.\n\n` +
+    `📝 <b>Reason:</b> ${data.reason}\n\n` +
+    `<i>Check the admin dashboard — Artists tab.</i>`
+  await sendTelegram(text, {
+    inline_keyboard: [[
+      { text: '👤 View in dashboard', url: `${APP_URL}/admin/dashboard?tab=artists` }
+    ]]
+  })
+}
