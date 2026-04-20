@@ -363,7 +363,7 @@ export default function CheckoutPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: paymentMethod === 'swipe' ? 12 : 0 }}>
                   <div style={{ width: 16, height: 16, borderRadius: '50%', border: paymentMethod === 'swipe' ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0 }} />
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <img src="/swipe-logo.svg" alt="Swipe" style={{ height: 20, width: 'auto', display: 'block' }} />
+                    <img src="/swipe-logo.svg" alt="Swipe" style={{ height: 35, width: 'auto', display: 'block' }} />
                   </div>
                 </div>
                 {paymentMethod === 'swipe' && (
