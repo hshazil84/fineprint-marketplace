@@ -1,0 +1,77 @@
+import Link from 'next/link'
+import Footer from '../components/Footer'
+
+export default function CookiesPage() {
+  return (
+    <div>
+      <nav className="nav">
+        <Link href="/storefront" className="nav-logo">Fine<span>Print</span> Studio</Link>
+        <div className="nav-links">
+          <Link href="/storefront" className="btn btn-sm">Browse prints</Link>
+        </div>
+      </nav>
+
+      <div className="container" style={{ maxWidth: 720, paddingTop: 48, paddingBottom: 60 }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>Legal</p>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: 8 }}>Cookie Policy</h1>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 40 }}>Last updated: April 2026</p>
+
+        <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--color-text)' }}>
+
+          <Section title="1. What are cookies">
+            Cookies are small text files stored on your device when you visit a website. They are widely used to make websites work efficiently and to provide information to website operators.
+          </Section>
+
+          <Section title="2. How we use cookies">
+            FinePrint Studio uses a minimal number of cookies strictly necessary for the platform to function. We do not use advertising cookies, tracking cookies, or third-party analytics cookies.
+            <br /><br />
+            The only cookie we use is a <b style={{ fontWeight: 500 }}>session authentication cookie</b> provided by Supabase, our authentication and database provider. This cookie keeps you logged in to your account during your browsing session and is automatically deleted when you log out or close your browser.
+          </Section>
+
+          <Section title="3. Cookie details">
+            <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '16px 20px', marginTop: 8 }}>
+              {[
+                ['Name', 'sb-[project]-auth-token'],
+                ['Provider', 'Supabase'],
+                ['Purpose', 'Keeps you authenticated during your session'],
+                ['Type', 'Session cookie (deleted on logout or browser close)'],
+                ['Data stored', 'Encrypted authentication token — no personal data'],
+                ['Third party', 'No — processed only by Supabase on our behalf'],
+              ].map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', gap: 16, fontSize: 13, padding: '5px 0', borderBottom: '0.5px solid var(--color-border)' }}>
+                  <span style={{ color: 'var(--color-text-muted)', minWidth: 100, flexShrink: 0 }}>{k}</span>
+                  <span style={{ color: 'var(--color-text)' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+
+          <Section title="4. Managing cookies">
+            Because we only use a strictly necessary authentication cookie, there is no cookie consent banner on our platform — this cookie is required for the platform to function when you are logged in.
+            <br /><br />
+            If you wish to delete this cookie, you can log out of your account, clear your browser cookies, or use your browser settings to block cookies entirely. Note that blocking cookies will prevent you from logging in to your artist or buyer account.
+          </Section>
+
+          <Section title="5. Changes to this policy">
+            We may update this Cookie Policy from time to time. Any changes will be posted on this page with an updated date.
+          </Section>
+
+          <Section title="6. Contact">
+            For any questions about how we use cookies, contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a>.
+          </Section>
+
+        </div>
+      </div>
+      <Footer />
+    </div>
+  )
+}
+
+function Section({ title, children }: { title: string, children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: 500, marginBottom: 10, color: 'var(--color-text)' }}>{title}</h2>
+      <div style={{ color: 'var(--color-text-muted)' }}>{children}</div>
+    </div>
+  )
+}
