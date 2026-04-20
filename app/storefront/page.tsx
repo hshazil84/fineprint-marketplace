@@ -110,17 +110,13 @@ export default function StorefrontPage() {
     return matchSearch && matchCat
   })
 
-  const tickerArtists = [...artists, ...artists, ...artists]
-
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
       <style>{`
-        @keyframes ticker { 0% { transform: translateX(0) } 100% { transform: translateX(-33.333%) } }
         @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
-        .ticker-track { animation: ticker 32s linear infinite; }
-        .ticker-track:hover { animation-play-state: paused; }
+        .artist-belt::-webkit-scrollbar { display: none; }
+        .cats-bar::-webkit-scrollbar { display: none; }
         .mobile-swipe::-webkit-scrollbar { display: none; }
-        .cats-scroll::-webkit-scrollbar { display: none; }
         @media(max-width: 768px) {
           .fp-desktop-only { display: none !important; }
           .fp-mobile-only { display: block !important; }
@@ -143,7 +139,7 @@ export default function StorefrontPage() {
 
       {/* CATEGORY CHIPS */}
       <div style={{ borderBottom: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)' }}>
-        <div className="cats-scroll" style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 6, height: 44, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="cats-bar" style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 6, height: 44, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
               fontSize: 12, padding: '4px 14px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer',
@@ -158,31 +154,31 @@ export default function StorefrontPage() {
         </div>
       </div>
 
-      {/* ARTIST TICKER */}
+      {/* ARTIST BELT */}
       {artists.length > 0 && (
-        <div style={{ borderBottom: '0.5px solid var(--color-border)', height: 68, overflow: 'hidden' }}>
-          <div style={{
-            maxWidth: 1080,
-            margin: '0 auto',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            overflow: 'hidden',
-            WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-            maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-          }}>
-            <div className="ticker-track" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 40px' }}>
-              {tickerArtists.map((artist, i) => {
+        <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
+          <div style={{ maxWidth: 1080, margin: '0 auto', position: 'relative' }}>
+            {/* Feathered edges */}
+            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to right, var(--color-background-primary), transparent)', pointerEvents: 'none', zIndex: 2 }} />
+            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to left, var(--color-background-primary), transparent)', pointerEvents: 'none', zIndex: 2 }} />
+            {/* Scrollable row */}
+            <div className="artist-belt" style={{
+              display: 'flex', gap: 12, padding: '12px 40px',
+              overflowX: 'auto', scrollbarWidth: 'none',
+              WebkitOverflowScrolling: 'touch' as any,
+            }}>
+              {artists.map(artist => {
                 const color = getColor(artist.artist_code || 'FP')
                 return (
-                  <div key={`${artist.id}-${i}`} style={{
-                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                    overflow: 'hidden', cursor: 'pointer',
+                  <div key={artist.id} style={{
+                    width: 48, height: 48, borderRadius: '50%',
+                    flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
                     border: '2px solid var(--color-border)',
-                    transition: 'transform 0.2s ease',
+                    transition: 'transform 0.18s ease',
                   }}
                     onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                  >
                     {artist.avatar_url ? (
                       <img src={artist.avatar_url} alt={artist.full_name}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -306,9 +302,11 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
 
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+      <div
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+      >
         <div style={{ aspectRatio: '4/3', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
@@ -328,7 +326,9 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
             </div>
           )}
           {isNew && !isTopSeller && (
-            <div style={{ position: 'absolute', top: 8, right: 8, background: '#1D9E75', color: '#E1F5EE', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>New</div>
+            <div style={{ position: 'absolute', top: 8, right: 8, background: '#1D9E75', color: '#E1F5EE', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
+              New
+            </div>
           )}
           {artwork.category && (
             <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(255,255,255,0.88)', color: '#2C2C2A', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
@@ -364,9 +364,11 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
 
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+      <div
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
+      >
         <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
