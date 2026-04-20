@@ -128,7 +128,7 @@ export default function StorefrontPage() {
         }
         @media(min-width: 769px) {
           .mobile-only { display: none !important; }
-          .desktop-only { display: block !important; }
+          .desktop-only { display: grid !important; }
           .mobile-grid { display: none !important; }
         }
       `}</style>
