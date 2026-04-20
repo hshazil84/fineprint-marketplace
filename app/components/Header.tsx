@@ -8,9 +8,11 @@ interface HeaderProps {
   search?: string
   onSearchChange?: (val: string) => void
   onSearchSubmit?: (val: string) => void
+  minimal?: boolean
+  rightContent?: React.ReactNode
 }
 
-export default function Header({ search = '', onSearchChange, onSearchSubmit }: HeaderProps) {
+export default function Header({ search = '', onSearchChange, onSearchSubmit, minimal = false, rightContent }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [mobileSearch, setMobileSearch] = useState('')
 
@@ -32,9 +34,7 @@ export default function Header({ search = '', onSearchChange, onSearchSubmit }: 
           -webkit-backdrop-filter: blur(16px);
         }
         @media (prefers-color-scheme: dark) {
-          .fp-nav {
-            background-color: rgba(20, 20, 20, 0.82);
-          }
+          .fp-nav { background-color: rgba(20, 20, 20, 0.82); }
         }
         @keyframes fp-slide-down {
           0% { opacity: 0; transform: translateY(-6px); }
@@ -49,103 +49,53 @@ export default function Header({ search = '', onSearchChange, onSearchSubmit }: 
           .fp-header-desktop { display: flex !important; }
         }
       `}</style>
-
-      <nav
-        className="fp-nav"
-        style={{
-          borderBottom: '0.5px solid var(--color-border)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 100,
-        }}
-      >
+      <nav className="fp-nav" style={{ borderBottom: '0.5px solid var(--color-border)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', gap: 16 }}>
 
           {/* Logo */}
           <Link href="/storefront" style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}
             dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
 
-          {/* Desktop */}
-          <div className="fp-header-desktop" style={{ flex: 1, alignItems: 'center', gap: 12 }}>
-            {onSearchChange && (
-              <div style={{ flex: 1, maxWidth: 360, position: 'relative' }}>
-                <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, opacity: 0.4 }}
-                  viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="6.5" cy="6.5" r="4.5" /><path d="M10.5 10.5 14 14" />
-                </svg>
-                <input
-                  value={search}
-                  onChange={e => onSearchChange(e.target.value)}
-                  placeholder="Search artworks, artists..."
-                  style={{ width: '100%', padding: '7px 14px 7px 32px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 20, fontSize: 12, color: 'var(--color-text)', outline: 'none' }}
-                />
-                {search && (
-                  <button onClick={() => onSearchChange('')}
-                    style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)' }}>✕</button>
-                )}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-              <Link href="/orders/track" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Track order</Link>
-              <Link href="/auth/login" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none' }}>Log in</Link>
-              <Link href="/auth/signup" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid #1a1a1a', background: '#1a1a1a', color: '#fff', textDecoration: 'none' }}>Sign up</Link>
+          {/* Minimal mode — logo only, optional right content */}
+          {minimal ? (
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+              {rightContent}
             </div>
-          </div>
-
-          {/* Mobile hamburger */}
-          <div className="fp-header-mobile" style={{ marginLeft: 'auto', alignItems: 'center' }}>
-            <button onClick={() => setMenuOpen(!menuOpen)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, color: 'var(--color-text)', display: 'flex', alignItems: 'center' }}>
-              {menuOpen ? (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 4l12 12M16 4L4 16" />
-                </svg>
-              ) : (
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M3 5h14M3 10h14M3 15h14" />
-                </svg>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile drawer */}
-        {menuOpen && (
-          <div
-            className="fp-nav"
-            style={{
-              borderTop: '0.5px solid var(--color-border)',
-              padding: '16px 24px 24px',
-              animation: 'fp-slide-down 0.18s ease',
-            }}
-          >
-            <form onSubmit={handleMobileSearchSubmit} style={{ marginBottom: 16 }}>
-              <div style={{ position: 'relative' }}>
-                <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 14, height: 14, opacity: 0.4 }}
-                  viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="6.5" cy="6.5" r="4.5" /><path d="M10.5 10.5 14 14" />
-                </svg>
-                <input
-                  value={mobileSearch}
-                  onChange={e => setMobileSearch(e.target.value)}
-                  placeholder="Search artworks, artists..."
-                  style={{ width: '100%', padding: '10px 54px 10px 34px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 20, fontSize: 14, color: 'var(--color-text)', outline: 'none' }}
-                />
-                <button type="submit"
-                  style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: '#1a1a1a', border: 'none', cursor: 'pointer', borderRadius: 14, padding: '5px 12px', fontSize: 12, color: '#fff' }}>
-                  Go
-                </button>
+          ) : (
+            <>
+              {/* Desktop nav */}
+              <div className="fp-header-desktop" style={{ flex: 1, alignItems: 'center', gap: 12 }}>
+                {onSearchChange && (
+                  <div style={{ flex: 1, maxWidth: 360, position: 'relative' }}>
+                    <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, opacity: 0.4 }}
+                      viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <circle cx="6.5" cy="6.5" r="4.5" /><path d="M10.5 10.5 14 14" />
+                    </svg>
+                    <input
+                      value={search}
+                      onChange={e => onSearchChange(e.target.value)}
+                      placeholder="Search artworks, artists..."
+                      style={{ width: '100%', padding: '7px 14px 7px 32px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 20, fontSize: 12, color: 'var(--color-text)', outline: 'none' }}
+                    />
+                    {search && (
+                      <button onClick={() => onSearchChange('')}
+                        style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)' }}>✕</button>
+                    )}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                  <Link href="/orders/track" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>Track order</Link>
+                  <Link href="/auth/login" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none' }}>Log in</Link>
+                  <Link href="/auth/signup" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid #1a1a1a', background: '#1a1a1a', color: '#fff', textDecoration: 'none' }}>Sign up</Link>
+                </div>
               </div>
-            </form>
-            {[['Track order', '/orders/track'], ['Log in', '/auth/login'], ['Sign up', '/auth/signup']].map(([label, href]) => (
-              <Link key={href} href={href} onClick={() => setMenuOpen(false)}
-                style={{ display: 'block', fontSize: 15, color: 'var(--color-text)', textDecoration: 'none', padding: '13px 0', borderBottom: '0.5px solid var(--color-border)' }}>
-                {label}
-              </Link>
-            ))}
-          </div>
-        )}
-      </nav>
-    </>
-  )
-}
+
+              {/* Mobile hamburger */}
+              <div className="fp-header-mobile" style={{ marginLeft: 'auto', alignItems: 'center' }}>
+                <button onClick={() => setMenuOpen(!menuOpen)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, color: 'var(--color-text)', display: 'flex', alignItems: 'center' }}>
+                  {menuOpen ? (
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+                      <path d="M4 4l12 12M16 4L4 16" />
+                    </svg>
+                  ) : (
