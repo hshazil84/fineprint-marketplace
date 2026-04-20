@@ -231,7 +231,7 @@ export default function CheckoutPage() {
                 <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px' }}>
                   <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>FinePrint Studio — Male</p>
                   {[
-                    ['Address', 'Confirmed at order approval'],
+                    ['Address', 'H. Dhunburimaage, Janavaree Magu, Malé'],
                     ['Hours', 'Sun - Thu, 9 am - 6 pm'],
                     ['Contact', 'hello@fineprintmv.com'],
                   ].map(([k, v]) => (
