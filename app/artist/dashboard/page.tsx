@@ -96,6 +96,8 @@ export default function ArtistDashboard() {
   }
 
   const approvedOrders = orders.filter(o => o.status === 'approved')
+  const activeOrders = orders.filter(o => o.status !== 'rejected')
+  const rejectedOrders = orders.filter(o => o.status === 'rejected')
   const totalEarnings = approvedOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
   const paidOut = payouts.filter(p => p.status === 'paid').reduce((s: number, p: any) => s + p.amount, 0)
   const pendingEarnings = totalEarnings - paidOut
@@ -124,21 +126,21 @@ export default function ArtistDashboard() {
           {profile?.avatar_url && (
             <img src={profile.avatar_url} alt={profile.full_name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
           )}
-        <div>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
-            {profile?.shop_status === 'closed' ? (
-              <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
-                Shop closed
-              </span>
-            ) : (
-              <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>
-                Shop open
-              </span>
-            )}
+          <div>
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
+              {profile?.shop_status === 'closed' ? (
+                <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
+                  Shop closed
+                </span>
+              ) : (
+                <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>
+                  Shop open
+                </span>
+              )}
+            </div>
           </div>
-        </div>
         </div>
 
         <div className="protection-banner" style={{ marginTop: 16 }}>
@@ -191,7 +193,6 @@ export default function ArtistDashboard() {
                 const artistEarns = a.price - platformFee
                 const isEditing = editingArtwork?.id === a.id
                 const isDeleting = deleteConfirmId === a.id
-
                 return (
                   <div key={a.id} style={{ borderBottom: '0.5px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px' }}>
@@ -213,14 +214,8 @@ export default function ArtistDashboard() {
                         <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>your earnings</p>
                       </div>
                     </div>
-
-                    {/* Action buttons */}
                     <div style={{ display: 'flex', gap: 8, padding: '0 20px 14px', flexWrap: 'wrap' }}>
-                      <button
-                        className="btn btn-sm"
-                        style={{ fontSize: 11 }}
-                        onClick={() => setEditingArtwork(isEditing ? null : a)}
-                      >
+                      <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setEditingArtwork(isEditing ? null : a)}>
                         {isEditing ? 'Cancel edit' : 'Edit'}
                       </button>
                       {a.status !== 'pending' && (
@@ -232,22 +227,14 @@ export default function ArtistDashboard() {
                           {a.status === 'hidden' ? 'Show listing' : 'Hide listing'}
                         </button>
                       )}
-                      <button
-                        className="btn btn-sm btn-danger"
-                        style={{ fontSize: 11 }}
-                        onClick={() => setDeleteConfirmId(isDeleting ? null : a.id)}
-                      >
+                      <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => setDeleteConfirmId(isDeleting ? null : a.id)}>
                         Delete
                       </button>
                     </div>
-
-                    {/* Delete confirmation */}
                     {isDeleting && (
                       <div style={{ padding: '0 20px 14px' }}>
                         <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <p style={{ fontSize: 13, color: '#A32D2D' }}>
-                            Permanently delete this listing? This cannot be undone.
-                          </p>
+                          <p style={{ fontSize: 13, color: '#A32D2D' }}>Permanently delete this listing? This cannot be undone.</p>
                           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                             <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setDeleteConfirmId(null)}>Cancel</button>
                             <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => deleteArtwork(a.id)}>Yes, delete</button>
@@ -255,8 +242,6 @@ export default function ArtistDashboard() {
                         </div>
                       </div>
                     )}
-
-                    {/* Edit form */}
                     {isEditing && (
                       <EditArtworkForm artwork={a} onSave={updates => saveEdit(a.id, updates)} onCancel={() => setEditingArtwork(null)} />
                     )}
@@ -271,29 +256,65 @@ export default function ArtistDashboard() {
         {tab === 'upload' && <UploadTab profile={profile} nextSeq={artworks.length + 1} onSuccess={() => { setTab('listings'); init() }} />}
 
         {tab === 'orders' && (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {orders.length === 0 ? (
-              <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No orders yet.</p>
-            ) : orders.map(o => (
-              <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 500 }}>{o.artworks?.title} — {o.print_size}</p>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                    {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
-                  </p>
-                  <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
-                  {o.status === 'approved' && (
-                    <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11, display: 'block' }} onClick={() => setSelectedOrder(o)}>
-                      View invoice
-                    </button>
-                  )}
+          <div>
+            {/* Active orders */}
+            <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: rejectedOrders.length > 0 ? 20 : 0 }}>
+              {activeOrders.length === 0 ? (
+                <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No orders yet.</p>
+              ) : activeOrders.map(o => (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 500 }}>{o.artworks?.title} — {o.print_size}</p>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                      {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
+                    </p>
+                    <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                    {o.status === 'approved' && (
+                      <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11, display: 'block' }} onClick={() => setSelectedOrder(o)}>
+                        View invoice
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <span className={'badge badge-' + o.status}>{o.status}</span>
+                    <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(o.artist_earnings)}</p>
+                  </div>
                 </div>
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  <span className={'badge badge-' + o.status}>{o.status}</span>
-                  <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(o.artist_earnings)}</p>
+              ))}
+            </div>
+
+            {/* Rejected orders — shown separately at the bottom */}
+            {rejectedOrders.length > 0 && (
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 500, color: '#A32D2D', marginBottom: 10 }}>
+                  Rejected orders
+                  <span style={{ fontWeight: 400, color: '#A32D2D', fontSize: 12, marginLeft: 6 }}>
+                    · payment could not be verified
+                  </span>
+                </p>
+                <div style={{ border: '0.5px solid #F09595', borderRadius: 12, overflow: 'hidden' }}>
+                  {rejectedOrders.map(o => (
+                    <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid #F09595', background: '#FCEBEB', gap: 12 }}>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D' }}>{o.artworks?.title} — {o.print_size}</p>
+                        <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 2, opacity: 0.7 }}>
+                          {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
+                        </p>
+                        <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                        <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 6, lineHeight: 1.5 }}>
+                          Payment could not be verified. Contact{' '}
+                          <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a>
+                          {' '}if you think this is a mistake.
+                        </p>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <span className="badge badge-rejected">rejected</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
 
@@ -312,15 +333,15 @@ export default function ArtistDashboard() {
         {tab === 'profile' && (
           <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />
         )}
-      </div>
 
         {tab === 'settings' && (
           <SettingsTab
             profile={profile}
             onProfileUpdate={(updates: any) => setProfile({ ...profile, ...updates })}
           />
-        )}  
-      
+        )}
+      </div>
+
       {selectedOrder && (
         <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />
       )}
