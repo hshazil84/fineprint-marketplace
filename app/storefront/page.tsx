@@ -156,44 +156,47 @@ export default function StorefrontPage() {
         </div>
       </div>
 
-      {/* ARTIST TICKER */}
-      {artists.length > 0 && (
-        <div style={{
-          borderBottom: '0.5px solid var(--color-border)',
-          height: 68,
-          display: 'flex',
-          alignItems: 'center',
-          overflow: 'hidden',
-          WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-          maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-        }}>
-          <div className="ticker-track" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 40px' }}>
-            {tickerArtists.map((artist, i) => {
-              const color = getColor(artist.artist_code || 'FP')
-              return (
-                <div key={`${artist.id}-${i}`} style={{
-                  width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                  overflow: 'hidden', cursor: 'pointer',
-                  border: '2px solid var(--color-border)',
-                  transition: 'transform 0.2s ease',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
-                  {artist.avatar_url ? (
-                    <img src={artist.avatar_url} alt={artist.full_name}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                      loading="lazy" />
-                  ) : (
-                    <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
-                      {getInitials(artist.full_name)}
-                    </div>
-                  )}
+{/* ARTIST TICKER */}
+{artists.length > 0 && (
+  <div style={{ borderBottom: '0.5px solid var(--color-border)', height: 68, overflow: 'hidden' }}>
+    <div style={{
+      maxWidth: 1080,
+      margin: '0 auto',
+      height: '100%',
+      display: 'flex',
+      alignItems: 'center',
+      overflow: 'hidden',
+      WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+      maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+    }}>
+      <div className="ticker-track" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 40px' }}>
+        {tickerArtists.map((artist, i) => {
+          const color = getColor(artist.artist_code || 'FP')
+          return (
+            <div key={`${artist.id}-${i}`} style={{
+              width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+              overflow: 'hidden', cursor: 'pointer',
+              border: '2px solid var(--color-border)',
+              transition: 'transform 0.2s ease',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+              {artist.avatar_url ? (
+                <img src={artist.avatar_url} alt={artist.full_name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  loading="lazy" />
+              ) : (
+                <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
+                  {getInitials(artist.full_name)}
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* MAIN CONTENT */}
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '36px 24px 80px' }}>
