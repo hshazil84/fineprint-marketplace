@@ -22,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
-        <Toaster position="top-right" toastOptions={{
+        <Toaster position="bottom-centre" toastOptions={{
           style: { fontFamily: 'DM Sans, sans-serif', fontSize: '13px' }
         }} />
       </body>
