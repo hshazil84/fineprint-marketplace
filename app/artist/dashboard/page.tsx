@@ -13,9 +13,10 @@ import { PayoutsTab } from '@/app/artist/components/PayoutsTab'
 import { ExportTab } from '@/app/artist/components/ExportTab'
 import { ProfileTab } from '@/app/artist/components/ProfileTab'
 import { UploadTab } from '@/app/artist/components/UploadTab'
+import { SettingsTab } from '@/app/artist/components/SettingsTab'
 
 const PLATFORM_FEE = 5
-const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile']
+const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile', 'settings']
 
 export default function ArtistDashboard() {
   const router = useRouter()
@@ -302,6 +303,13 @@ export default function ArtistDashboard() {
         )}
       </div>
 
+        {tab === 'settings' && (
+          <SettingsTab
+            profile={profile}
+            onProfileUpdate={(updates: any) => setProfile({ ...profile, ...updates })}
+          />
+        )}  
+      
       {selectedOrder && (
         <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />
       )}
