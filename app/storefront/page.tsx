@@ -1,8 +1,7 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
-import { renderProtectedImage, attachGlobalKeyboardProtection } from '@/lib/imageProtection'
 import Link from 'next/link'
 import Footer from '@/app/components/Footer'
 
@@ -10,7 +9,6 @@ interface Artwork {
   id: number
   sku: string
   title: string
-  description: string
   price: number
   preview_url: string
   sizes: string[]
@@ -25,19 +23,17 @@ export default function StorefrontPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    attachGlobalKeyboardProtection()
+    async function fetchArtworks() {
+      const { data } = await supabase
+        .from('artworks')
+        .select('*, profiles:artist_id(full_name, artist_code, location)')
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false })
+      setArtworks(data || [])
+      setLoading(false)
+    }
     fetchArtworks()
   }, [])
-
-  async function fetchArtworks() {
-    const { data } = await supabase
-      .from('artworks')
-      .select('*, profiles:artist_id(full_name, artist_code, location)')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false })
-    setArtworks(data || [])
-    setLoading(false)
-  }
 
   return (
     <div>
@@ -76,29 +72,26 @@ export default function StorefrontPage() {
           </div>
         )}
       </div>
+
+      <Footer />
     </div>
-    <Footer />
   )
 }
 
 function ArtworkCard({ artwork }: { artwork: Artwork }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const prices = { printPrice: artwork.offer_pct ? Math.round(artwork.price * (1 - artwork.offer_pct / 100)) : artwork.price }
-
-  useEffect(() => {
-    if (canvasRef.current && artwork.preview_url) {
-      renderProtectedImage(canvasRef.current, artwork.preview_url, artwork.profiles.full_name, 400, 400)
-    }
-  }, [artwork.preview_url])
+  const discountedPrice = artwork.offer_pct
+    ? Math.round(artwork.price * (1 - artwork.offer_pct / 100))
+    : artwork.price
 
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
       <div className="artwork-card">
-        <div className="artwork-protected" style={{ height: 220, background: 'var(--color-background-secondary)' }}>
+        <div className="artwork-protected" style={{ height: 220, background: 'var(--color-background-secondary)', position: 'relative' }}>
           {artwork.preview_url ? (
             <img
               src={artwork.preview_url}
               alt={artwork.title}
+              loading="lazy"
               style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none' }}
             />
           ) : (
@@ -130,7 +123,7 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
                   {formatMVR(artwork.price)}
                 </span>
                 <span style={{ fontSize: 15, fontWeight: 500 }}>
-                  {formatMVR(prices.printPrice)}
+                  {formatMVR(discountedPrice)}
                 </span>
               </>
             ) : (
