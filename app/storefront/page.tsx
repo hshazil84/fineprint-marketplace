@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { formatMVR } from '@/lib/pricing'
+import { formatMVR, getFromPrice } from '@/lib/pricing'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 import Footer from '@/app/components/Footer'
@@ -19,12 +19,13 @@ interface Artwork {
   painting_by: string | null
   artist_id: string
   created_at: string
-  profiles: { full_name: string; artist_code: string; avatar_url: string | null }
+  profiles: { full_name: string; artist_code: string; avatar_url: string | null; display_name: string | null }
 }
 
 interface Artist {
   id: string
   full_name: string
+  display_name: string | null
   artist_code: string
   avatar_url: string | null
 }
@@ -40,6 +41,10 @@ function getColor(code: string) {
   let h = 0
   for (let i = 0; i < code.length; i++) h = code.charCodeAt(i) + ((h << 5) - h)
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+
+function artistName(profiles: Artwork['profiles']): string {
+  return profiles?.display_name || profiles?.full_name || 'Unknown'
 }
 
 function StarIcon() {
@@ -67,13 +72,14 @@ export default function StorefrontPage() {
     const [artRes, artistRes, orderRes] = await Promise.all([
       supabase
         .from('artworks')
-        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, profiles:artist_id(full_name, artist_code, avatar_url)')
+        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, profiles:artist_id(full_name, artist_code, avatar_url, display_name)')
         .eq('status', 'approved')
         .order('created_at', { ascending: false }),
       supabase
         .from('profiles')
-        .select('id, full_name, artist_code, avatar_url')
+        .select('id, full_name, display_name, artist_code, avatar_url')
         .eq('role', 'artist')
+        .eq('shop_status', 'open')
         .limit(20),
       supabase
         .from('orders')
@@ -104,7 +110,7 @@ export default function StorefrontPage() {
   const filtered = artworks.filter(a => {
     const matchSearch = !search ||
       a.title.toLowerCase().includes(search.toLowerCase()) ||
-      (a.profiles?.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      artistName(a.profiles).toLowerCase().includes(search.toLowerCase()) ||
       a.sku.toLowerCase().includes(search.toLowerCase())
     const matchCat = activeCategory === 'All' || a.category === activeCategory
     return matchSearch && matchCat
@@ -131,11 +137,7 @@ export default function StorefrontPage() {
         }
       `}</style>
 
-      <Header
-        search={search}
-        onSearchChange={setSearch}
-        onSearchSubmit={setSearch}
-      />
+      <Header search={search} onSearchChange={setSearch} onSearchSubmit={setSearch} />
 
       {/* CATEGORY CHIPS */}
       <div style={{ borderBottom: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)' }}>
@@ -158,34 +160,30 @@ export default function StorefrontPage() {
       {artists.length > 0 && (
         <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
           <div style={{ maxWidth: 1080, margin: '0 auto', position: 'relative' }}>
-            {/* Feathered edges */}
             <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to right, var(--color-background-primary), transparent)', pointerEvents: 'none', zIndex: 2 }} />
             <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to left, var(--color-background-primary), transparent)', pointerEvents: 'none', zIndex: 2 }} />
-            {/* Scrollable row */}
-            <div className="artist-belt" style={{
-              display: 'flex', gap: 12, padding: '12px 40px',
-              overflowX: 'auto', scrollbarWidth: 'none',
-              WebkitOverflowScrolling: 'touch' as any,
-            }}>
+            <div className="artist-belt" style={{ display: 'flex', gap: 12, padding: '12px 40px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' as any }}>
               {artists.map(artist => {
                 const color = getColor(artist.artist_code || 'FP')
+                const name = artist.display_name || artist.full_name
                 return (
                   <div key={artist.id} style={{
-                    width: 48, height: 48, borderRadius: '50%',
-                    flexShrink: 0, overflow: 'hidden', cursor: 'pointer',
+                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                    overflow: 'hidden', cursor: 'pointer',
                     border: '2px solid var(--color-border)',
                     transition: 'transform 0.18s ease',
                   }}
                     onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
                     onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                    title={name}
                   >
                     {artist.avatar_url ? (
-                      <img src={artist.avatar_url} alt={artist.full_name}
+                      <img src={artist.avatar_url} alt={name}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                         loading="lazy" />
                     ) : (
                       <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
-                        {getInitials(artist.full_name)}
+                        {getInitials(name)}
                       </div>
                     )}
                   </div>
@@ -211,23 +209,18 @@ export default function StorefrontPage() {
                 </div>
 
                 {/* Desktop: 3-col 4:3 grid */}
-                <div
-                  className="fp-desktop-only"
-                  style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}
-                >
+                <div className="fp-desktop-only" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
                   {recentSix.map((artwork, i) => (
                     <ArtworkCard43 key={artwork.id} artwork={artwork} isNew={i < 2} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
 
-                {/* Mobile: horizontal swipe carousel */}
+                {/* Mobile: horizontal swipe */}
                 <div className="fp-mobile-only" style={{ display: 'none' }}>
                   <div className="mobile-swipe" style={{
                     display: 'flex', gap: 12,
-                    overflowX: 'auto',
-                    scrollSnapType: 'x mandatory',
-                    WebkitOverflowScrolling: 'touch' as any,
-                    scrollbarWidth: 'none',
+                    overflowX: 'auto', scrollSnapType: 'x mandatory',
+                    WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none',
                   }}>
                     {recentSix.map(artwork => (
                       <div key={artwork.id} style={{ flex: '0 0 calc(100vw - 48px)', scrollSnapAlign: 'start' }}>
@@ -267,20 +260,13 @@ export default function StorefrontPage() {
             ) : (
               <>
                 {/* Desktop: 5-col 1:1 */}
-                <div
-                  className="fp-desktop-grid"
-                  style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}
-                >
+                <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
                   {filtered.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
-
                 {/* Mobile: 2-col grid */}
-                <div
-                  className="fp-mobile-grid"
-                  style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}
-                >
+                <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
                   {filtered.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
@@ -298,15 +284,14 @@ export default function StorefrontPage() {
 
 function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNew: boolean; isTopSeller: boolean }) {
   const [loaded, setLoaded] = useState(false)
-  const discounted = artwork.offer_pct ? Math.round(artwork.price * (1 - artwork.offer_pct / 100)) : artwork.price
+  const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
+  const name = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
 
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div
-        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+      <div style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
-      >
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
         <div style={{ aspectRatio: '4/3', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
@@ -326,9 +311,7 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
             </div>
           )}
           {isNew && !isTopSeller && (
-            <div style={{ position: 'absolute', top: 8, right: 8, background: '#1D9E75', color: '#E1F5EE', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
-              New
-            </div>
+            <div style={{ position: 'absolute', top: 8, right: 8, background: '#1D9E75', color: '#E1F5EE', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>New</div>
           )}
           {artwork.category && (
             <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(255,255,255,0.88)', color: '#2C2C2A', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
@@ -338,17 +321,11 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
         </div>
         <div style={{ padding: '12px 14px 14px' }}>
           <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 2, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
-          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>by {artwork.painting_by || artwork.profiles?.full_name}</p>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>by {artwork.painting_by || name}</p>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {artwork.offer_pct ? (
-                <>
-                  <span style={{ fontSize: 12, color: 'var(--color-text-hint)', textDecoration: 'line-through' }}>{formatMVR(artwork.price)}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500 }}>{formatMVR(discounted)}</span>
-                </>
-              ) : (
-                <span style={{ fontSize: 14, fontWeight: 500 }}>{formatMVR(artwork.price)}</span>
-              )}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>From</span>
+              <span style={{ fontSize: 14, fontWeight: 500 }}>{formatMVR(fromPrice)}</span>
             </div>
             <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontFamily: 'monospace' }}>{artwork.sku}</span>
           </div>
@@ -360,15 +337,14 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
 
 function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller: boolean }) {
   const [loaded, setLoaded] = useState(false)
-  const discounted = artwork.offer_pct ? Math.round(artwork.price * (1 - artwork.offer_pct / 100)) : artwork.price
+  const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
+  const name = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
 
   return (
     <Link href={`/artwork/${artwork.id}`} style={{ textDecoration: 'none' }}>
-      <div
-        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
+      <div style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
-        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
-      >
+        onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}>
         <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
@@ -390,8 +366,11 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
         </div>
         <div style={{ padding: '9px 10px 10px' }}>
           <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 1, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
-          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.painting_by || artwork.profiles?.full_name}</p>
-          <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>{formatMVR(discounted)}</p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.painting_by || name}</p>
+          <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>
+            <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 400 }}>From </span>
+            {formatMVR(fromPrice)}
+          </p>
         </div>
       </div>
     </Link>
