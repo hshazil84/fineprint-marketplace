@@ -1,122 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase'
-import { calculatePrices, buildOrderSKU } from '@/lib/pricing'
 import { notifyNewOrder } from '@/lib/telegram'
+import { sendInvoiceEmail } from '@/lib/invoice'
+
+function generateInvoiceNumber(): string {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const rand = Math.floor(Math.random() * 9000) + 1000
+  return 'INV-' + year + '-' + month + day + '-' + rand
+}
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const {
-      artworkId, artworkSku, artworkTitle, artistName,
-      artistId, buyerId, buyerName, buyerEmail, buyerPhone,
-      printSize, deliveryMethod,
-      deliveryIsland, deliveryAtoll, deliveryNotes,
-      originalPrice, offerLabel, offerPct,
-      newsletterOptIn, isGuest,
-    } = body
-
     const supabase = createAdminClient()
 
-    // Calculate all prices
-    const prices = calculatePrices(originalPrice, offerPct || 0, offerLabel, deliveryMethod, printSize)
+    const invoiceNumber = generateInvoiceNumber()
+    const orderSku = body.artworkSku + '-' + body.printSize
 
-    // Generate invoice number
-    const { data: invData } = await supabase.rpc('generate_invoice_number')
-    const invoiceNumber = invData || `INV-${new Date().getFullYear()}-${Date.now()}`
+    const hasOffer = body.offerPct && body.offerPct > 0
+    const discountAmount = hasOffer ? Math.round(body.originalPrice * body.offerPct / 100) : 0
+    const printPrice = body.originalPrice - discountAmount
 
-    // Build order SKU
-    const orderSku = buildOrderSKU(artworkSku, printSize)
-
-    // Insert order
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert({
-        invoice_number:   invoiceNumber,
-        order_sku:        orderSku,
-        artwork_id:       artworkId,
-        buyer_id:         buyerId || null,
-        buyer_name:       buyerName,
-        buyer_email:      buyerEmail,
-        buyer_phone:      buyerPhone,
-        original_price:   prices.originalPrice,
-        offer_label:      offerLabel || null,
-        offer_pct:        offerPct || 0,
-        discount_amount:  prices.discountAmount,
-        print_price:      prices.printPrice,
-        printing_fee:     prices.printingFee,
-        handling_fee:     prices.handlingFee,
-        total_paid:       prices.totalPaid,
-        fp_commission:    prices.fpCommission,
-        artist_earnings:  prices.artistEarnings,
-        delivery_method:  deliveryMethod,
-        delivery_island:  deliveryIsland || null,
-        delivery_atoll:   deliveryAtoll || null,
-        delivery_notes:   deliveryNotes || null,
-        print_size:       printSize,
-        status:           'pending',
-      })
-      .select()
-      .single()
+    const { data: order, error } = await supabase.from('orders').insert({
+      invoice_number:   invoiceNumber,
+      order_sku:        orderSku,
+      artwork_id:       body.artworkId,
+      buyer_id:         body.buyerId || null,
+      buyer_name:       body.buyerName,
+      buyer_email:      body.buyerEmail,
+      buyer_phone:      body.buyerPhone,
+      original_price:   body.originalPrice,
+      offer_label:      body.offerLabel || null,
+      offer_pct:        body.offerPct || null,
+      discount_amount:  discountAmount,
+      print_price:      printPrice,
+      printing_fee:     body.printingFee,
+      handling_fee:     body.handlingFee,
+      total_paid:       body.totalPaid,
+      fp_commission:    body.fpCommission,
+      artist_earnings:  body.artistEarnings,
+      print_size:       body.printSize,
+      delivery_method:  body.deliveryMethod,
+      delivery_island:  body.deliveryIsland || null,
+      delivery_atoll:   body.deliveryAtoll || null,
+      delivery_notes:   body.deliveryNotes || null,
+      status:           'pending',
+      payment_method:   body.paymentMethod || 'bank_transfer',
+    }).select().single()
 
     if (error) throw error
 
-    // Upsert customer record
-    // If buyer already exists by email update their details
-    // If new buyer create a new record
-    const { data: existingCustomer } = await supabase
-      .from('customers')
-      .select('id, order_count, total_spent, newsletter_opt_in')
-      .eq('email', buyerEmail)
-      .maybeSingle()
+    const { data: artwork } = await supabase
+      .from('artworks')
+      .select('profiles:artist_id(full_name, display_name)')
+      .eq('id', body.artworkId)
+      .single()
 
-    if (existingCustomer) {
-      await supabase
-        .from('customers')
-        .update({
-          name:             buyerName,
-          phone:            buyerPhone,
-          last_order_at:    new Date().toISOString(),
-          order_count:      (existingCustomer.order_count || 0) + 1,
-          total_spent:      (existingCustomer.total_spent || 0) + prices.totalPaid,
-          newsletter_opt_in: newsletterOptIn || existingCustomer.newsletter_opt_in,
-          updated_at:       new Date().toISOString(),
-        })
-        .eq('id', existingCustomer.id)
-    } else {
-      await supabase
-        .from('customers')
-        .insert({
-          name:             buyerName,
-          email:            buyerEmail,
-          phone:            buyerPhone,
-          is_guest:         isGuest || false,
-          newsletter_opt_in: newsletterOptIn || false,
-          order_count:      1,
-          total_spent:      prices.totalPaid,
-          first_order_at:   new Date().toISOString(),
-          last_order_at:    new Date().toISOString(),
-        })
-    }
+    const artistName = (artwork?.profiles as any)?.display_name || (artwork?.profiles as any)?.full_name || body.artistName
 
-    // Send Telegram notification
     await notifyNewOrder({
       invoiceNumber,
       orderSku,
-      artworkTitle,
+      artworkTitle:   body.artworkTitle,
       artistName,
-      buyerName,
-      buyerPhone: buyerPhone || 'Not provided',
-      deliveryMethod,
-      deliveryIsland,
-      deliveryAtoll,
-      totalPaid:  prices.totalPaid,
-      offerLabel,
-      offerPct,
+      buyerName:      body.buyerName,
+      buyerPhone:     body.buyerPhone,
+      deliveryMethod: body.deliveryMethod,
+      deliveryIsland: body.deliveryIsland,
+      deliveryAtoll:  body.deliveryAtoll,
+      totalPaid:      body.totalPaid,
+      offerLabel:     body.offerLabel,
+      offerPct:       body.offerPct,
+      paymentMethod:  body.paymentMethod || 'bank_transfer',
     })
 
-    return NextResponse.json({ success: true, invoiceNumber, orderSku })
+    try {
+      await upsertCustomer(supabase, {
+        name:            body.buyerName,
+        email:           body.buyerEmail,
+        phone:           body.buyerPhone,
+        isGuest:         body.isGuest,
+        newsletterOptIn: body.newsletterOptIn,
+        totalPaid:       body.totalPaid,
+      })
+    } catch (customerErr) {
+      console.error('Customer upsert failed:', customerErr)
+    }
+
+    return NextResponse.json({ success: true, invoiceNumber, orderSku, orderId: order.id })
   } catch (err: any) {
-    console.error('Order error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('Order creation failed:', err)
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 })
+  }
+}
+
+async function upsertCustomer(supabase: any, data: {
+  name: string
+  email: string
+  phone: string
+  isGuest: boolean
+  newsletterOptIn: boolean
+  totalPaid: number
+}) {
+  const { data: existing } = await supabase
+    .from('customers')
+    .select('id, order_count, total_spent')
+    .eq('email', data.email.toLowerCase())
+    .single()
+
+  if (existing) {
+    await supabase.from('customers').update({
+      name:             data.name,
+      phone:            data.phone,
+      order_count:      (existing.order_count || 0) + 1,
+      total_spent:      (existing.total_spent || 0) + data.totalPaid,
+      last_order_at:    new Date().toISOString(),
+      newsletter_opt_in: data.newsletterOptIn || false,
+      updated_at:       new Date().toISOString(),
+    }).eq('id', existing.id)
+  } else {
+    await supabase.from('customers').insert({
+      name:             data.name,
+      email:            data.email.toLowerCase(),
+      phone:            data.phone,
+      is_guest:         data.isGuest,
+      newsletter_opt_in: data.newsletterOptIn || false,
+      order_count:      1,
+      total_spent:      data.totalPaid,
+      first_order_at:   new Date().toISOString(),
+      last_order_at:    new Date().toISOString(),
+    })
   }
 }
