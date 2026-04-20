@@ -76,7 +76,6 @@ export default function StorefrontPage() {
           </div>
         )}
       </div>
-
       <Footer />
     </div>
   )
@@ -145,7 +144,6 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
             )}
           </div>
         </div>
-        <Footer />
       </div>
     </Link>
   )
