@@ -19,6 +19,12 @@ function getColor(code: string) {
   return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
+function makeHref(value: string, prefix: string): string {
+  if (!value) return ''
+  if (value.startsWith('http')) return value
+  return prefix + value.replace('@', '')
+}
+
 function StarIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 16 16" fill="#FAC775" style={{ flexShrink: 0 }}>
@@ -60,7 +66,11 @@ export default function ArtistProfilePage() {
       .eq('role', 'artist')
       .single()
 
-    if (!prof) { setNotFound(true); setLoading(false); return }
+    if (!prof) {
+      setNotFound(true)
+      setLoading(false)
+      return
+    }
     setProfile(prof)
 
     const [artRes, orderRes] = await Promise.all([
@@ -119,13 +129,12 @@ export default function ArtistProfilePage() {
   const color = getColor(profile.artist_code || 'FP')
   const isClosed = profile.shop_status === 'closed'
 
-  const socialLinks = [
-    { label: 'Instagram', value: profile.instagram, href: profile.instagram ? (profile.instagram.startsWith('http') ? profile.instagram : 'https://instagram.com/' + profile.instagram.replace('@', '')) : '' },
-    { label: 'TikTok', value: profile.tiktok, href: profile.tiktok ? (profile.tiktok.startsWith('http') ? profile.tiktok : 'https://tiktok.com/@' + profile.tiktok.replace('@', '')) : '' },
-    { label: 'Facebook', value: profile.facebook, href: profile.facebook ? (profile.facebook.startsWith('http') ? profile.facebook : 'https://' + profile.facebook) : '' },
-    { label: 'LinkedIn', value: profile.linkedin, href: profile.linkedin ? (profile.linkedin.startsWith('http') ? profile.linkedin : 'https://' + profile.linkedin) : '' },
-    { label: 'Website', value: profile.website, href: profile.website ? (profile.website.startsWith('http') ? profile.website : 'https://' + profile.website) : '' },
-  ].filter(s => s.value)
+  const socialLinks: { label: string; href: string }[] = []
+  if (profile.instagram) socialLinks.push({ label: 'Instagram', href: makeHref(profile.instagram, 'https://instagram.com/') })
+  if (profile.tiktok) socialLinks.push({ label: 'TikTok', href: makeHref(profile.tiktok, 'https://tiktok.com/@') })
+  if (profile.facebook) socialLinks.push({ label: 'Facebook', href: makeHref(profile.facebook, 'https://') })
+  if (profile.linkedin) socialLinks.push({ label: 'LinkedIn', href: makeHref(profile.linkedin, 'https://') })
+  if (profile.website) socialLinks.push({ label: 'Website', href: makeHref(profile.website, 'https://') })
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
@@ -223,7 +232,7 @@ export default function ArtistProfilePage() {
             <p style={{ fontSize: 14, color: 'var(--color-text-muted)' }}>No artworks listed yet.</p>
           </div>
         ) : (
-          <>
+          <div>
             <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 20 }}>
               Artworks by {displayName}
               <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 8 }}>
@@ -242,7 +251,7 @@ export default function ArtistProfilePage() {
                 <ArtworkCard key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
               ))}
             </div>
-          </>
+          </div>
         )}
       </div>
 
@@ -290,7 +299,7 @@ function ArtworkCard({ artwork, isTopSeller }: { artwork: any, isTopSeller: bool
         <div style={{ padding: '10px 12px 12px' }}>
           <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 1, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
           {artwork.painting_by && (
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>by {artwork.painting_by}</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>by {artwork.painting_by}</p>
           )}
           <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text)' }}>
             <span style={{ fontSize: 10, color: 'var(--color-text-muted)', fontWeight: 400 }}>From </span>
