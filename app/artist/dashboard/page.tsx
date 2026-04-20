@@ -124,10 +124,21 @@ export default function ArtistDashboard() {
           {profile?.avatar_url && (
             <img src={profile.avatar_url} alt={profile.full_name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
           )}
-          <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
             <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
+            {profile?.shop_status === 'closed' ? (
+              <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
+                Shop closed
+              </span>
+            ) : (
+              <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>
+                Shop open
+              </span>
+            )}
           </div>
+        </div>
         </div>
 
         <div className="protection-banner" style={{ marginTop: 16 }}>
