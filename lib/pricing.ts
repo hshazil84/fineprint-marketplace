@@ -1,15 +1,20 @@
 export const PLATFORM_FEE_PCT = 5
 export const HANDLING_FEE = 100
 export const COMMISSION_PCT = 5
-
 export const PRINTING_FEES: Record<string, number> = {
-  'A4':  200,
-  'A3':  350,
-  'A2':  500,
+  'A4': 200,
+  'A3': 350,
+  'A2': 500,
   '12x16': 450,
 }
-
 export const SIZES = ['A4', 'A3']
+
+export const SIZE_DIMENSIONS: Record<string, string> = {
+  'A4': '210 × 297 mm',
+  'A3': '297 × 420 mm',
+  'A2': '420 × 594 mm',
+  '12x16': '305 × 406 mm',
+}
 
 export interface PriceBreakdown {
   artistPrice: number
@@ -47,13 +52,19 @@ export function calculatePrices(
   const artworkLineItem = discountedPrice + printingFee
   const totalPaid       = artworkLineItem + handlingFee
   const fpTotal         = platformFeeAmt + printingFee + handlingFee
-
   return {
     artistPrice, platformFeePct: PLATFORM_FEE_PCT, platformFeeAmt,
     artistEarnings, printSize, printingFee, deliveryMethod, handlingFee,
     artworkLineItem, totalPaid, offerLabel, offerPct, discountAmount, fpTotal,
     originalPrice: artistPrice, printPrice: discountedPrice, fpCommission: platformFeeAmt,
   }
+}
+
+export function getFromPrice(artistPrice: number, sizes: string[], offerPct: number = 0): number {
+  if (!sizes || sizes.length === 0) sizes = ['A4']
+  const discountedPrice = artistPrice - Math.round(artistPrice * offerPct / 100)
+  const lowestPrintingFee = Math.min(...sizes.map(s => PRINTING_FEES[s] || PRINTING_FEES['A4']))
+  return discountedPrice + lowestPrintingFee
 }
 
 export function formatMVR(amount: number): string {
