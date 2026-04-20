@@ -169,16 +169,17 @@ export default function StorefrontPage() {
                 const color = getColor(artist.artist_code || 'FP')
                 const name = artist.display_name || artist.full_name
                 return (
-                  <div key={artist.id} style={{
-                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                    overflow: 'hidden', cursor: 'pointer',
-                    border: '2px solid var(--color-border)',
-                    transition: 'transform 0.18s ease',
-                  }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
-                    title={name}
-                  >
+                    <Link key={artist.id} href={'/artist/' + artist.artist_code} style={{
+                      width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                      overflow: 'hidden', cursor: 'pointer', display: 'block',
+                      border: '2px solid var(--color-border)',
+                      transition: 'transform 0.18s ease',
+                      textDecoration: 'none',
+                    }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.12)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
+                      title={name}
+                    >
                     {artist.avatar_url ? (
                       <img src={artist.avatar_url} alt={name}
                         style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
@@ -188,7 +189,7 @@ export default function StorefrontPage() {
                         {getInitials(name)}
                       </div>
                     )}
-                  </div>
+                  </Link>
                 )
               })}
             </div>
