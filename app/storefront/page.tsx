@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
 import { renderProtectedImage, attachGlobalKeyboardProtection } from '@/lib/imageProtection'
 import Link from 'next/link'
-import Footer from '../components/Footer'
+import Footer from '@/app/components/Footer'
 
 interface Artwork {
   id: number
