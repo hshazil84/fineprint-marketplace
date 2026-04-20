@@ -22,9 +22,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
-        <Toaster position="top-right" toastOptions={{
-          style: { fontFamily: 'DM Sans, sans-serif', fontSize: '13px' }
-        }} />
+        <Toaster
+          position="bottom-center"
+          toastOptions={{
+            style: {
+              fontFamily: 'DM Sans, sans-serif',
+              fontSize: '13px',
+              borderRadius: '20px',
+              background: '#1a1a1a',
+              color: '#fff',
+              padding: '10px 18px',
+            },
+            success: {
+              iconTheme: {
+                primary: '#1D9E75',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#E24B4A',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
       </body>
     </html>
   )
