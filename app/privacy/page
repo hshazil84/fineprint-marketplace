@@ -16,66 +16,50 @@ export default function PrivacyPage() {
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', marginBottom: 8 }}>Privacy Policy</h1>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 40 }}>Last updated: April 2026</p>
 
-        <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--color-text)' }}>
-
+        <div style={{ fontSize: 14, lineHeight: 1.8 }}>
           <Section title="1. Who we are">
-            FinePrint Studio is a registered business in the Republic of Maldives, operating the online print marketplace at shop.fineprintmv.com. We are responsible for the personal data collected through this platform. For any privacy queries, contact us at hello@fineprintmv.com.
+            FinePrint Studio is a registered business in the Republic of Maldives, operating the online print marketplace at shop.fineprintmv.com. For privacy queries, contact us at hello@fineprintmv.com.
           </Section>
-
           <Section title="2. What data we collect">
-            <b style={{ fontWeight: 500 }}>Buyers:</b> When you place an order, we collect your name, email address, phone number, and delivery address. We also collect your bank transfer reference for payment verification purposes.
+            <b style={{ fontWeight: 500 }}>Buyers:</b> Name, email address, phone number, and delivery address when placing an order. Bank transfer reference for payment verification.
             <br /><br />
-            <b style={{ fontWeight: 500 }}>Artists:</b> When you register as an artist, we collect your name, email address, location, profile information, social media handles, and bank account details for payout processing. We also store the artwork files you upload.
+            <b style={{ fontWeight: 500 }}>Artists:</b> Name, email address, location, profile information, social media handles, and bank account details for payout processing. Artwork files you upload.
             <br /><br />
-            <b style={{ fontWeight: 500 }}>All users:</b> When you use our platform, we may collect browser session data through authentication cookies provided by Supabase. We do not use advertising trackers or third-party analytics.
+            <b style={{ fontWeight: 500 }}>All users:</b> Browser session data through authentication cookies provided by Supabase. We do not use advertising trackers or third-party analytics.
           </Section>
-
           <Section title="3. How we use your data">
-            We use your data solely for the following purposes:
+            We use your data solely for:
             <br /><br />
-            — Processing and fulfilling your print orders<br />
+            — Processing and fulfilling print orders<br />
             — Sending order confirmations, invoices, and status updates<br />
             — Processing artist payouts<br />
-            — Communicating with you about your order or account<br />
-            — Maintaining the security and integrity of our platform
+            — Communicating about your order or account<br />
+            — Maintaining platform security
             <br /><br />
             We do not sell, rent, or share your personal data with third parties for marketing purposes.
           </Section>
-
           <Section title="4. Who we share data with">
-            Your data may be shared with the following service providers solely for the purpose of operating our platform:
-            <br /><br />
             — <b style={{ fontWeight: 500 }}>Supabase</b> — database, file storage, and authentication<br />
             — <b style={{ fontWeight: 500 }}>Resend</b> — transactional email delivery<br />
-            — <b style={{ fontWeight: 500 }}>Vercel</b> — platform hosting<br />
-            <br />
-            All providers are contractually bound to handle your data securely and only for the purposes we specify.
+            — <b style={{ fontWeight: 500 }}>Vercel</b> — platform hosting
+            <br /><br />
+            All providers are bound to handle your data securely and only for specified purposes.
           </Section>
-
           <Section title="5. Artwork files">
-            Hi-resolution print files uploaded by artists are stored in a private, access-controlled storage bucket. They are only accessible to FinePrint Studio staff for print fulfillment purposes. Watermarked preview images are stored in a public bucket and displayed to buyers on the storefront.
+            Hi-resolution print files are stored in a private, access-controlled storage bucket, accessible only to FinePrint Studio staff for print fulfillment. Watermarked preview images are stored publicly and displayed on the storefront.
           </Section>
-
           <Section title="6. Data retention">
-            We retain order data for a minimum of 5 years for accounting and legal compliance purposes. Artist payout records are retained for the same period. You may request deletion of your account and personal data at any time by emailing hello@fineprintmv.com, subject to our legal retention obligations.
+            We retain order data for a minimum of 5 years for accounting and legal compliance. You may request deletion of your account at any time by emailing hello@fineprintmv.com, subject to our legal retention obligations.
           </Section>
-
           <Section title="7. Your rights">
-            You have the right to access the personal data we hold about you, request corrections, request deletion, and object to processing. To exercise any of these rights, contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a>.
+            You have the right to access, correct, delete, or object to processing of your personal data. Contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a>.
           </Section>
-
           <Section title="8. Cookies">
-            We use a minimal session cookie for authentication purposes only. For full details, see our <Link href="/cookies" style={{ color: 'var(--color-teal)' }}>Cookie Policy</Link>.
+            We use a minimal session cookie for authentication only. See our <Link href="/cookies" style={{ color: 'var(--color-teal)' }}>Cookie Policy</Link> for details.
           </Section>
-
-          <Section title="9. Changes to this policy">
-            We may update this policy from time to time. Changes will be posted on this page with an updated date. Continued use of the platform after changes constitutes acceptance of the updated policy.
+          <Section title="9. Contact">
+            For privacy queries, contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a> or call 9998124.
           </Section>
-
-          <Section title="10. Contact">
-            For any privacy-related queries, contact us at <a href="mailto:hello@fineprintmv.com" style={{ color: 'var(--color-teal)' }}>hello@fineprintmv.com</a> or call 9998124.
-          </Section>
-
         </div>
       </div>
       <Footer />
