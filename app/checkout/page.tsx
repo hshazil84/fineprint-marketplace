@@ -126,6 +126,25 @@ export default function CheckoutPage() {
 
   const sizeLabel = checkoutData.printSize + (SIZE_DIMENSIONS[checkoutData.printSize] ? ' (' + SIZE_DIMENSIONS[checkoutData.printSize] + ')' : '')
 
+  const optionStyle = (active: boolean) => ({
+    border: active ? '1.5px solid rgba(0,0,0,0.7)' : '0.5px solid var(--color-border)',
+    borderRadius: 12,
+    padding: 14,
+    cursor: 'pointer',
+    marginBottom: 10,
+    background: active ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
+    transition: 'all 0.15s',
+  })
+
+  const radioStyle = (active: boolean) => ({
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    border: active ? '5px solid rgba(0,0,0,0.7)' : '1.5px solid var(--color-border)',
+    flexShrink: 0,
+    transition: 'all 0.15s',
+  })
+
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
       <Header />
@@ -180,14 +199,13 @@ export default function CheckoutPage() {
                   { id: 'pickup', title: 'Pick up', desc: 'Collect from our Male studio', price: 'Free', priceColor: '#1D9E75' },
                 ].map(opt => (
                   <div key={opt.id} onClick={() => setDeliveryMethod(opt.id as any)}
-                    style={{
-                      border: deliveryMethod === opt.id ? '2px solid var(--color-text)' : '0.5px solid var(--color-border)',
-                      borderRadius: 'var(--radius-lg)', padding: 14, cursor: 'pointer',
-                      background: deliveryMethod === opt.id ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
-                    }}>
-                    <p style={{ fontSize: 13, fontWeight: 500 }}>{opt.title}</p>
-                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2, lineHeight: 1.5 }}>{opt.desc}</p>
-                    <p style={{ fontSize: 13, fontWeight: 500, marginTop: 8, color: opt.priceColor }}>{opt.price}</p>
+                    style={optionStyle(deliveryMethod === opt.id)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={radioStyle(deliveryMethod === opt.id)} />
+                      <p style={{ fontSize: 13, fontWeight: 500 }}>{opt.title}</p>
+                    </div>
+                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.5, paddingLeft: 24 }}>{opt.desc}</p>
+                    <p style={{ fontSize: 13, fontWeight: 500, marginTop: 6, paddingLeft: 24, color: opt.priceColor }}>{opt.price}</p>
                   </div>
                 ))}
               </div>
@@ -210,7 +228,7 @@ export default function CheckoutPage() {
                   </div>
                 </>
               ) : (
-                <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px' }}>
+                <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px' }}>
                   <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>FinePrint Studio — Male</p>
                   {[
                     ['Address', 'Confirmed at order approval'],
@@ -290,23 +308,13 @@ export default function CheckoutPage() {
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>Payment method</p>
 
               {/* Bank transfer option */}
-              <div
-                onClick={() => setPaymentMethod('bank_transfer')}
-                style={{
-                  border: paymentMethod === 'bank_transfer' ? '2px solid var(--color-text)' : '0.5px solid var(--color-border)',
-                  borderRadius: 'var(--border-radius-md)',
-                  padding: 14,
-                  cursor: 'pointer',
-                  marginBottom: 10,
-                  background: paymentMethod === 'bank_transfer' ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: paymentMethod === 'bank_transfer' ? 12 : 0 }}>
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: paymentMethod === 'bank_transfer' ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0 }} />
+              <div onClick={() => setPaymentMethod('bank_transfer')} style={optionStyle(paymentMethod === 'bank_transfer')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={radioStyle(paymentMethod === 'bank_transfer')} />
                   <p style={{ fontSize: 13, fontWeight: 500 }}>Bank transfer — BML</p>
                 </div>
                 {paymentMethod === 'bank_transfer' && (
-                  <div style={{ paddingLeft: 24 }}>
+                  <div style={{ paddingLeft: 24, marginTop: 12 }}>
                     <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
                       {[
                         ['Bank', 'Bank of Maldives (BML)'],
@@ -349,31 +357,19 @@ export default function CheckoutPage() {
               </div>
 
               {/* Swipe option */}
-              <div
-                onClick={() => setPaymentMethod('swipe')}
-                style={{
-                  border: paymentMethod === 'swipe' ? '2px solid var(--color-text)' : '0.5px solid var(--color-border)',
-                  borderRadius: 'var(--border-radius-md)',
-                  padding: 14,
-                  cursor: 'pointer',
-                  marginBottom: 16,
-                  background: paymentMethod === 'swipe' ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: paymentMethod === 'swipe' ? 12 : 0 }}>
-                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: paymentMethod === 'swipe' ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0 }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div onClick={() => setPaymentMethod('swipe')} style={optionStyle(paymentMethod === 'swipe')}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={radioStyle(paymentMethod === 'swipe')} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Pay via</span>
                     <img src="/swipe-logo.svg" alt="Swipe" style={{ height: 35, width: 'auto', display: 'block' }} />
                   </div>
                 </div>
-
-                      <p style={{ fontSize: 12, fontWeight: 500, marginTop: 8, color: 'var(--color-text)' }}>
-                        Amount: {formatMVR(prices.totalPaid)}
-                      </p>
-                    </div>
-                    <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '10px 12px' }}>
-                      <p style={{ fontSize: 12, color: '#0F6E56', lineHeight: 1.6 }}>
-                        Open your Swipe app, send <strong>{formatMVR(prices.totalPaid)}</strong> to <strong>hasan@swipe</strong> then tap Submit order below.
+                {paymentMethod === 'swipe' && (
+                  <div style={{ paddingLeft: 24, marginTop: 12 }}>
+                    <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '12px 14px', marginBottom: 4 }}>
+                      <p style={{ fontSize: 13, color: '#0F6E56', lineHeight: 1.7 }}>
+                        Open your Swipe app and send <strong>{formatMVR(prices.totalPaid)}</strong> then tap Submit order below.
                       </p>
                     </div>
                   </div>
