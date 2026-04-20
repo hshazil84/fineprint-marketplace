@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
-import { calculatePrices, formatMVR } from '@/lib/pricing'
+import { formatMVR } from '@/lib/pricing'
 import { renderProtectedImage, attachGlobalKeyboardProtection } from '@/lib/imageProtection'
 import Link from 'next/link'
 import Footer from '../components/Footer'
@@ -76,18 +76,15 @@ export default function StorefrontPage() {
           </div>
         )}
       </div>
+
+      <Footer />
     </div>
   )
 }
 
 function ArtworkCard({ artwork }: { artwork: Artwork }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const prices = calculatePrices(
-    artwork.price,
-    artwork.offer_pct || 0,
-    artwork.offer_label,
-    'delivery'
-  )
+  const prices = { printPrice: artwork.offer_pct ? Math.round(artwork.price * (1 - artwork.offer_pct / 100)) : artwork.price }
 
   useEffect(() => {
     if (canvasRef.current && artwork.preview_url) {
@@ -148,7 +145,6 @@ function ArtworkCard({ artwork }: { artwork: Artwork }) {
             )}
           </div>
         </div>
-        <Footer />
       </div>
     </Link>
   )
