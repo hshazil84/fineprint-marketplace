@@ -120,7 +120,7 @@ export default function CheckoutPage() {
       <Header />
       <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Complete your order</h1>
-        <p style={{ color: 'var(--color-text-muted)', marginBottom: 32 }}>Pay via BML bank transfer and upload your slip</p>
+        <p style={{ color: 'var(--color-text-muted)', marginBottom: 32 }}>Pay via bank transfer and upload your slip. Thank you.</p>
 
         <div className="grid-2" style={{ gap: 32, alignItems: 'start' }}>
           {/* LEFT COL */}
