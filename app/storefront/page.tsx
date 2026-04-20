@@ -120,16 +120,18 @@ export default function StorefrontPage() {
         .ticker-track { animation: ticker 32s linear infinite; }
         .ticker-track:hover { animation-play-state: paused; }
         .mobile-swipe::-webkit-scrollbar { display: none; }
+        .cats-scroll::-webkit-scrollbar { display: none; }
         @media(max-width: 768px) {
-          .desktop-only { display: none !important; }
-          .mobile-only { display: block !important; }
-          .desktop-grid { display: none !important; }
-          .mobile-grid { display: grid !important; }
+          .fp-desktop-only { display: none !important; }
+          .fp-mobile-only { display: block !important; }
+          .fp-desktop-grid { display: none !important; }
+          .fp-mobile-grid { display: grid !important; }
         }
         @media(min-width: 769px) {
-          .mobile-only { display: none !important; }
-          .desktop-only { display: grid !important; }
-          .mobile-grid { display: none !important; }
+          .fp-mobile-only { display: none !important; }
+          .fp-desktop-only { display: grid !important; }
+          .fp-desktop-grid { display: grid !important; }
+          .fp-mobile-grid { display: none !important; }
         }
       `}</style>
 
@@ -141,7 +143,7 @@ export default function StorefrontPage() {
 
       {/* CATEGORY CHIPS */}
       <div style={{ borderBottom: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)' }}>
-        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 6, height: 44, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
+        <div className="cats-scroll" style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 6, height: 44, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
               fontSize: 12, padding: '4px 14px', borderRadius: 20, whiteSpace: 'nowrap', flexShrink: 0, cursor: 'pointer',
@@ -156,47 +158,47 @@ export default function StorefrontPage() {
         </div>
       </div>
 
-{/* ARTIST TICKER */}
-{artists.length > 0 && (
-  <div style={{ borderBottom: '0.5px solid var(--color-border)', height: 68, overflow: 'hidden' }}>
-    <div style={{
-      maxWidth: 1080,
-      margin: '0 auto',
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      overflow: 'hidden',
-      WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-      maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
-    }}>
-      <div className="ticker-track" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 40px' }}>
-        {tickerArtists.map((artist, i) => {
-          const color = getColor(artist.artist_code || 'FP')
-          return (
-            <div key={`${artist.id}-${i}`} style={{
-              width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-              overflow: 'hidden', cursor: 'pointer',
-              border: '2px solid var(--color-border)',
-              transition: 'transform 0.2s ease',
-            }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
-              {artist.avatar_url ? (
-                <img src={artist.avatar_url} alt={artist.full_name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  loading="lazy" />
-              ) : (
-                <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
-                  {getInitials(artist.full_name)}
-                </div>
-              )}
+      {/* ARTIST TICKER */}
+      {artists.length > 0 && (
+        <div style={{ borderBottom: '0.5px solid var(--color-border)', height: 68, overflow: 'hidden' }}>
+          <div style={{
+            maxWidth: 1080,
+            margin: '0 auto',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            overflow: 'hidden',
+            WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+            maskImage: 'linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%)',
+          }}>
+            <div className="ticker-track" style={{ display: 'flex', gap: 14, width: 'max-content', padding: '0 40px' }}>
+              {tickerArtists.map((artist, i) => {
+                const color = getColor(artist.artist_code || 'FP')
+                return (
+                  <div key={`${artist.id}-${i}`} style={{
+                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                    overflow: 'hidden', cursor: 'pointer',
+                    border: '2px solid var(--color-border)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.12)' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}>
+                    {artist.avatar_url ? (
+                      <img src={artist.avatar_url} alt={artist.full_name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        loading="lazy" />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
+                        {getInitials(artist.full_name)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          )
-        })}
-      </div>
-    </div>
-  </div>
-)}
+          </div>
+        </div>
+      )}
 
       {/* MAIN CONTENT */}
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '36px 24px 80px' }}>
@@ -212,11 +214,18 @@ export default function StorefrontPage() {
                   <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>6 newest artworks</span>
                 </div>
 
-               {/* Desktop: 3-col grid */}
-                <div className="desktop-only" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14, width: '100%' }}>
+                {/* Desktop: 3-col 4:3 grid */}
+                <div
+                  className="fp-desktop-only"
+                  style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}
+                >
+                  {recentSix.map((artwork, i) => (
+                    <ArtworkCard43 key={artwork.id} artwork={artwork} isNew={i < 2} isTopSeller={topSellerIds.has(artwork.id)} />
+                  ))}
+                </div>
 
-                {/* Mobile: 1 card golden view with horizontal swipe */}
-                <div className="mobile-only" style={{ display: 'none' }}>
+                {/* Mobile: horizontal swipe carousel */}
+                <div className="fp-mobile-only" style={{ display: 'none' }}>
                   <div className="mobile-swipe" style={{
                     display: 'flex', gap: 12,
                     overflowX: 'auto',
@@ -262,13 +271,20 @@ export default function StorefrontPage() {
             ) : (
               <>
                 {/* Desktop: 5-col 1:1 */}
-                <div className="desktop-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
+                <div
+                  className="fp-desktop-grid"
+                  style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}
+                >
                   {filtered.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
+
                 {/* Mobile: 2-col grid */}
-                <div className="mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
+                <div
+                  className="fp-mobile-grid"
+                  style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}
+                >
                   {filtered.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
