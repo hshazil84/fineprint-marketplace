@@ -40,23 +40,23 @@ export async function notifyNewOrder(order: {
 }) {
   const delivery = order.deliveryMethod === 'pickup'
     ? '🏪 Pickup — Malé studio'
-    : `📦 Deliver → ${order.deliveryIsland}, ${order.deliveryAtoll}`
+    : '📦 Deliver to ' + order.deliveryIsland + ', ' + order.deliveryAtoll
   const offer = order.offerPct
-    ? `\n🏷 <b>Offer:</b> ${order.offerLabel} −${order.offerPct}%`
+    ? '\n🏷 <b>Offer:</b> ' + order.offerLabel + ' ' + order.offerPct + '% off'
     : ''
   const text =
-    `🖼 <b>New order</b>\n\n` +
-    `<b>${order.invoiceNumber}</b> · <code>${order.orderSku}</code>\n\n` +
-    `📌 <b>${order.artworkTitle}</b>\n` +
-    `👤 by ${order.artistName}${offer}\n\n` +
-    `🛒 <b>Buyer:</b> ${order.buyerName}\n` +
-    `📞 ${order.buyerPhone}\n` +
-    `${delivery}\n\n` +
-    `💰 <b>Total:</b> MVR ${order.totalPaid}\n` +
-    `📎 <i>Awaiting transfer slip...</i>`
+    '🖼 <b>New order</b>\n\n' +
+    '<b>' + order.invoiceNumber + '</b> · <code>' + order.orderSku + '</code>\n\n' +
+    '📌 <b>' + order.artworkTitle + '</b>\n' +
+    '👤 by ' + order.artistName + offer + '\n\n' +
+    '🛒 <b>Buyer:</b> ' + order.buyerName + '\n' +
+    '📞 ' + order.buyerPhone + '\n' +
+    delivery + '\n\n' +
+    '💰 <b>Total:</b> MVR ' + order.totalPaid + '\n' +
+    '📎 <i>Awaiting transfer slip...</i>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '📋 View in dashboard', url: `${APP_URL}/admin/dashboard` }
+      { text: '📋 View in dashboard', url: APP_URL + '/admin/dashboard' }
     ]]
   })
 }
@@ -68,16 +68,16 @@ export async function notifySlipUploaded(order: {
   totalPaid: number
 }) {
   const text =
-    `📎 <b>Slip uploaded</b>\n\n` +
-    `<b>${order.invoiceNumber}</b> · <code>${order.orderSku}</code>\n\n` +
-    `👤 ${order.buyerName} uploaded their BML transfer slip.\n` +
-    `💰 Amount: MVR ${order.totalPaid}\n\n` +
-    `<i>Ready for your review.</i>`
+    '📎 <b>Slip uploaded</b>\n\n' +
+    '<b>' + order.invoiceNumber + '</b> · <code>' + order.orderSku + '</code>\n\n' +
+    '👤 ' + order.buyerName + ' uploaded their BML transfer slip.\n' +
+    '💰 Amount: MVR ' + order.totalPaid + '\n\n' +
+    '<i>Ready for your review.</i>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '✅ Approve', url: `${APP_URL}/admin/dashboard?approve=${order.invoiceNumber}` },
-      { text: '❌ Reject',  url: `${APP_URL}/admin/dashboard?reject=${order.invoiceNumber}` },
-      { text: '🖼 View slip', url: `${APP_URL}/admin/dashboard?slip=${order.invoiceNumber}` },
+      { text: '✅ Approve', url: APP_URL + '/admin/dashboard?approve=' + order.invoiceNumber },
+      { text: '❌ Reject', url: APP_URL + '/admin/dashboard?reject=' + order.invoiceNumber },
+      { text: '🖼 View slip', url: APP_URL + '/admin/dashboard?slip=' + order.invoiceNumber },
     ]]
   })
 }
@@ -88,14 +88,14 @@ export async function notifyNewArtist(artist: {
   location?: string
 }) {
   const text =
-    `🎨 <b>New artist signed up</b>\n\n` +
-    `<b>${artist.name}</b>\n` +
-    `📧 ${artist.email}\n` +
-    `📍 ${artist.location || 'Location not set'}\n\n` +
-    `<i>No listings yet.</i>`
+    '🎨 <b>New artist signed up</b>\n\n' +
+    '<b>' + artist.name + '</b>\n' +
+    '📧 ' + artist.email + '\n' +
+    '📍 ' + (artist.location || 'Location not set') + '\n\n' +
+    '<i>No listings yet.</i>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '👤 View profile', url: `${APP_URL}/admin/dashboard?tab=artists` }
+      { text: '👤 View profile', url: APP_URL + '/admin/dashboard?tab=artists' }
     ]]
   })
 }
@@ -108,17 +108,17 @@ export async function notifyNewArtwork(artwork: {
   sizes: string[]
 }) {
   const text =
-    `🖼 <b>New artwork submitted</b>\n\n` +
-    `<code>${artwork.sku}</code>\n` +
-    `<b>${artwork.title}</b>\n` +
-    `👤 by ${artwork.artistName}\n\n` +
-    `💰 MVR ${artwork.price}\n` +
-    `📐 Sizes: ${artwork.sizes.join(', ')}\n\n` +
-    `<i>Pending your approval before going live.</i>`
+    '🖼 <b>New artwork submitted</b>\n\n' +
+    '<code>' + artwork.sku + '</code>\n' +
+    '<b>' + artwork.title + '</b>\n' +
+    '👤 by ' + artwork.artistName + '\n\n' +
+    '💰 MVR ' + artwork.price + '\n' +
+    '📐 Sizes: ' + artwork.sizes.join(', ') + '\n\n' +
+    '<i>Pending your approval before going live.</i>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '✅ Approve', url: `${APP_URL}/admin/dashboard?tab=listings&approve=${artwork.sku}` },
-      { text: '❌ Reject',  url: `${APP_URL}/admin/dashboard?tab=listings&reject=${artwork.sku}` },
+      { text: '✅ Approve', url: APP_URL + '/admin/dashboard?tab=listings&approve=' + artwork.sku },
+      { text: '❌ Reject', url: APP_URL + '/admin/dashboard?tab=listings&reject=' + artwork.sku },
     ]]
   })
 }
@@ -131,15 +131,15 @@ export async function notifyPayoutRequest(payout: {
   accountNumber: string
 }) {
   const text =
-    `💸 <b>Payout request</b>\n\n` +
-    `<b>${payout.artistName}</b> has requested a payout.\n\n` +
-    `💰 Amount: <b>MVR ${payout.amount.toLocaleString()}</b>\n\n` +
-    `🏦 <b>Bank:</b> ${payout.bankName}\n` +
-    `👤 <b>Account name:</b> ${payout.accountName}\n` +
-    `🔢 <b>Account number:</b> <code>${payout.accountNumber}</code>`
+    '💸 <b>Payout request</b>\n\n' +
+    '<b>' + payout.artistName + '</b> has requested a payout.\n\n' +
+    '💰 Amount: <b>MVR ' + payout.amount.toLocaleString() + '</b>\n\n' +
+    '🏦 <b>Bank:</b> ' + payout.bankName + '\n' +
+    '👤 <b>Account name:</b> ' + payout.accountName + '\n' +
+    '🔢 <b>Account number:</b> <code>' + payout.accountNumber + '</code>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '💸 View payout requests', url: `${APP_URL}/admin/dashboard?tab=artists` }
+      { text: '💸 View payout requests', url: APP_URL + '/admin/dashboard?tab=artists' }
     ]]
   })
 }
@@ -150,13 +150,13 @@ export async function notifyWithdrawRequest(data: {
   reason: string
 }) {
   const text =
-    `⚠️ <b>Withdrawal request</b>\n\n` +
-    `<b>${data.artistName}</b> (FP-${data.artistCode}) wants to leave the platform.\n\n` +
-    `📝 <b>Reason:</b> ${data.reason}\n\n` +
-    `<i>Check the admin dashboard — Artists tab.</i>`
+    '⚠️ <b>Withdrawal request</b>\n\n' +
+    '<b>' + data.artistName + '</b> (FP-' + data.artistCode + ') wants to leave the platform.\n\n' +
+    '📝 <b>Reason:</b> ' + data.reason + '\n\n' +
+    '<i>Check the admin dashboard — Artists tab.</i>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '👤 View in dashboard', url: `${APP_URL}/admin/dashboard?tab=artists` }
+      { text: '👤 View in dashboard', url: APP_URL + '/admin/dashboard?tab=artists' }
     ]]
   })
 }
@@ -168,13 +168,13 @@ export async function notifyShopStatus(data: {
 }) {
   const emoji = data.status === 'closed' ? '🔒' : '🟢'
   const text =
-    `${emoji} <b>Shop ${data.status}</b>\n\n` +
-    `<b>${data.artistName}</b> (FP-${data.artistCode}) has ` +
+    emoji + ' <b>Shop ' + data.status + '</b>\n\n' +
+    '<b>' + data.artistName + '</b> (FP-' + data.artistCode + ') has ' +
     (data.status === 'closed' ? 'temporarily closed their shop.' : 'reopened their shop.') +
-    `\n\n<i>Check the admin dashboard — Artists tab.</i>`
+    '\n\n<i>Check the admin dashboard — Artists tab.</i>'
   await sendTelegram(text, {
     inline_keyboard: [[
-      { text: '👤 View in dashboard', url: `${APP_URL}/admin/dashboard?tab=artists` }
+      { text: '👤 View in dashboard', url: APP_URL + '/admin/dashboard?tab=artists' }
     ]]
   })
 }
