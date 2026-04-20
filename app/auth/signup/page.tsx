@@ -4,10 +4,18 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
+import Header from '@/app/components/Header'
 
 export default function SignupPage() {
   const router = useRouter()
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'buyer', location: '' })
+  const [form, setForm] = useState({
+    name: '',
+    displayName: '',
+    email: '',
+    password: '',
+    role: 'artist',
+    location: '',
+  })
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
@@ -51,6 +59,7 @@ export default function SignupPage() {
     const { error: profileError } = await supabase.from('profiles').insert({
       id: data.user.id,
       full_name: form.name,
+      display_name: form.displayName || null,
       email: form.email,
       role: form.role,
       location: form.location || null,
@@ -75,62 +84,80 @@ export default function SignupPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <nav className="nav">
-        <Link href="/storefront" className="nav-logo">Fine<span>Print</span> Studio</Link>
-      </nav>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--color-background-primary)' }}>
+      <Header />
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ width: '100%', maxWidth: 400 }}>
-          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Create account</h1>
-          <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>Join FinePrint Studio</p>
+        <div style={{ width: '100%', maxWidth: 440 }}>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Join FinePrint Studio</h1>
+          <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>Artist account — sell your prints</p>
+
           <form onSubmit={handleSignup} className="card">
+
             <div className="form-group">
               <label className="form-label">Full name</label>
-              <input className="form-input" placeholder="Ahmed Ali" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+              <input className="form-input" placeholder="Ahmed Ali"
+                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                Your legal name — not shown publicly
+              </p>
             </div>
+
+            <div className="form-group">
+              <label className="form-label">Display name</label>
+              <input className="form-input" placeholder="e.g. One Media, Naif Studio"
+                value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} />
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+                Shown on your artworks and public profile. Leave blank to use your full name.
+              </p>
+            </div>
+
             <div className="form-group">
               <label className="form-label">Email</label>
-              <input className="form-input" type="email" placeholder="you@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+              <input className="form-input" type="email" placeholder="you@example.com"
+                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
             </div>
+
             <div className="form-group">
               <label className="form-label">Password</label>
-              <input className="form-input" type="password" placeholder="min. 8 characters" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
+              <input className="form-input" type="password" placeholder="min. 8 characters"
+                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
             </div>
+
             <div className="form-group">
-              <label className="form-label">I am joining as</label>
-              <select className="form-input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
-                <option value="buyer">Buyer — browse and buy prints</option>
-                <option value="artist">Artist — sell my prints</option>
-              </select>
+              <label className="form-label">Island / Location</label>
+              <input className="form-input" placeholder="e.g. Malé, Kaafu Atoll"
+                value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
             </div>
-            {form.role === 'artist' && (
-              <div className="form-group">
-                <label className="form-label">Island / Location</label>
-                <input className="form-input" placeholder="e.g. Malé, Kaafu Atoll" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
-              </div>
-            )}
-            {form.role === 'artist' && form.name && (
-              <div style={{ background: 'var(--color-teal-light)', borderRadius: 8, padding: '8px 12px', marginBottom: 8 }}>
-                <p style={{ fontSize: 12, color: 'var(--color-teal-dark)' }}>
-                  Your artist code will be: <strong>FP-{generateArtistCode(form.name)}</strong>
+
+            {form.name && (
+              <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+                <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                  Your artist code: <strong style={{ color: 'var(--color-text)', fontFamily: 'monospace' }}>FP-{generateArtistCode(form.name)}</strong>
                 </p>
               </div>
             )}
+
             <div className="form-group" style={{ marginTop: 8 }}>
               <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
-                <input type="checkbox" required style={{ marginTop: 2, flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-                  I agree to the <a href="/terms" style={{ color: 'var(--color-teal)' }}>Terms & Conditions</a> and understand that pricing structure and platform fees are confidential between me and FinePrint Studio.
+                <input type="checkbox" required style={{ marginTop: 3, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+                  I agree to the{' '}
+                  <Link href="/terms" style={{ color: 'var(--color-teal)' }}>Terms & Conditions</Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" style={{ color: 'var(--color-teal)' }}>Privacy Policy</Link>
                 </span>
               </label>
             </div>
+
             <button type="submit" className="btn btn-primary btn-full" style={{ marginTop: 8 }} disabled={loading}>
               {loading ? 'Creating account...' : 'Create account'}
             </button>
+
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 14, textAlign: 'center' }}>
               Already have an account?{' '}
               <Link href="/auth/login" style={{ color: 'var(--color-teal)' }}>Log in</Link>
             </p>
+
           </form>
         </div>
       </div>
