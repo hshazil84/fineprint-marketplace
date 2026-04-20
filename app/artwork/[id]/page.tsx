@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES } from '@/lib/pricing'
 import Link from 'next/link'
+import Header from '@/app/components/Header'
 
 export default function ArtworkPage() {
   const { id } = useParams()
@@ -38,7 +39,10 @@ export default function ArtworkPage() {
   }
 
   if (!artwork) return (
-    <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
+    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+      <Header />
+      <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
+    </div>
   )
 
   const availableSizes = artwork.sizes || SIZES
@@ -50,7 +54,7 @@ export default function ArtworkPage() {
       artworkId:    artwork.id,
       artworkSku:   artwork.sku,
       artworkTitle: artwork.title,
-      artistName:   artist?.full_name,
+      artistName:   artist?.display_name || artist?.full_name,
       artistId:     artwork.artist_id,
       printSize:    selectedSize,
       artistPrice:  artwork.price,
@@ -63,20 +67,12 @@ export default function ArtworkPage() {
   }
 
   return (
-    <div>
-      <nav className="nav">
-        <Link href="/storefront" className="nav-logo">Fine<span>Print</span> Studio</Link>
-        <div className="nav-links">
-          <Link href="/auth/login" className="btn">Log in</Link>
-          <Link href="/auth/signup" className="btn btn-primary">Sign up</Link>
-        </div>
-      </nav>
-
+    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+      <Header />
       <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
         <Link href="/storefront" className="btn btn-sm" style={{ marginBottom: 24, display: 'inline-flex' }}>
-          ← Back
+          Back
         </Link>
-
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
           <div style={{ position: 'relative' }}>
             <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-background-secondary)', position: 'relative' }}>
@@ -99,7 +95,6 @@ export default function ArtworkPage() {
               </div>
             ) : null}
           </div>
-
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>
               {artwork.title}
@@ -108,19 +103,15 @@ export default function ArtworkPage() {
               onClick={() => setShowArtistModal(true)}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, padding: 0, textDecoration: 'underline' }}
             >
-              by {artist?.full_name}
+              by {artist?.display_name || artist?.full_name}
             </button>
-
             <div style={{ marginBottom: 16 }}>
               <span className="sku-tag">Artwork SKU: {artwork.sku}</span>
             </div>
-
             <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.7, marginBottom: 20 }}>
               {artwork.description}
             </p>
-
             <div className="divider" />
-
             <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Select print size</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
               {availableSizes.map((size: string) => (
@@ -134,7 +125,6 @@ export default function ArtworkPage() {
                 </button>
               ))}
             </div>
-
             <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '14px 16px', marginBottom: 16 }}>
               {artwork.offer_pct ? (
                 <>
@@ -143,8 +133,8 @@ export default function ArtworkPage() {
                     <span style={{ textDecoration: 'line-through' }}>{formatMVR(artwork.price)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-red)', marginBottom: 4 }}>
-                    <span>{artwork.offer_label} (−{artwork.offer_pct}%)</span>
-                    <span>− {formatMVR(prices.discountAmount)}</span>
+                    <span>{artwork.offer_label} (-{artwork.offer_pct}%)</span>
+                    <span>- {formatMVR(prices.discountAmount)}</span>
                   </div>
                 </>
               ) : (
@@ -154,7 +144,7 @@ export default function ArtworkPage() {
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-                <span>{selectedSize} giclée printing</span>
+                <span>{selectedSize} giclee printing</span>
                 <span>{formatMVR(prices.printingFee)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
@@ -162,10 +152,9 @@ export default function ArtworkPage() {
                 <span>{formatMVR(prices.artworkLineItem)}</span>
               </div>
               <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
-                + MVR 100 delivery fee at checkout · or free pickup from Malé studio
+                + MVR 100 delivery fee at checkout · or free pickup from Male studio
               </p>
             </div>
-
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 6 }}>Order SKU</p>
             <span className="sku-tag" style={{ marginBottom: 20, display: 'inline-block', fontSize: 13 }}>
               {orderSKU}
@@ -180,11 +169,11 @@ export default function ArtworkPage() {
         {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 20 }}>
-              More by {artist?.full_name}
+              More by {artist?.display_name || artist?.full_name}
             </h2>
             <div className="grid-3">
               {related.map((rel: any) => (
-                <Link key={rel.id} href={`/artwork/${rel.id}`} style={{ textDecoration: 'none' }}>
+                <Link key={rel.id} href={'/artwork/' + rel.id} style={{ textDecoration: 'none' }}>
                   <div className="artwork-card">
                     <div style={{ background: 'var(--color-background-secondary)' }}>
                       {rel.preview_url ? (
@@ -216,20 +205,21 @@ export default function ArtworkPage() {
 }
 
 function ArtistModal({ artist, onClose, artworks }: any) {
+  const displayName = artist.display_name || artist.full_name
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 600, overflow: 'hidden', position: 'relative' }}>
-        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
+        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>x</button>
         <div style={{ padding: '24px 24px 0' }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 20 }}>
             <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#9FE1CB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#085041', flexShrink: 0 }}>
-              {artist.full_name.split(' ').map((w: string) => w[0]).join('').toUpperCase()}
+              {displayName.split(' ').map((w: string) => w[0]).join('').toUpperCase()}
             </div>
             <div>
-              <p style={{ fontSize: 18, fontWeight: 500 }}>{artist.full_name}</p>
+              <p style={{ fontSize: 18, fontWeight: 500 }}>{displayName}</p>
               <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{artist.location}</p>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.6 }}>{artist.bio}</p>
               {artist.instagram && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>{artist.instagram}</p>}
@@ -239,7 +229,7 @@ function ArtistModal({ artist, onClose, artworks }: any) {
         <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', padding: '0 24px', marginBottom: 12 }}>Other works</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, padding: '0 24px 24px' }}>
           {artworks.map((w: any) => (
-            <Link key={w.id} href={`/artwork/${w.id}`} onClick={onClose} style={{ textDecoration: 'none' }}>
+            <Link key={w.id} href={'/artwork/' + w.id} onClick={onClose} style={{ textDecoration: 'none' }}>
               <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border)', cursor: 'pointer' }}>
                 {w.preview_url ? (
                   <img src={w.preview_url} alt={w.title} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
