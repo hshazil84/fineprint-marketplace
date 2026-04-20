@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link'
 
 export default function Footer() {
@@ -6,7 +7,6 @@ export default function Footer() {
       borderTop: '0.5px solid var(--color-border)',
       background: 'var(--color-background-secondary)',
       padding: '32px 0 24px',
-      marginTop: 40,
     }}>
       <div className="container">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 32, marginBottom: 32 }}>
@@ -35,9 +35,9 @@ export default function Footer() {
             ))}
           </div>
 
-          {/* Info */}
+          {/* Legal */}
           <div>
-            <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 12 }}>Info</p>
+            <p style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 12 }}>Legal</p>
             {[
               ['Terms & conditions', '/terms'],
               ['Privacy policy', '/privacy'],
