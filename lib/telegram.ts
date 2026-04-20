@@ -160,3 +160,21 @@ export async function notifyWithdrawRequest(data: {
     ]]
   })
 }
+
+export async function notifyShopStatus(data: {
+  artistName: string
+  artistCode: string
+  status: string
+}) {
+  const emoji = data.status === 'closed' ? '🔒' : '🟢'
+  const text =
+    `${emoji} <b>Shop ${data.status}</b>\n\n` +
+    `<b>${data.artistName}</b> (FP-${data.artistCode}) has ` +
+    (data.status === 'closed' ? 'temporarily closed their shop.' : 'reopened their shop.') +
+    `\n\n<i>Check the admin dashboard — Artists tab.</i>`
+  await sendTelegram(text, {
+    inline_keyboard: [[
+      { text: '👤 View in dashboard', url: `${APP_URL}/admin/dashboard?tab=artists` }
+    ]]
+  })
+}
