@@ -1,6 +1,3 @@
-Here's the full `app/artwork/[id]/page.tsx`:
-
-```tsx
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -296,4 +293,3 @@ function ArtistModal({ artist, onClose, artworks }: any) {
     </div>
   )
 }
-```
