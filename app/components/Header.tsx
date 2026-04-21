@@ -104,7 +104,7 @@ export default function Header({
     <>
       <style>{`
         .fp-nav {
-          background-color: rgba(250, 249, 246, 0.85);
+          background-color: rgba(250, 249, 246, 0.92);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
         }
