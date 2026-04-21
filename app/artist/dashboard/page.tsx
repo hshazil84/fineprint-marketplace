@@ -50,12 +50,52 @@ export default function ArtistDashboard() {
   }
 
   async function fetchOrders(artistId: string) {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, artworks!inner(title, sku, artist_id, profiles:artist_id(full_name))')
-      .eq('artworks.artist_id', artistId)
+    // Fetch via order_items (new multi-item orders)
+    const { data: itemRows } = await supabase
+      .from('order_items')
+      .select('*, orders(*), artworks(title, sku)')
+      .eq('artist_id', artistId)
       .order('created_at', { ascending: false })
-    setOrders(data || [])
+
+    if (itemRows && itemRows.length > 0) {
+      // Group by order, attach artist's items
+      const orderMap: Record<number, any> = {}
+      for (const item of itemRows) {
+        const orderId = item.order_id
+        if (!orderMap[orderId]) {
+          orderMap[orderId] = {
+            ...item.orders,
+            myItems: [],
+            artist_earnings: 0,
+          }
+        }
+        orderMap[orderId].myItems.push(item)
+        orderMap[orderId].artist_earnings += item.artist_earnings || 0
+      }
+      const merged = Object.values(orderMap)
+
+      // Also fetch legacy orders (artwork_id directly on order)
+      const { data: legacyOrders } = await supabase
+        .from('orders')
+        .select('*, artworks!inner(title, sku, artist_id)')
+        .eq('artworks.artist_id', artistId)
+        .order('created_at', { ascending: false })
+
+      const legacyIds = new Set(merged.map((o: any) => o.id))
+      const legacyOnly = (legacyOrders || []).filter((o: any) => !legacyIds.has(o.id))
+
+      setOrders([...merged, ...legacyOnly].sort((a: any, b: any) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      ))
+    } else {
+      // Fallback — all legacy orders
+      const { data } = await supabase
+        .from('orders')
+        .select('*, artworks!inner(title, sku, artist_id)')
+        .eq('artworks.artist_id', artistId)
+        .order('created_at', { ascending: false })
+      setOrders(data || [])
+    }
   }
 
   async function fetchPayouts(artistId: string) {
@@ -257,33 +297,46 @@ export default function ArtistDashboard() {
 
         {tab === 'orders' && (
           <div>
-            {/* Active orders */}
             <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: rejectedOrders.length > 0 ? 20 : 0 }}>
               {activeOrders.length === 0 ? (
                 <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No orders yet.</p>
-              ) : activeOrders.map(o => (
-                <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                  <div>
-                    <p style={{ fontSize: 14, fontWeight: 500 }}>{o.artworks?.title} — {o.print_size}</p>
-                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                      {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
-                    </p>
-                    <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
-                    {o.status === 'approved' && (
-                      <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11, display: 'block' }} onClick={() => setSelectedOrder(o)}>
-                        View invoice
-                      </button>
-                    )}
+              ) : activeOrders.map(o => {
+                const myItems = o.myItems || []
+                const isMultiItem = myItems.length > 0
+                const title = isMultiItem
+                  ? myItems.map((i: any) => i.artworks?.title).join(', ')
+                  : o.artworks?.title
+                const sizeLabel = isMultiItem
+                  ? myItems.map((i: any) => i.print_size).join(', ')
+                  : o.print_size
+                return (
+                  <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 500 }}>{title} — {sizeLabel}</p>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                        {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
+                      </p>
+                      <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                      {o.status === 'approved' && (
+                        <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11, display: 'block' }} onClick={() => setSelectedOrder(o)}>
+                          View invoice
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <span className={'badge badge-' + o.status}>{o.status}</span>
+                      <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(o.artist_earnings)}</p>
+                      {isMultiItem && (
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                          {myItems.length} item{myItems.length !== 1 ? 's' : ''}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <span className={'badge badge-' + o.status}>{o.status}</span>
-                    <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(o.artist_earnings)}</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
-            {/* Rejected orders — shown separately at the bottom */}
             {rejectedOrders.length > 0 && (
               <div>
                 <p style={{ fontSize: 13, fontWeight: 500, color: '#A32D2D', marginBottom: 10 }}>
@@ -293,25 +346,35 @@ export default function ArtistDashboard() {
                   </span>
                 </p>
                 <div style={{ border: '0.5px solid #F09595', borderRadius: 12, overflow: 'hidden' }}>
-                  {rejectedOrders.map(o => (
-                    <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid #F09595', background: '#FCEBEB', gap: 12 }}>
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D' }}>{o.artworks?.title} — {o.print_size}</p>
-                        <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 2, opacity: 0.7 }}>
-                          {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
-                        </p>
-                        <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
-                        <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 6, lineHeight: 1.5 }}>
-                          Payment could not be verified. Contact{' '}
-                          <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a>
-                          {' '}if you think this is a mistake.
-                        </p>
+                  {rejectedOrders.map(o => {
+                    const myItems = o.myItems || []
+                    const isMultiItem = myItems.length > 0
+                    const title = isMultiItem
+                      ? myItems.map((i: any) => i.artworks?.title).join(', ')
+                      : o.artworks?.title
+                    const sizeLabel = isMultiItem
+                      ? myItems.map((i: any) => i.print_size).join(', ')
+                      : o.print_size
+                    return (
+                      <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid #F09595', background: '#FCEBEB', gap: 12 }}>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D' }}>{title} — {sizeLabel}</p>
+                          <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 2, opacity: 0.7 }}>
+                            {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
+                          </p>
+                          <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                          <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 6, lineHeight: 1.5 }}>
+                            Payment could not be verified. Contact{' '}
+                            <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a>
+                            {' '}if you think this is a mistake.
+                          </p>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <span className="badge badge-rejected">rejected</span>
+                        </div>
                       </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <span className="badge badge-rejected">rejected</span>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
