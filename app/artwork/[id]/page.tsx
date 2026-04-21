@@ -187,17 +187,21 @@ export default function ArtworkPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
               <button
                 className="btn btn-primary btn-full"
-                onClick={alreadyInCart ? () => router.push('/checkout') : addToCart}
+                onClick={alreadyInCart ? undefined : addToCart}
+                style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}}
+                disabled={alreadyInCart}
               >
-                {alreadyInCart ? 'Already in cart — Go to checkout' : 'Add to cart'}
+                {alreadyInCart ? 'Added to cart ✓' : 'Add to cart'}
               </button>
-              {!alreadyInCart && (
-                <button className="btn btn-full" onClick={buyNow}>
-                  Buy now
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>
+                  Checkout
                 </button>
-              )}
+                <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>
+                  Continue shopping
+                </button>
+              </div>
             </div>
-          </div>
         </div>
 
         {related.length > 0 && (
