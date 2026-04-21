@@ -53,17 +53,15 @@ export default function Header({
     return () => subscription.unsubscribe()
   }, [])
 
-  // Lock scroll when menu open
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [menuOpen])
 
-  // Focus search input when opened
   useEffect(() => {
     if (mobileSearchOpen) {
       setTimeout(() => mobileSearchRef.current?.focus(), 80)
-      setMobileSearch(search) // pre-fill with current search
+      setMobileSearch(search)
     }
   }, [mobileSearchOpen])
 
@@ -106,12 +104,12 @@ export default function Header({
     <>
       <style>{`
         .fp-nav {
-          background-color: rgba(255,255,255,0.82);
-          backdrop-filter: blur(16px);
-          -webkit-backdrop-filter: blur(16px);
+          background-color: rgba(250, 249, 246, 0.85);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
         }
         @media (prefers-color-scheme: dark) {
-          .fp-nav { background-color: rgba(20,20,20,0.82); }
+          .fp-nav { background-color: rgba(20,20,20,0.85); }
         }
         @media(max-width:768px) {
           .fp-header-desktop { display: none !important; }
@@ -126,7 +124,6 @@ export default function Header({
       <nav className="fp-nav" style={{ borderBottom: '0.5px solid var(--color-border)', position: 'sticky', top: 0, zIndex: 100 }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', gap: 16 }}>
 
-          {/* Logo */}
           <Link
             href="/storefront"
             style={{ textDecoration: 'none', color: 'inherit', flexShrink: 0 }}
@@ -140,7 +137,7 @@ export default function Header({
             </div>
           ) : (
             <>
-              {/* ── DESKTOP NAV (unchanged) ── */}
+              {/* ── DESKTOP NAV ── */}
               <div className="fp-header-desktop" style={{ flex: 1, alignItems: 'center', gap: 12 }}>
                 {onSearchChange && (
                   <div style={{ flex: 1, maxWidth: 360, position: 'relative' }}>
@@ -151,7 +148,7 @@ export default function Header({
                       value={search}
                       onChange={e => onSearchChange(e.target.value)}
                       placeholder="Search artworks, artists..."
-                      style={{ width: '100%', padding: '7px 14px 7px 32px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 20, fontSize: 12, color: 'var(--color-text)', outline: 'none' }}
+                      style={{ width: '100%', padding: '7px 14px 7px 32px', background: 'rgba(0,0,0,0.04)', border: '0.5px solid var(--color-border)', borderRadius: 20, fontSize: 12, color: 'var(--color-text)', outline: 'none' }}
                     />
                     {search && (
                       <button onClick={() => onSearchChange('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)' }}>×</button>
@@ -197,12 +194,10 @@ export default function Header({
 
               {/* ── MOBILE: search + wishlist + hamburger ── */}
               <div className="fp-header-mobile" style={{ marginLeft: 'auto', alignItems: 'center', gap: 2 }}>
-                {/* Search icon */}
-                <MobileIconBtn label="Search" active={mobileSearchOpen} onClick={() => { setMobileSearchOpen(o => !o); setMenuOpen(false) }}>
+                <MobileIconBtn label="Search" onClick={() => { setMobileSearchOpen(o => !o); setMenuOpen(false) }}>
                   <SearchIcon />
                 </MobileIconBtn>
 
-                {/* Wishlist icon */}
                 <MobileIconBtn label="Wishlist" onClick={() => { window.location.href = '/wishlist'; setMenuOpen(false) }}>
                   <HeartIcon />
                   {wishlistCount > 0 && (
@@ -212,8 +207,7 @@ export default function Header({
                   )}
                 </MobileIconBtn>
 
-                {/* Hamburger */}
-                <MobileIconBtn label={menuOpen ? 'Close' : 'Menu'} active={menuOpen} onClick={() => { setMenuOpen(o => !o); setMobileSearchOpen(false) }}>
+                <MobileIconBtn label={menuOpen ? 'Close' : 'Menu'} onClick={() => { setMenuOpen(o => !o); setMobileSearchOpen(false) }}>
                   <AnimatePresence mode="wait" initial={false}>
                     {menuOpen ? (
                       <motion.span key="close" initial={{ rotate: -45, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 45, opacity: 0 }} transition={{ duration: 0.15 }} style={{ display: 'flex' }}>
@@ -231,7 +225,7 @@ export default function Header({
           )}
         </div>
 
-        {/* ── MOBILE SEARCH BAR (slides down under nav) ── */}
+        {/* ── MOBILE SEARCH BAR ── */}
         <AnimatePresence>
           {mobileSearchOpen && (
             <motion.div
@@ -252,16 +246,15 @@ export default function Header({
                     value={mobileSearch}
                     onChange={e => {
                       setMobileSearch(e.target.value)
-                      // Live filter as you type
                       if (onSearchChange) onSearchChange(e.target.value)
                     }}
                     onKeyDown={e => e.key === 'Escape' && setMobileSearchOpen(false)}
                     placeholder="Search artworks, artists..."
-                    style={{ width: '100%', padding: '11px 52px 11px 36px', background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border)', borderRadius: 24, fontSize: 15, color: 'var(--color-text)', outline: 'none' }}
+                    style={{ width: '100%', padding: '11px 52px 11px 36px', background: 'rgba(0,0,0,0.04)', border: '0.5px solid var(--color-border)', borderRadius: 24, fontSize: 15, color: 'var(--color-text)', outline: 'none' }}
                   />
-                  {mobileSearch ? (
+                  {mobileSearch && (
                     <button type="button" onClick={clearMobileSearch} style={{ position: 'absolute', right: 52, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', padding: '0 6px', fontSize: 16, lineHeight: 1 }}>×</button>
-                  ) : null}
+                  )}
                   <button type="submit" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: '#1a1a1a', border: 'none', cursor: 'pointer', borderRadius: 18, padding: '6px 14px', fontSize: 13, color: '#fff', fontWeight: 500 }}>
                     Go
                   </button>
@@ -281,7 +274,11 @@ export default function Header({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            style={{ position: 'fixed', inset: 0, top: 56, zIndex: 99, backgroundColor: 'var(--color-background-primary)', overflowY: 'auto' }}
+            style={{
+              position: 'fixed', inset: 0, top: 56, zIndex: 99,
+              backgroundColor: '#faf9f6',
+              overflowY: 'auto',
+            }}
           >
             <div style={{ padding: '28px 28px 48px' }}>
               <nav>
@@ -304,7 +301,6 @@ export default function Header({
                     </motion.div>
                   ))}
 
-                {/* Log out inside menu if logged in */}
                 {user && (
                   <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: navLinks.length * 0.055, duration: 0.26, ease: 'easeOut' }}>
                     <button
@@ -334,13 +330,17 @@ export default function Header({
   )
 }
 
-// ── Small icon button for mobile ────────────────────────────────────────────
-function MobileIconBtn({ children, label, onClick, active }: { children: ReactNode; label: string; onClick: () => void; active?: boolean }) {
+function MobileIconBtn({ children, label, onClick }: { children: ReactNode; label: string; onClick: () => void }) {
   return (
     <button
       aria-label={label}
       onClick={onClick}
-      style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 8, background: active ? 'var(--color-background-secondary)' : 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text)', WebkitTapHighlightColor: 'transparent' }}
+      style={{
+        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 40, height: 40, borderRadius: 8,
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: 'var(--color-text)', WebkitTapHighlightColor: 'transparent',
+      }}
     >
       {children}
     </button>
