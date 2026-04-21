@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, getFromPrice } from '@/lib/pricing'
 import Link from 'next/link'
@@ -30,6 +30,16 @@ interface Artist {
   avatar_url: string | null
 }
 
+type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'popular'
+
+const SORT_LABELS: Record<SortOption, string> = {
+  newest: 'Newest',
+  price_asc: 'Price: Low → High',
+  price_desc: 'Price: High → Low',
+  popular: 'Most popular',
+}
+
+const PAGE_SIZE = 20
 const CATEGORIES = ['All', 'Photography', 'Fine Art', 'Abstract', 'Illustration', 'Digital Art', 'Watercolour', 'Charcoal & Sketch', 'Mixed Media']
 const AVATAR_COLORS = ['#1D9E75', '#378ADD', '#D85A30', '#7F77DD', '#BA7517', '#993556', '#0F6E56', '#534AB7', '#D4537E', '#639922']
 
@@ -58,15 +68,19 @@ function StarIcon() {
 export default function StorefrontPage() {
   const [artworks, setArtworks] = useState<Artwork[]>([])
   const [artists, setArtists] = useState<Artist[]>([])
+  const [orderCounts, setOrderCounts] = useState<Record<number, number>>({})
   const [topSellerIds, setTopSellerIds] = useState<Set<number>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
+  const [sort, setSort] = useState<SortOption>('newest')
+  const [page, setPage] = useState(1)
   const supabase = createClient()
 
-  useEffect(() => {
-    fetchAll()
-  }, [])
+  useEffect(() => { fetchAll() }, [])
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1) }, [search, activeCategory, sort])
 
   async function fetchAll() {
     const [artRes, artistRes, orderRes] = await Promise.all([
@@ -97,6 +111,7 @@ export default function StorefrontPage() {
       orderRes.data.forEach((o: any) => {
         if (o.artwork_id) counts[o.artwork_id] = (counts[o.artwork_id] || 0) + 1
       })
+      setOrderCounts(counts)
       const top5 = Object.entries(counts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
@@ -109,17 +124,53 @@ export default function StorefrontPage() {
 
   const recentSix = artworks.slice(0, 6)
 
-  const filtered = artworks.filter(a => {
-    const matchSearch = !search ||
-      a.title.toLowerCase().includes(search.toLowerCase()) ||
-      artistName(a.profiles).toLowerCase().includes(search.toLowerCase()) ||
-      a.sku.toLowerCase().includes(search.toLowerCase())
-    const matchCat = activeCategory === 'All' || a.category === activeCategory
-    return matchSearch && matchCat
-  })
+  // Filter
+  const filtered = useMemo(() => {
+    return artworks.filter(a => {
+      const matchSearch = !search ||
+        a.title.toLowerCase().includes(search.toLowerCase()) ||
+        artistName(a.profiles).toLowerCase().includes(search.toLowerCase()) ||
+        a.sku.toLowerCase().includes(search.toLowerCase())
+      const matchCat = activeCategory === 'All' || a.category === activeCategory
+      return matchSearch && matchCat
+    })
+  }, [artworks, search, activeCategory])
+
+  // Sort
+  const sorted = useMemo(() => {
+    const arr = [...filtered]
+    switch (sort) {
+      case 'price_asc':
+        return arr.sort((a, b) => {
+          const pa = getFromPrice(a.price, a.sizes || ['A4'], a.offer_pct || 0)
+          const pb = getFromPrice(b.price, b.sizes || ['A4'], b.offer_pct || 0)
+          return pa - pb
+        })
+      case 'price_desc':
+        return arr.sort((a, b) => {
+          const pa = getFromPrice(a.price, a.sizes || ['A4'], a.offer_pct || 0)
+          const pb = getFromPrice(b.price, b.sizes || ['A4'], b.offer_pct || 0)
+          return pb - pa
+        })
+      case 'popular':
+        return arr.sort((a, b) => (orderCounts[b.id] || 0) - (orderCounts[a.id] || 0))
+      case 'newest':
+      default:
+        return arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    }
+  }, [filtered, sort, orderCounts])
+
+  // Paginate
+  const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
+  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  function handlePage(p: number) {
+    setPage(p)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   return (
-    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+    <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
       <style>{`
         @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
         .artist-belt::-webkit-scrollbar { display: none; }
@@ -142,7 +193,7 @@ export default function StorefrontPage() {
       <Header search={search} onSearchChange={setSearch} onSearchSubmit={setSearch} />
 
       {/* CATEGORY CHIPS */}
-      <div style={{ borderBottom: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)' }}>
+      <div style={{ borderBottom: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-bg)' }}>
         <div className="cats-bar" style={{ maxWidth: 1080, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 6, height: 44, alignItems: 'center', overflowX: 'auto', scrollbarWidth: 'none' }}>
           {CATEGORIES.map(cat => (
             <button key={cat} onClick={() => setActiveCategory(cat)} style={{
@@ -162,28 +213,26 @@ export default function StorefrontPage() {
       {artists.length > 0 && (
         <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
           <div style={{ maxWidth: 1080, margin: '0 auto', position: 'relative' }}>
-            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to right, var(--color-background-primary), transparent)', pointerEvents: 'none', zIndex: 2 }} />
-            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to left, var(--color-background-primary), transparent)', pointerEvents: 'none', zIndex: 2 }} />
+            <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to right, var(--color-bg), transparent)', pointerEvents: 'none', zIndex: 2 }} />
+            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to left, var(--color-bg), transparent)', pointerEvents: 'none', zIndex: 2 }} />
             <div className="artist-belt" style={{ display: 'flex', gap: 12, padding: '12px 40px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' as any }}>
               {artists.map(artist => {
                 const color = getColor(artist.artist_code || 'FP')
                 const name = artist.display_name || artist.full_name
                 return (
-                    <Link key={artist.id} href={'/artist/' + artist.artist_code} style={{
-                      width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                      overflow: 'hidden', cursor: 'pointer', display: 'block',
-                      border: '2px solid var(--color-border)',
-                      transition: 'transform 0.18s ease',
-                      textDecoration: 'none',
-                    }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.12)' }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
-                      title={name}
-                    >
+                  <Link key={artist.id} href={'/artist/' + artist.artist_code} style={{
+                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                    overflow: 'hidden', cursor: 'pointer', display: 'block',
+                    border: '2px solid var(--color-border)',
+                    transition: 'transform 0.18s ease',
+                    textDecoration: 'none',
+                  }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.12)' }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
+                    title={name}
+                  >
                     {artist.avatar_url ? (
-                      <img src={artist.avatar_url} alt={name}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                        loading="lazy" />
+                      <img src={artist.avatar_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
                     ) : (
                       <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
                         {getInitials(name)}
@@ -203,8 +252,8 @@ export default function StorefrontPage() {
           <SkeletonGrid />
         ) : (
           <>
-            {/* RECENTLY LISTED */}
-            {!search && activeCategory === 'All' && recentSix.length > 0 && (
+            {/* RECENTLY LISTED — always newest 6, unaffected by sort */}
+            {!search && activeCategory === 'All' && sort === 'newest' && recentSix.length > 0 && (
               <div style={{ marginBottom: 40 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
                   <h2 style={{ fontSize: 15, fontWeight: 500 }}>Recently listed</h2>
@@ -231,41 +280,67 @@ export default function StorefrontPage() {
               </div>
             )}
 
-            {!search && activeCategory === 'All' && (
+            {!search && activeCategory === 'All' && sort === 'newest' && (
               <hr style={{ border: 'none', borderTop: '0.5px solid var(--color-border)', marginBottom: 28 }} />
             )}
 
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+            {/* SORT + RESULTS HEADER */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: 15, fontWeight: 500 }}>
-                {search ? 'Results for "' + search + '"' : activeCategory !== 'All' ? activeCategory : 'All prints'}
+                {search ? `Results for "${search}"` : activeCategory !== 'All' ? activeCategory : 'All prints'}
                 <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 8 }}>
-                  · {filtered.length} {filtered.length === 1 ? 'print' : 'prints'}
+                  · {sorted.length} {sorted.length === 1 ? 'print' : 'prints'}
                 </span>
               </h2>
-              {(search || activeCategory !== 'All') && (
-                <button onClick={() => { setSearch(''); setActiveCategory('All') }}
-                  style={{ fontSize: 12, color: '#1D9E75', background: 'none', border: 'none', cursor: 'pointer' }}>
-                  Clear x
-                </button>
-              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {(search || activeCategory !== 'All') && (
+                  <button
+                    onClick={() => { setSearch(''); setActiveCategory('All') }}
+                    style={{ fontSize: 12, color: '#1D9E75', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  >
+                    Clear ×
+                  </button>
+                )}
+                <select
+                  value={sort}
+                  onChange={e => setSort(e.target.value as SortOption)}
+                  style={{
+                    fontSize: 12, padding: '5px 10px', borderRadius: 20,
+                    border: '0.5px solid var(--color-border)',
+                    background: 'transparent', color: 'var(--color-text)',
+                    cursor: 'pointer', outline: 'none',
+                    fontFamily: 'var(--font-body)',
+                  }}
+                >
+                  {Object.entries(SORT_LABELS).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {filtered.length === 0 ? (
+            {sorted.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-muted)', fontSize: 14 }}>
                 No artworks found.
               </div>
             ) : (
               <>
                 <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
-                  {filtered.map(artwork => (
+                  {paginated.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
                 <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
-                  {filtered.map(artwork => (
+                  {paginated.map(artwork => (
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
+
+                {/* PAGINATION */}
+                {totalPages > 1 && (
+                  <Pagination page={page} totalPages={totalPages} onPage={handlePage} />
+                )}
               </>
             )}
           </>
@@ -273,6 +348,73 @@ export default function StorefrontPage() {
       </div>
 
       <Footer />
+    </div>
+  )
+}
+
+function Pagination({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
+  // Build page numbers with ellipsis
+  function getPages() {
+    const pages: (number | '...')[] = []
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      if (page > 3) pages.push('...')
+      for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) pages.push(i)
+      if (page < totalPages - 2) pages.push('...')
+      pages.push(totalPages)
+    }
+    return pages
+  }
+
+  const btnBase: React.CSSProperties = {
+    minWidth: 36, height: 36, borderRadius: 8, border: '0.5px solid var(--color-border)',
+    background: 'transparent', cursor: 'pointer', fontSize: 13,
+    color: 'var(--color-text)', fontFamily: 'var(--font-body)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'all 0.15s',
+  }
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 40 }}>
+      {/* Prev */}
+      <button
+        onClick={() => onPage(page - 1)}
+        disabled={page === 1}
+        style={{ ...btnBase, opacity: page === 1 ? 0.35 : 1, padding: '0 12px' }}
+      >
+        ←
+      </button>
+
+      {getPages().map((p, i) =>
+        p === '...' ? (
+          <span key={`ellipsis-${i}`} style={{ minWidth: 36, textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>…</span>
+        ) : (
+          <button
+            key={p}
+            onClick={() => onPage(p as number)}
+            style={{
+              ...btnBase,
+              background: page === p ? '#1a1a1a' : 'transparent',
+              color: page === p ? '#fff' : 'var(--color-text)',
+              borderColor: page === p ? '#1a1a1a' : 'var(--color-border)',
+              fontWeight: page === p ? 500 : 400,
+            }}
+          >
+            {p}
+          </button>
+        )
+      )}
+
+      {/* Next */}
+      <button
+        onClick={() => onPage(page + 1)}
+        disabled={page === totalPages}
+        style={{ ...btnBase, opacity: page === totalPages ? 0.35 : 1, padding: '0 12px' }}
+      >
+        →
+      </button>
     </div>
   )
 }
@@ -285,11 +427,11 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
   return (
     <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
       <div
-        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-surface)', transition: 'border-color 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-md)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
       >
-        <div style={{ aspectRatio: '4/3', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
+        <div style={{ aspectRatio: '4/3', position: 'relative', backgroundColor: 'var(--color-surface)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
             <img src={artwork.preview_url} alt={artwork.title} loading="lazy" decoding="async"
@@ -339,11 +481,11 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
   return (
     <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
       <div
-        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-background-primary)', transition: 'border-color 0.15s' }}
-        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-secondary)')}
+        style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)', backgroundColor: 'var(--color-surface)', transition: 'border-color 0.15s' }}
+        onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--color-border-md)')}
         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--color-border)')}
       >
-        <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-background-secondary)', overflow: 'hidden' }}>
+        <div style={{ aspectRatio: '1', position: 'relative', backgroundColor: 'var(--color-surface)', overflow: 'hidden' }}>
           {!loaded && <SkeletonShimmer style={{ position: 'absolute', inset: 0 }} />}
           {artwork.preview_url && (
             <img src={artwork.preview_url} alt={artwork.title} loading="lazy" decoding="async"
@@ -377,7 +519,7 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
 function SkeletonShimmer({ style }: { style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: 'linear-gradient(90deg, var(--color-background-secondary) 25%, var(--color-border) 50%, var(--color-background-secondary) 75%)',
+      background: 'linear-gradient(90deg, var(--color-surface) 25%, var(--color-border) 50%, var(--color-surface) 75%)',
       backgroundSize: '800px 100%',
       animation: 'shimmer 1.4s infinite',
       ...style,
@@ -389,7 +531,7 @@ function SkeletonGrid() {
   return (
     <>
       <div style={{ marginBottom: 40 }}>
-        <div style={{ height: 20, width: 140, background: 'var(--color-background-secondary)', borderRadius: 4, marginBottom: 16 }} />
+        <div style={{ height: 20, width: 140, background: 'var(--color-surface)', borderRadius: 4, marginBottom: 16 }} />
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
           {[...Array(6)].map((_, i) => (
             <div key={i} style={{ borderRadius: 12, overflow: 'hidden', border: '0.5px solid var(--color-border)' }}>
