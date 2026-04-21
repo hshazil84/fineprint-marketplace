@@ -108,9 +108,7 @@ export default function Header({
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
         }
-        @media (prefers-color-scheme: dark) {
-          .fp-nav { background-color: rgba(20,20,20,0.85); }
-        }
+        
         @media(max-width:768px) {
           .fp-header-desktop { display: none !important; }
           .fp-header-mobile { display: flex !important; }
