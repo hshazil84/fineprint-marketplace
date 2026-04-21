@@ -7,17 +7,50 @@ import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 export default function InvoicePage() {
   const { invoiceNumber } = useParams()
   const [order, setOrder] = useState<any>(null)
+  const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data: orderData } = await supabase
         .from('orders')
-        .select('*, artworks(title, sku, profiles:artist_id(full_name))')
+        .select('*')
         .eq('invoice_number', invoiceNumber)
         .single()
-      setOrder(data)
+
+      if (!orderData) { setLoading(false); return }
+      setOrder(orderData)
+
+      // Fetch order items with artwork + artist details
+      const { data: orderItems } = await supabase
+        .from('order_items')
+        .select('*, artworks(title, sku, profiles:artist_id(full_name, display_name))')
+        .eq('order_id', orderData.id)
+
+      if (orderItems && orderItems.length > 0) {
+        setItems(orderItems)
+      } else {
+        // Fallback for legacy single-item orders
+        const { data: artwork } = await supabase
+          .from('artworks')
+          .select('title, sku, profiles:artist_id(full_name, display_name)')
+          .eq('id', orderData.artwork_id)
+          .single()
+
+        setItems([{
+          artwork_id:      orderData.artwork_id,
+          print_size:      orderData.print_size,
+          original_price:  orderData.original_price,
+          offer_pct:       orderData.offer_pct,
+          offer_label:     orderData.offer_label,
+          discount_amount: orderData.discount_amount,
+          print_price:     orderData.print_price,
+          printing_fee:    orderData.printing_fee || PRINTING_FEES[orderData.print_size] || PRINTING_FEES['A4'],
+          artworks:        artwork,
+        }])
+      }
+
       setLoading(false)
     }
     load()
@@ -26,14 +59,14 @@ export default function InvoicePage() {
   if (loading) return <div style={{ padding: 60, textAlign: 'center' }}>Loading...</div>
   if (!order) return <div style={{ padding: 60, textAlign: 'center' }}>Invoice not found.</div>
 
-  const printingFee = order.printing_fee || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4']
-  const hasOffer = order.offer_pct && order.offer_pct > 0
   const date = new Date(order.approved_at || order.created_at).toLocaleDateString('en-GB', {
     day: 'numeric', month: 'long', year: 'numeric'
   })
   const buyerAddress = order.delivery_method === 'pickup'
     ? 'Pickup — FinePrint Studio, Malé'
     : `${order.delivery_island || ''}, ${order.delivery_atoll || ''}, Maldives`
+
+  const isSwipe = order.payment_method === 'swipe'
 
   return (
     <>
@@ -114,7 +147,9 @@ export default function InvoicePage() {
             </div>
 
             {/* Order details */}
-            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 10 }}>Order details</div>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 10 }}>
+              Order details · {items.length} item{items.length !== 1 ? 's' : ''}
+            </div>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e8e8e4' }}>
@@ -124,43 +159,70 @@ export default function InvoicePage() {
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: '1px solid #f4f4f0' }}>
-                  <td style={{ padding: '14px 0', verticalAlign: 'top' }}>
-                    <div style={{ fontSize: 14, color: '#222', fontWeight: 500 }}>{order.artworks?.title}</div>
-                    <div style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace', marginTop: 2 }}>{order.order_sku}</div>
-                    {hasOffer && <div style={{ fontSize: 11, color: '#c05030', marginTop: 3 }}>{order.offer_label} −{order.offer_pct}% applied</div>}
-                  </td>
-                  <td style={{ padding: '14px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{order.artworks?.profiles?.full_name}</td>
-                  <td style={{ padding: '14px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{order.print_size}</td>
-                  <td style={{ padding: '14px 0', textAlign: 'right', verticalAlign: 'top' }}>
-                    {hasOffer && <div style={{ fontSize: 12, color: '#aaa', textDecoration: 'line-through' }}>MVR {order.original_price}</div>}
-                    <div style={{ fontSize: 14, color: '#222', fontWeight: 500 }}>MVR {order.print_price}</div>
-                  </td>
-                </tr>
+                {items.map((item, i) => {
+                  const hasOffer = item.offer_pct && item.offer_pct > 0
+                  const artistName = item.artworks?.profiles?.display_name || item.artworks?.profiles?.full_name || '—'
+                  const itemSku = item.artworks?.sku ? item.artworks.sku + '-' + item.print_size : order.order_sku
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid #f4f4f0' }}>
+                      <td style={{ padding: '14px 0', verticalAlign: 'top' }}>
+                        <div style={{ fontSize: 14, color: '#222', fontWeight: 500 }}>{item.artworks?.title}</div>
+                        <div style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace', marginTop: 2 }}>{itemSku}</div>
+                        {hasOffer && <div style={{ fontSize: 11, color: '#c05030', marginTop: 3 }}>{item.offer_label} −{item.offer_pct}% applied</div>}
+                      </td>
+                      <td style={{ padding: '14px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{artistName}</td>
+                      <td style={{ padding: '14px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{item.print_size}</td>
+                      <td style={{ padding: '14px 0', textAlign: 'right', verticalAlign: 'top' }}>
+                        {hasOffer && <div style={{ fontSize: 12, color: '#aaa', textDecoration: 'line-through' }}>MVR {item.original_price + item.printing_fee}</div>}
+                        <div style={{ fontSize: 14, color: '#222', fontWeight: 500 }}>MVR {item.print_price}</div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
 
             {/* Totals */}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <table style={{ width: 260, borderCollapse: 'collapse' }}>
-                {hasOffer ? (
-                  <>
-                    <tr><td style={{ color: '#888', padding: '4px 0', fontSize: 13 }}>Original price</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13 }}>MVR {order.original_price}</td></tr>
-                    <tr><td style={{ color: '#c05030', padding: '4px 0', fontSize: 13 }}>{order.offer_label} (−{order.offer_pct}%)</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13, color: '#c05030' }}>− MVR {order.discount_amount}</td></tr>
-                  </>
-                ) : (
-                  <tr><td style={{ color: '#888', padding: '4px 0', fontSize: 13 }}>Artwork price</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13 }}>MVR {order.original_price}</td></tr>
-                )}
-                <tr><td style={{ color: '#888', padding: '4px 0', fontSize: 13 }}>{order.print_size} giclée printing</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13 }}>MVR {printingFee}</td></tr>
-                {order.delivery_method === 'delivery' ? (
-                  <tr><td style={{ color: '#888', padding: '4px 0', fontSize: 13 }}>Handling & delivery</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13 }}>MVR {order.handling_fee}</td></tr>
-                ) : (
-                  <tr><td style={{ color: '#1D9E75', padding: '4px 0', fontSize: 13 }}>Pickup</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13, color: '#1D9E75' }}>Free</td></tr>
-                )}
-                <tr style={{ borderTop: '1px solid #e8e8e4' }}>
-                  <td style={{ padding: '10px 0 4px', fontSize: 16, fontWeight: 600, color: '#111' }}>Total paid</td>
-                  <td style={{ textAlign: 'right', padding: '10px 0 4px', fontSize: 16, fontWeight: 600, color: '#111' }}>MVR {order.total_paid}</td>
-                </tr>
+              <table style={{ width: 280, borderCollapse: 'collapse' }}>
+                {items.map((item, i) => {
+                  const hasOffer = item.offer_pct && item.offer_pct > 0
+                  const printingFee = item.printing_fee || PRINTING_FEES[item.print_size] || PRINTING_FEES['A4']
+                  return (
+                    <tbody key={i}>
+                      {items.length > 1 && (
+                        <tr>
+                          <td colSpan={2} style={{ color: '#aaa', padding: '6px 0 2px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            {item.artworks?.title}
+                          </td>
+                        </tr>
+                      )}
+                      {hasOffer ? (
+                        <>
+                          <tr><td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>Artwork price</td><td style={{ textAlign: 'right', padding: '3px 0', fontSize: 13, color: '#aaa', textDecoration: 'line-through' }}>MVR {item.original_price}</td></tr>
+                          <tr><td style={{ color: '#c05030', padding: '3px 0', fontSize: 13 }}>{item.offer_label} (−{item.offer_pct}%)</td><td style={{ textAlign: 'right', padding: '3px 0', fontSize: 13, color: '#c05030' }}>− MVR {item.discount_amount}</td></tr>
+                        </>
+                      ) : (
+                        <tr><td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>Artwork price</td><td style={{ textAlign: 'right', padding: '3px 0', fontSize: 13 }}>MVR {item.original_price}</td></tr>
+                      )}
+                      <tr>
+                        <td style={{ color: '#888', padding: '3px 0', fontSize: 13 }}>{item.print_size} giclée printing</td>
+                        <td style={{ textAlign: 'right', padding: '3px 0', fontSize: 13 }}>MVR {printingFee}</td>
+                      </tr>
+                    </tbody>
+                  )
+                })}
+                <tbody>
+                  {order.delivery_method === 'delivery' ? (
+                    <tr><td style={{ color: '#888', padding: '4px 0', fontSize: 13 }}>Handling & delivery</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13 }}>MVR {order.handling_fee}</td></tr>
+                  ) : (
+                    <tr><td style={{ color: '#1D9E75', padding: '4px 0', fontSize: 13 }}>Pickup</td><td style={{ textAlign: 'right', padding: '4px 0', fontSize: 13, color: '#1D9E75' }}>Free</td></tr>
+                  )}
+                  <tr style={{ borderTop: '1px solid #e8e8e4' }}>
+                    <td style={{ padding: '10px 0 4px', fontSize: 16, fontWeight: 600, color: '#111' }}>Total paid</td>
+                    <td style={{ textAlign: 'right', padding: '10px 0 4px', fontSize: 16, fontWeight: 600, color: '#111' }}>MVR {order.total_paid}</td>
+                  </tr>
+                </tbody>
               </table>
             </div>
 
@@ -169,10 +231,12 @@ export default function InvoicePage() {
             {/* Payment note */}
             <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 8 }}>Payment</div>
             <p style={{ fontSize: 12, color: '#888', lineHeight: 1.6, margin: '0 0 12px' }}>
-              Paid via BML bank transfer to account 7703230358101 (Hasan Shazil).
+              {isSwipe
+                ? 'Paid via Swipe to hasan@swipe.'
+                : 'Paid via BML bank transfer to account 7703230358101 (Hasan Shazil).'}
               {order.delivery_method === 'pickup'
-                ? ' Your print will be ready for pickup at FinePrint Studio, Malé. We will contact you when it is ready.'
-                : ' Your print will be prepared and dispatched to your address.'}
+                ? ' Your print(s) will be ready for pickup at FinePrint Studio, Malé. We will contact you when ready.'
+                : ' Your print(s) will be prepared and dispatched to your address.'}
             </p>
             <p style={{ fontSize: 12, color: '#aaa', lineHeight: 1.6, margin: 0 }}>
               All artwork is protected by copyright and remains the intellectual property of the respective artist.
