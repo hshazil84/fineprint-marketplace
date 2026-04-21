@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Toaster } from 'react-hot-toast'
+import { CartProvider } from '@/lib/cart'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
       </head>
       <body>
-        {children}
+        <CartProvider>
+          {children}
+        </CartProvider>
         <Toaster
           position="bottom-center"
           toastOptions={{
@@ -33,18 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               color: '#fff',
               padding: '10px 18px',
             },
-            success: {
-              iconTheme: {
-                primary: '#1D9E75',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: '#E24B4A',
-                secondary: '#fff',
-              },
-            },
+            success: { iconTheme: { primary: '#1D9E75', secondary: '#fff' } },
+            error: { iconTheme: { primary: '#E24B4A', secondary: '#fff' } },
           }}
         />
       </body>
