@@ -1,3 +1,6 @@
+Here's the full `app/artwork/[id]/page.tsx`:
+
+```tsx
 'use client'
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -95,6 +98,8 @@ export default function ArtworkPage() {
           Back
         </Link>
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
+
+          {/* LEFT — image */}
           <div style={{ position: 'relative' }}>
             <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative' }}>
               {artwork.preview_url ? (
@@ -117,6 +122,7 @@ export default function ArtworkPage() {
             ) : null}
           </div>
 
+          {/* RIGHT — details */}
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>
               {artwork.title}
@@ -200,12 +206,13 @@ export default function ArtworkPage() {
                 <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>
                   Continue shopping
                 </button>
-            </div>
+              </div>
             </div>
           </div>
-        </div>
+          {/* END RIGHT */}
 
-        {related.length > 0 && (
+        </div>
+        {/* END grid-2 */}
 
         {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
@@ -289,3 +296,4 @@ function ArtistModal({ artist, onClose, artworks }: any) {
     </div>
   )
 }
+```
