@@ -168,12 +168,18 @@ export function CartDrawer({ open, onClose }: Props) {
                 <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginBottom: 14 }}>
                   Delivery fee added at checkout
                 </p>
-                <button
-                  onClick={goToCheckout}
-                  style={{ width: '100%', padding: '12px 20px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}
-                >
-                  Checkout — {formatMVR(subtotal)}
-                </button>
+              <button
+                onClick={goToCheckout}
+                style={{ width: '100%', padding: '12px 20px', borderRadius: 12, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', marginBottom: 8 }}
+              >
+                Checkout — {formatMVR(subtotal)}
+              </button>
+              <button
+                onClick={onClose}
+                style={{ width: '100%', padding: '10px 20px', borderRadius: 12, border: '0.5px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer' }}
+              >
+                Continue shopping
+              </button>
               </div>
             )}
           </motion.div>
