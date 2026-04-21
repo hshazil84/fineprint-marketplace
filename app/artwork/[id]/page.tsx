@@ -200,9 +200,12 @@ export default function ArtworkPage() {
                 <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>
                   Continue shopping
                 </button>
-              </div>
             </div>
+            </div>
+          </div>
         </div>
+
+        {related.length > 0 && (
 
         {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
