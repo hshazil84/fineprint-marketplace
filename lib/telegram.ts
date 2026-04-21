@@ -38,6 +38,7 @@ export async function notifyNewOrder(order: {
   offerLabel?: string
   offerPct?: number
   paymentMethod?: string
+  itemCount?: number
 }) {
   const delivery = order.deliveryMethod === 'pickup'
     ? '🏪 Pickup — Male studio'
@@ -48,16 +49,20 @@ export async function notifyNewOrder(order: {
   const payment = order.paymentMethod === 'swipe'
     ? '💳 <b>Payment:</b> Swipe — verify in your Swipe app'
     : '🏦 <b>Payment:</b> BML bank transfer — awaiting slip'
+  const itemLine = order.itemCount && order.itemCount > 1
+    ? '🛍 <b>' + order.itemCount + ' items:</b> ' + order.artworkTitle + '\n'
+    : '📌 <b>' + order.artworkTitle + '</b>\n' + '👤 by ' + order.artistName + offer + '\n'
+
   const text =
     '🖼 <b>New order</b>\n\n' +
     '<b>' + order.invoiceNumber + '</b> · <code>' + order.orderSku + '</code>\n\n' +
-    '📌 <b>' + order.artworkTitle + '</b>\n' +
-    '👤 by ' + order.artistName + offer + '\n\n' +
+    itemLine + '\n' +
     '🛒 <b>Buyer:</b> ' + order.buyerName + '\n' +
     '📞 ' + order.buyerPhone + '\n' +
     delivery + '\n\n' +
     '💰 <b>Total:</b> MVR ' + order.totalPaid + '\n' +
     payment
+
   await sendTelegram(text, {
     inline_keyboard: [[
       { text: '📋 View in dashboard', url: APP_URL + '/admin/dashboard' }
