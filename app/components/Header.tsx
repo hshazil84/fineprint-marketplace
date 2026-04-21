@@ -158,15 +158,16 @@ export default function Header({
                     Track order
                   </Link>
 
-                  {/* Desktop cart button */}
+                  {/* Desktop cart icon */}
                   <button
                     onClick={() => setCartOpen(true)}
-                    style={{ position: 'relative', fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', background: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    aria-label="Cart"
+                    style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 8, border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text)', flexShrink: 0 }}
                   >
-                    Cart
+                    <CartIcon />
                     {cartCount > 0 && (
-                      <span style={{ marginLeft: 5, background: '#1D9E75', color: '#fff', fontSize: 10, padding: '1px 5px', borderRadius: 20, fontWeight: 500 }}>
-                        {cartCount}
+                      <span style={{ position: 'absolute', top: 4, right: 4, minWidth: 15, height: 15, borderRadius: 20, background: '#1D9E75', color: '#fff', fontSize: 9, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>
+                        {cartCount > 9 ? '9+' : cartCount}
                       </span>
                     )}
                   </button>
