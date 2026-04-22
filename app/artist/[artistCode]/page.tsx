@@ -91,10 +91,14 @@ function ArtworkCard({ artwork, isTopSeller }: { artwork: any; isTopSeller: bool
   )
 }
 
-function ProfileContent({ profile, artworks, topSellerIds }: { profile: any; artworks: any[]; topSellerIds: Set<number> }) {
-  const displayName  = profile.display_name || profile.full_name
-  const isClosed     = profile.shop_status === 'closed'
-  const socialLinks  = getSocialLinks(profile)
+function ProfileContent({ profile, artworks, topSellerIds }: {
+  profile: any
+  artworks: any[]
+  topSellerIds: Set<number>
+}) {
+  const displayName = profile.display_name || profile.full_name
+  const isClosed    = profile.shop_status === 'closed'
+  const socialLinks = getSocialLinks(profile)
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
@@ -112,12 +116,11 @@ function ProfileContent({ profile, artworks, topSellerIds }: { profile: any; art
 
       <Header />
 
-      {/* Artist header */}
       <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
 
-            {/* Avatar — uses AvatarDisplay */}
+            {/* Avatar */}
             <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--color-border)' }}>
               <AvatarDisplay profile={profile} size={88} />
             </div>
@@ -165,7 +168,6 @@ function ProfileContent({ profile, artworks, topSellerIds }: { profile: any; art
         </div>
       </div>
 
-      {/* Artworks grid */}
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 24px 80px' }}>
         {isClosed ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
