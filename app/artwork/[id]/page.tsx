@@ -14,6 +14,8 @@ export default function ArtworkPage() {
   const [artwork, setArtwork] = useState<any>(null)
   const [artist, setArtist] = useState<any>(null)
   const [related, setRelated] = useState<any[]>([])
+  const [galleryImages, setGalleryImages] = useState<any[]>([])
+  const [activeImage, setActiveImage] = useState<string | null>(null)
   const [selectedSize, setSelectedSize] = useState('A4')
   const [showArtistModal, setShowArtistModal] = useState(false)
   const { add, has } = useCart()
@@ -30,7 +32,17 @@ export default function ArtworkPage() {
     if (!data) return
     setArtwork(data)
     setArtist(data.profiles)
+    setActiveImage(data.preview_url)
     if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[0])
+
+    // Fetch gallery images
+    const { data: gallery } = await supabase
+      .from('artwork_images')
+      .select('*')
+      .eq('artwork_id', data.id)
+      .order('sort_order', { ascending: true })
+    setGalleryImages(gallery || [])
+
     const { data: rel } = await supabase
       .from('artworks')
       .select('*, profiles:artist_id(full_name)')
@@ -52,6 +64,10 @@ export default function ArtworkPage() {
   const prices = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize)
   const orderSKU = buildOrderSKU(artwork.sku, selectedSize)
   const alreadyInCart = has(artwork.id, selectedSize)
+  const allThumbnails = [
+    { url: artwork.preview_url, isMain: true },
+    ...galleryImages.map(g => ({ url: g.url, isMain: false })),
+  ]
 
   function addToCart() {
     add({
@@ -92,16 +108,17 @@ export default function ArtworkPage() {
       <Header />
       <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
         <Link href="/storefront" className="btn btn-sm" style={{ marginBottom: 24, display: 'inline-flex' }}>
-          Back
+          ← Back
         </Link>
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
 
-          {/* LEFT — image */}
-          <div style={{ position: 'relative' }}>
-            <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative' }}>
-              {artwork.preview_url ? (
+          {/* LEFT — image + gallery strip */}
+          <div>
+            {/* Main image */}
+            <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative', marginBottom: galleryImages.length > 0 ? 10 : 0 }}>
+              {activeImage ? (
                 <img
-                  src={artwork.preview_url}
+                  src={activeImage}
                   alt={artwork.title}
                   style={{ width: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none', objectFit: 'contain', maxHeight: 520 }}
                 />
@@ -110,13 +127,47 @@ export default function ArtworkPage() {
                   No preview available
                 </div>
               )}
+              {/* Overlay to prevent right-click save */}
               <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
+              {/* Offer badge */}
+              {artwork.offer_pct ? (
+                <div style={{ position: 'absolute', top: 14, left: 14, background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, zIndex: 20, pointerEvents: 'none' }}>
+                  {artwork.offer_pct}% off
+                </div>
+              ) : null}
             </div>
-            {artwork.offer_pct ? (
-              <div style={{ position: 'absolute', top: 14, left: 14, background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, zIndex: 20, pointerEvents: 'none' }}>
-                {artwork.offer_pct}% off
+
+            {/* Thumbnail strip — only shown if gallery images exist */}
+            {allThumbnails.length > 1 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + allThumbnails.length + ', 1fr)', gap: 8 }}>
+                {allThumbnails.map((thumb, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setActiveImage(thumb.url)}
+                    style={{
+                      aspectRatio: '4/3',
+                      borderRadius: 'var(--radius-md)',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      border: activeImage === thumb.url
+                        ? '2px solid #1a1a1a'
+                        : '0.5px solid var(--color-border)',
+                      transition: 'border-color 0.15s',
+                      background: 'var(--color-surface)',
+                      position: 'relative',
+                    }}
+                  >
+                    <img
+                      src={thumb.url}
+                      alt={'View ' + (i + 1)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                    />
+                    {/* Overlay to prevent right-click */}
+                    <div style={{ position: 'absolute', inset: 0 }} onContextMenu={e => e.preventDefault()} />
+                  </div>
+                ))}
               </div>
-            ) : null}
+            )}
           </div>
 
           {/* RIGHT — details */}
@@ -178,7 +229,7 @@ export default function ArtworkPage() {
                 <span>{formatMVR(prices.artworkLineItem)}</span>
               </div>
               <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
-                + MVR 100 delivery fee at checkout · or free pickup from Male studio
+                + MVR 100 delivery fee at checkout · or free pickup from Malé studio
               </p>
             </div>
 
@@ -206,11 +257,9 @@ export default function ArtworkPage() {
               </div>
             </div>
           </div>
-          {/* END RIGHT */}
-
         </div>
-        {/* END grid-2 */}
 
+        {/* More by this artist */}
         {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 20 }}>
@@ -260,8 +309,11 @@ function ArtistModal({ artist, onClose, artworks }: any) {
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>×</button>
         <div style={{ padding: '24px 24px 0' }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 20 }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#9FE1CB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#085041', flexShrink: 0 }}>
-              {displayName.split(' ').map((w: string) => w[0]).join('').toUpperCase()}
+            <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: '#9FE1CB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#085041' }}>
+              {artist.avatar_url
+                ? <img src={artist.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : displayName.split(' ').map((w: string) => w[0]).join('').toUpperCase()
+              }
             </div>
             <div>
               <p style={{ fontSize: 18, fontWeight: 500 }}>{displayName}</p>
