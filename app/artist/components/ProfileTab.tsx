@@ -345,7 +345,7 @@ export function ProfileTab({ profile, onSave }: any) {
 
       <div className="form-group">
         <label className="form-label">Display name</label>
-        <input className="form-input" value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="e.g. One Media, Naif Studio" />
+        <input className="form-input" value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} placeholder="e.g. raajjethere, Azleena" />
         <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Shown on your artworks and public profile. Leave blank to use your full name.</p>
       </div>
 
