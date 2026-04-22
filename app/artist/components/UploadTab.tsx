@@ -48,6 +48,9 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [hiresFile, setHiresFile] = useState<File | null>(null)
   const [previewFile, setPreviewFile] = useState<File | null>(null)
   const [previewThumb, setPreviewThumb] = useState<string | null>(null)
+  const [galleryFiles, setGalleryFiles] = useState<(File | null)[]>([null, null, null])
+  const [galleryThumbs, setGalleryThumbs] = useState<(string | null)[]>([null, null, null])
+  const [activeThumb, setActiveThumb] = useState<number>(0)
   const [uploading, setUploading] = useState(false)
 
   const nextSku = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
@@ -65,10 +68,49 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     setPreviewFile(file)
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader()
-      reader.onload = ev => setPreviewThumb(ev.target?.result as string)
+      reader.onload = ev => {
+        setPreviewThumb(ev.target?.result as string)
+        setActiveThumb(0)
+      }
       reader.readAsDataURL(file)
     }
   }
+
+  function clearPreview() {
+    setPreviewFile(null)
+    setPreviewThumb(null)
+    if (activeThumb === 0) setActiveThumb(0)
+  }
+
+  function handleGallerySelect(index: number, file: File | null) {
+    if (!file) return
+    const newFiles = [...galleryFiles]
+    newFiles[index] = file
+    setGalleryFiles(newFiles)
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const newThumbs = [...galleryThumbs]
+      newThumbs[index] = ev.target?.result as string
+      setGalleryThumbs(newThumbs)
+      setActiveThumb(index + 1)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function clearGallerySlot(index: number) {
+    const newFiles = [...galleryFiles]
+    const newThumbs = [...galleryThumbs]
+    newFiles[index] = null
+    newThumbs[index] = null
+    setGalleryFiles(newFiles)
+    setGalleryThumbs(newThumbs)
+    if (activeThumb === index + 1) setActiveThumb(0)
+  }
+
+  // What shows in the big preview
+  const bigImage = activeThumb === 0
+    ? previewThumb
+    : galleryThumbs[activeThumb - 1]
 
   async function handleUpload() {
     if (!form.title) { toast.error('Please fill in the title'); return }
@@ -108,7 +150,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
 
       toast.loading('Saving listing...', { id: 'upload' })
-      const { error: dbError } = await supabase.from('artworks').insert({
+      const { data: artwork, error: dbError } = await supabase.from('artworks').insert({
         sku,
         artist_id: user.id,
         title: form.title,
@@ -120,8 +162,30 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         status: 'pending',
         category: form.category,
         painting_by: form.paintingBy || null,
-      })
+      }).select().single()
       if (dbError) throw dbError
+
+      // Upload gallery images
+      const hasGallery = galleryFiles.some(Boolean)
+      if (hasGallery && artwork) {
+        toast.loading('Uploading gallery images...', { id: 'upload' })
+        for (let i = 0; i < galleryFiles.length; i++) {
+          const gFile = galleryFiles[i]
+          if (!gFile) continue
+          const gExt = gFile.name.split('.').pop()
+          const gPath = 'gallery/' + sku + '-gallery-' + (i + 1) + '.' + gExt
+          const { error: gError } = await supabase.storage
+            .from('artwork-previews')
+            .upload(gPath, gFile, { contentType: gFile.type })
+          if (gError) { console.error('Gallery upload error:', gError); continue }
+          const { data: gUrl } = supabase.storage.from('artwork-previews').getPublicUrl(gPath)
+          await supabase.from('artwork_images').insert({
+            artwork_id: artwork.id,
+            url: gUrl.publicUrl,
+            sort_order: i + 1,
+          })
+        }
+      }
 
       await fetch('/api/notify/artwork', {
         method: 'POST',
@@ -145,51 +209,182 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         Upload both your hi-res print file and a watermarked preview for buyers.
       </p>
 
-      {/* Hi-res file upload — file only, no preview */}
+      {/* Hi-res file */}
       <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
         Hi-res print file
         <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>private, for printing only</span>
       </p>
-      <div
-        style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--border-radius-md)', padding: '12px 16px', marginBottom: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
-        onClick={() => document.getElementById('hires-input')?.click()}
-      >
-        <span style={{ fontSize: 20 }}>🖨</span>
-        <div>
-          <p style={{ fontSize: 13, color: hiresFile ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-            {hiresFile ? hiresFile.name : 'Tap to upload hi-res file'}
-          </p>
-          {hiresFile && (
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-              {(hiresFile.size / 1024 / 1024).toFixed(1)} MB
+      <div style={{ position: 'relative', marginBottom: 6 }}>
+        <div
+          style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
+          onClick={() => !hiresFile && document.getElementById('hires-input')?.click()}
+        >
+          <span style={{ fontSize: 20 }}>🖨</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, color: hiresFile ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+              {hiresFile ? hiresFile.name : 'Tap to upload hi-res file'}
             </p>
-          )}
+            {hiresFile && (
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                {(hiresFile.size / 1024 / 1024).toFixed(1)} MB
+              </p>
+            )}
+          </div>
+          {hiresFile ? (
+            <button
+              onClick={e => { e.stopPropagation(); setHiresFile(null); (document.getElementById('hires-input') as HTMLInputElement).value = '' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}
+              title="Remove file"
+            >×</button>
+          ) : null}
         </div>
+        {hiresFile && (
+          <button
+            onClick={() => document.getElementById('hires-input')?.click()}
+            style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
+          >
+            Change file
+          </button>
+        )}
       </div>
       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 20 }}>
         JPG or PNG · A4 min 2339 x 1654 px · A3 min 3307 x 2339 px (200 DPI) · up to 35 MB
       </p>
-      <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => setHiresFile(e.target.files?.[0] || null)} />
+      <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
 
-      {/* Preview image upload — shows thumbnail */}
+      {/* ── ARTWORK PREVIEW — mirrors how it looks on artwork page ── */}
       <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
         Preview image
-        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>shown to buyers, add your watermark first</span>
+        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>shown to buyers — add your watermark first</span>
       </p>
+
+      {/* Big main image slot */}
       <div
-        style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--border-radius-md)', marginBottom: 20, overflow: 'hidden', cursor: 'pointer' }}
-        onClick={() => document.getElementById('preview-input')?.click()}
+        style={{
+          border: bigImage ? 'none' : '0.5px solid var(--color-border)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          marginBottom: 8,
+          position: 'relative',
+          aspectRatio: '4/3',
+          background: 'var(--color-surface)',
+          cursor: bigImage ? 'default' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        onClick={() => !bigImage && document.getElementById('preview-input')?.click()}
       >
-        {previewThumb ? (
-          <img src={previewThumb} alt="preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+        {bigImage ? (
+          <>
+            <img
+              src={bigImage}
+              alt="preview"
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
+            />
+            {/* Clear button for currently active image */}
+            {activeThumb === 0 && previewThumb && (
+              <button
+                onClick={e => { e.stopPropagation(); clearPreview() }}
+                style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                title="Remove image"
+              >×</button>
+            )}
+            {activeThumb > 0 && galleryThumbs[activeThumb - 1] && (
+              <button
+                onClick={e => { e.stopPropagation(); clearGallerySlot(activeThumb - 1) }}
+                style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                title="Remove image"
+              >×</button>
+            )}
+          </>
         ) : (
-          <div style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 20 }}>🖼</span>
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Tap to upload preview image</p>
+          <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>+</div>
+            <p style={{ fontSize: 12 }}>Tap to upload main preview</p>
           </div>
         )}
       </div>
+
+      {/* Change link for main preview */}
+      {previewThumb && activeThumb === 0 && (
+        <button
+          onClick={() => document.getElementById('preview-input')?.click()}
+          style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 8px', display: 'block' }}
+        >
+          Change main image
+        </button>
+      )}
       <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }} onChange={e => handlePreviewSelect(e.target.files?.[0] || null)} />
+
+      {/* Thumbnail strip — 3 optional gallery slots */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 6 }}>
+        {[0, 1, 2].map(i => {
+          const thumb = galleryThumbs[i]
+          const isActive = activeThumb === i + 1
+          return (
+            <div key={i} style={{ position: 'relative' }}>
+              <div
+                onClick={() => {
+                  if (thumb) {
+                    setActiveThumb(i + 1)
+                  } else {
+                    document.getElementById('gallery-input-' + i)?.click()
+                  }
+                }}
+                style={{
+                  aspectRatio: '4/3',
+                  borderRadius: 'var(--radius-md)',
+                  border: isActive
+                    ? '2px solid #1a1a1a'
+                    : thumb
+                    ? '0.5px solid var(--color-border)'
+                    : '0.5px dashed var(--color-border-md)',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'var(--color-surface)',
+                  transition: 'border-color 0.15s',
+                }}
+              >
+                {thumb ? (
+                  <img src={thumb} alt={'gallery ' + (i + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                ) : (
+                  <span style={{ fontSize: 18, color: 'var(--color-border-md)' }}>+</span>
+                )}
+              </div>
+              {/* Remove button */}
+              {thumb && (
+                <button
+                  onClick={e => { e.stopPropagation(); clearGallerySlot(i) }}
+                  style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                  title="Remove"
+                >×</button>
+              )}
+              <input
+                type="file"
+                id={'gallery-input-' + i}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => handleGallerySelect(i, e.target.files?.[0] || null)}
+              />
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Optional label + tip */}
+      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>
+        Optional · tap a slot to add gallery images
+      </p>
+      <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
+        <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
+          💡 <strong>Tip:</strong> Artworks with room mockups and close-up shots sell significantly better.
+          Show buyers how your print looks framed on a wall — it makes all the difference!
+        </p>
+      </div>
 
       <div className="form-group">
         <label className="form-label">Title</label>
@@ -225,13 +420,8 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             { size: 'A4', dims: '210 x 297 mm', fee: PRINTING_FEES['A4'] },
             { size: 'A3', dims: '297 x 420 mm', fee: PRINTING_FEES['A3'] },
           ].map(({ size, dims, fee }) => (
-            <label key={size} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 14px', border: selectedSizes.includes(size) ? '0.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 'var(--border-radius-md)', background: selectedSizes.includes(size) ? 'var(--color-background-secondary)' : 'transparent' }}>
-              <input
-                type="checkbox"
-                checked={selectedSizes.includes(size)}
-                onChange={() => toggleSize(size)}
-                style={{ flexShrink: 0 }}
-              />
+            <label key={size} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 14px', border: selectedSizes.includes(size) ? '0.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: selectedSizes.includes(size) ? 'var(--color-surface)' : 'transparent' }}>
+              <input type="checkbox" checked={selectedSizes.includes(size)} onChange={() => toggleSize(size)} style={{ flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 13, fontWeight: 500 }}>{size} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 12 }}>({dims})</span></p>
                 <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Printing fee: {formatMVR(fee)} added to buyer price</p>
@@ -246,7 +436,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         <label className="form-label">Your artwork price (MVR)</label>
         <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="e.g. 800" style={{ maxWidth: 160 }} />
         {price > 0 && (
-          <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '12px 14px', marginTop: 10 }}>
+          <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '12px 14px', marginTop: 10 }}>
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8, fontWeight: 500 }}>What buyers pay</p>
             {selectedSizes.map(size => (
               <div key={size} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '2px 0', color: 'var(--color-text-muted)' }}>
@@ -262,7 +452,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         )}
       </div>
 
-      <div style={{ background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+      <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>SKU assigned on approval</p>
         <p style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, marginTop: 2 }}>{nextSku} next available</p>
       </div>
