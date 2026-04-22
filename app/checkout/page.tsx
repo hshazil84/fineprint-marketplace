@@ -26,11 +26,14 @@ export default function CheckoutPage() {
 
   if (items.length === 0) return null
 
-  // Calculate totals
-  const itemPrices = items.map(item => calculatePrices(item.artistPrice, item.offerPct || 0, item.offerLabel, deliveryMethod, item.printSize))
-  const subtotal = itemPrices.reduce((s, p) => s + p.artworkLineItem, 0)
+  // Calculate totals — multiply by quantity
+  const itemPrices = items.map(item =>
+    calculatePrices(item.artistPrice, item.offerPct || 0, item.offerLabel, deliveryMethod, item.printSize)
+  )
+  const subtotal    = itemPrices.reduce((s, p, i) => s + p.artworkLineItem * items[i].quantity, 0)
   const handlingFee = deliveryMethod === 'delivery' ? 100 : 0
-  const totalPaid = subtotal + handlingFee
+  const totalPaid   = subtotal + handlingFee
+  const totalItems  = items.reduce((s, i) => s + i.quantity, 0)
 
   function handleSlip(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -62,26 +65,33 @@ export default function CheckoutPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
+      // Expand items by quantity — each qty unit becomes a separate order_item
+      const expandedItems = items.flatMap((item, i) => {
+        const p = itemPrices[i]
+        return Array.from({ length: item.quantity }, () => ({
+          artworkId:      item.artworkId,
+          artworkSku:     item.artworkSku,
+          artworkTitle:   item.artworkTitle,
+          artistName:     item.artistName,
+          artistId:       item.artistId,
+          printSize:      item.printSize,
+          originalPrice:  item.artistPrice,
+          offerLabel:     item.offerLabel,
+          offerPct:       item.offerPct,
+          printingFee:    p.printingFee,
+          printPrice:     p.artworkLineItem,
+          fpCommission:   p.platformFeeAmt,
+          artistEarnings: p.artistEarnings,
+          discountAmount: p.discountAmount,
+          quantity:       item.quantity,
+        }))
+      })
+
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map((item, i) => ({
-            artworkId:      item.artworkId,
-            artworkSku:     item.artworkSku,
-            artworkTitle:   item.artworkTitle,
-            artistName:     item.artistName,
-            artistId:       item.artistId,
-            printSize:      item.printSize,
-            originalPrice:  item.artistPrice,
-            offerLabel:     item.offerLabel,
-            offerPct:       item.offerPct,
-            printingFee:    itemPrices[i].printingFee,
-            printPrice:     itemPrices[i].artworkLineItem,
-            fpCommission:   itemPrices[i].platformFeeAmt,
-            artistEarnings: itemPrices[i].artistEarnings,
-            discountAmount: itemPrices[i].discountAmount,
-          })),
+          items:          expandedItems,
           buyerId:        user?.id || null,
           buyerName:      form.name,
           buyerEmail:     form.email,
@@ -117,12 +127,13 @@ export default function CheckoutPage() {
         deliveryMethod,
         totalPaid,
         paymentMethod,
-        itemCount:      items.length,
+        itemCount:      totalItems,
         items:          items.map((item, i) => ({
           title:      item.artworkTitle,
           artistName: item.artistName,
           printSize:  item.printSize,
-          price:      itemPrices[i].artworkLineItem,
+          quantity:   item.quantity,
+          price:      itemPrices[i].artworkLineItem * item.quantity,
           previewUrl: item.previewUrl,
         })),
       }))
@@ -157,6 +168,7 @@ export default function CheckoutPage() {
         <p style={{ color: 'var(--color-text-muted)', marginBottom: 32 }}>Choose your payment method and submit your order</p>
 
         <div className="grid-2" style={{ gap: 32, alignItems: 'start' }}>
+
           {/* LEFT COL */}
           <div>
             <div className="card" style={{ marginBottom: 16 }}>
@@ -186,7 +198,7 @@ export default function CheckoutPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
                   { id: 'delivery', title: 'Deliver to me', desc: 'Anywhere in the Maldives', price: '+ MVR 100', priceColor: 'var(--color-text)' },
-                  { id: 'pickup', title: 'Pick up', desc: 'Collect from our Male studio', price: 'Free', priceColor: '#1D9E75' },
+                  { id: 'pickup',   title: 'Pick up',       desc: 'Collect from our Male studio', price: 'Free', priceColor: '#1D9E75' },
                 ].map(opt => (
                   <div key={opt.id} onClick={() => setDeliveryMethod(opt.id as any)} style={optionStyle(deliveryMethod === opt.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -218,7 +230,7 @@ export default function CheckoutPage() {
                   <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>FinePrint Studio — Male</p>
                   {[
                     ['Address', 'H. Dhunburimaage, Janavaree Magu, Malé'],
-                    ['Hours', 'Sun - Thu, 9 am - 6 pm'],
+                    ['Hours',   'Sun - Thu, 9 am - 6 pm'],
                     ['Contact', 'hello@fineprintmv.com'],
                   ].map(([k, v]) => (
                     <div key={k} style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 3 }}>
@@ -232,20 +244,24 @@ export default function CheckoutPage() {
 
           {/* RIGHT COL */}
           <div>
-            {/* Order summary — multi item */}
+            {/* Order summary */}
             <div className="card" style={{ marginBottom: 14 }}>
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
                 Order summary
                 <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 13, marginLeft: 8 }}>
-                  · {items.length} item{items.length !== 1 ? 's' : ''}
+                  · {totalItems} item{totalItems !== 1 ? 's' : ''}
                 </span>
               </p>
 
               {items.map((item, i) => {
-                const p = itemPrices[i]
+                const p         = itemPrices[i]
+                const lineTotal = p.artworkLineItem * item.quantity
                 const sizeLabel = item.printSize + (SIZE_DIMENSIONS?.[item.printSize] ? ' (' + SIZE_DIMENSIONS[item.printSize] + ')' : '')
                 return (
-                  <div key={`${item.artworkId}-${item.printSize}`} style={{ display: 'flex', gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: i < items.length - 1 ? '0.5px solid var(--color-border)' : 'none' }}>
+                  <div
+                    key={`${item.artworkId}-${item.printSize}`}
+                    style={{ display: 'flex', gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: i < items.length - 1 ? '0.5px solid var(--color-border)' : 'none' }}
+                  >
                     {item.previewUrl && (
                       <img src={item.previewUrl} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
                     )}
@@ -253,15 +269,35 @@ export default function CheckoutPage() {
                       <p style={{ fontSize: 13, fontWeight: 500 }}>{item.artworkTitle}</p>
                       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>by {item.artistName}</p>
                       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>{sizeLabel}</p>
-                      {item.offerPct ? (
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                          <span style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(p.artworkLineItem)}</span>
-                          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textDecoration: 'line-through' }}>{formatMVR(item.artistPrice + p.printingFee)}</span>
-                          <span style={{ fontSize: 10, color: '#E24B4A' }}>-{item.offerPct}%</span>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                        {/* Qty badge */}
+                        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 6, padding: '2px 8px' }}>
+                          Qty {item.quantity}
+                        </span>
+
+                        {/* Price */}
+                        <div style={{ textAlign: 'right' }}>
+                          {item.offerPct ? (
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(lineTotal)}</span>
+                              {item.quantity === 1 && (
+                                <span style={{ fontSize: 11, color: 'var(--color-text-muted)', textDecoration: 'line-through' }}>
+                                  {formatMVR(item.artistPrice + p.printingFee)}
+                                </span>
+                              )}
+                              <span style={{ fontSize: 10, color: '#E24B4A' }}>-{item.offerPct}%</span>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(lineTotal)}</span>
+                          )}
+                          {item.quantity > 1 && (
+                            <p style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 1 }}>
+                              {formatMVR(p.artworkLineItem)} each
+                            </p>
+                          )}
                         </div>
-                      ) : (
-                        <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(p.artworkLineItem)}</p>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )
@@ -301,17 +337,20 @@ export default function CheckoutPage() {
                   <div style={{ paddingLeft: 24, marginTop: 12 }}>
                     <div style={{ background: 'var(--color-bg)', border: '0.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
                       {[
-                        ['Bank', 'Bank of Maldives (BML)'],
-                        ['Account name', 'Hasan Shazil'],
+                        ['Bank',           'Bank of Maldives (BML)'],
+                        ['Account name',   'Hasan Shazil'],
                         ['Account number', '7703230358101'],
-                        ['Amount', formatMVR(totalPaid)],
+                        ['Amount',         formatMVR(totalPaid)],
                       ].map(([k, v]) => (
                         <div key={k} style={{ marginBottom: 8 }}>
                           <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{k}</p>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <p style={{ fontSize: k === 'Amount' ? 17 : 13, fontWeight: 500, fontFamily: k === 'Account number' ? 'var(--font-mono)' : 'inherit' }}>{v}</p>
                             {k === 'Account number' && (
-                              <button onClick={e => { e.stopPropagation(); copyAccountNumber() }} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--color-border)', background: copied ? '#1D9E75' : 'var(--color-surface)', color: copied ? '#fff' : 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.15s' }}>
+                              <button
+                                onClick={e => { e.stopPropagation(); copyAccountNumber() }}
+                                style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, border: '0.5px solid var(--color-border)', background: copied ? '#1D9E75' : 'var(--color-surface)', color: copied ? '#fff' : 'var(--color-text-muted)', cursor: 'pointer', transition: 'all 0.15s' }}
+                              >
                                 {copied ? 'Copied!' : 'Copy'}
                               </button>
                             )}
