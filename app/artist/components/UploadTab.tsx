@@ -79,7 +79,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   function clearPreview() {
     setPreviewFile(null)
     setPreviewThumb(null)
-    if (activeThumb === 0) setActiveThumb(0)
+    setActiveThumb(0)
   }
 
   function handleGallerySelect(index: number, file: File | null) {
@@ -107,7 +107,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     if (activeThumb === index + 1) setActiveThumb(0)
   }
 
-  // What shows in the big preview
   const bigImage = activeThumb === 0
     ? previewThumb
     : galleryThumbs[activeThumb - 1]
@@ -165,7 +164,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       }).select().single()
       if (dbError) throw dbError
 
-      // Upload gallery images
       const hasGallery = galleryFiles.some(Boolean)
       if (hasGallery && artwork) {
         toast.loading('Uploading gallery images...', { id: 'upload' })
@@ -230,13 +228,13 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
               </p>
             )}
           </div>
-          {hiresFile ? (
+          {hiresFile && (
             <button
               onClick={e => { e.stopPropagation(); setHiresFile(null); (document.getElementById('hires-input') as HTMLInputElement).value = '' }}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}
               title="Remove file"
             >×</button>
-          ) : null}
+          )}
         </div>
         {hiresFile && (
           <button
@@ -252,7 +250,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </p>
       <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
 
-      {/* ── ARTWORK PREVIEW — mirrors how it looks on artwork page ── */}
+      {/* Preview image section */}
       <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 4 }}>
         Preview image
         <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>shown to buyers — add your watermark first</span>
@@ -261,7 +259,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       {/* Big main image slot */}
       <div
         style={{
-          border: bigImage ? 'none' : '0.5px solid var(--color-border)',
+          border: bigImage ? '0.5px solid var(--color-border)' : '0.5px solid var(--color-border)',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
           marginBottom: 8,
@@ -282,7 +280,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
               alt="preview"
               style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
             />
-            {/* Clear button for currently active image */}
             {activeThumb === 0 && previewThumb && (
               <button
                 onClick={e => { e.stopPropagation(); clearPreview() }}
@@ -306,7 +303,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         )}
       </div>
 
-      {/* Change link for main preview */}
       {previewThumb && activeThumb === 0 && (
         <button
           onClick={() => document.getElementById('preview-input')?.click()}
@@ -317,7 +313,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       )}
       <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }} onChange={e => handlePreviewSelect(e.target.files?.[0] || null)} />
 
-      {/* Thumbnail strip — 3 optional gallery slots */}
+      {/* Thumbnail strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 6 }}>
         {[0, 1, 2].map(i => {
           const thumb = galleryThumbs[i]
@@ -326,20 +322,13 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             <div key={i} style={{ position: 'relative' }}>
               <div
                 onClick={() => {
-                  if (thumb) {
-                    setActiveThumb(i + 1)
-                  } else {
-                    document.getElementById('gallery-input-' + i)?.click()
-                  }
+                  if (thumb) setActiveThumb(i + 1)
+                  else document.getElementById('gallery-input-' + i)?.click()
                 }}
                 style={{
                   aspectRatio: '4/3',
                   borderRadius: 'var(--radius-md)',
-                  border: isActive
-                    ? '2px solid #1a1a1a'
-                    : thumb
-                    ? '0.5px solid var(--color-border)'
-                    : '0.5px dashed var(--color-border-md)',
+                  border: isActive ? '2px solid #1a1a1a' : thumb ? '0.5px solid var(--color-border)' : '0.5px dashed var(--color-border-md)',
                   overflow: 'hidden',
                   cursor: 'pointer',
                   display: 'flex',
@@ -355,7 +344,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                   <span style={{ fontSize: 18, color: 'var(--color-border-md)' }}>+</span>
                 )}
               </div>
-              {/* Remove button */}
               {thumb && (
                 <button
                   onClick={e => { e.stopPropagation(); clearGallerySlot(i) }}
@@ -375,7 +363,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         })}
       </div>
 
-      {/* Optional label + tip */}
       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>
         Optional · tap a slot to add gallery images
       </p>
@@ -412,24 +399,28 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </div>
 
       {/* Print sizes */}
-      {[
-        { size: 'A4', dims: '210 x 297 mm', fee: PRINTING_FEES['A4'], comingSoon: false },
-        { size: 'A3', dims: '297 x 420 mm', fee: PRINTING_FEES['A3'], comingSoon: false },
-        { size: 'A2', dims: '420 x 594 mm', fee: 0, comingSoon: true },
-      ].map(({ size, dims, fee, comingSoon }) => (
-        <label key={size} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: comingSoon ? 'not-allowed' : 'pointer', padding: '10px 14px', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: comingSoon ? 'rgba(0,0,0,0.02)' : selectedSizes.includes(size) ? 'var(--color-surface)' : 'transparent', opacity: comingSoon ? 0.5 : 1 }}>
-          <input type="checkbox" checked={!comingSoon && selectedSizes.includes(size)} onChange={() => !comingSoon && toggleSize(size)} disabled={comingSoon} style={{ flexShrink: 0 }} />
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 13, fontWeight: 500 }}>
-              {size} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 12 }}>({dims})</span>
-              {comingSoon && <span style={{ fontSize: 10, marginLeft: 8, background: 'var(--color-amber-light)', color: '#633806', padding: '1px 7px', borderRadius: 20, fontWeight: 500 }}>Coming soon</span>}
-            </p>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-              {comingSoon ? 'Available soon' : 'Printing fee: ' + formatMVR(fee) + ' added to buyer price'}
-            </p>
-          </div>
-        </label>
-      ))}
+      <div className="form-group">
+        <label className="form-label">Available print sizes</label>
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10 }}>Select which sizes you will offer for this artwork</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { size: 'A4', dims: '210 x 297 mm', fee: PRINTING_FEES['A4'], comingSoon: false },
+            { size: 'A3', dims: '297 x 420 mm', fee: PRINTING_FEES['A3'], comingSoon: false },
+            { size: 'A2', dims: '420 x 594 mm', fee: 0, comingSoon: true },
+          ].map(({ size, dims, fee, comingSoon }) => (
+            <label key={size} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: comingSoon ? 'not-allowed' : 'pointer', padding: '10px 14px', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: comingSoon ? 'rgba(0,0,0,0.02)' : selectedSizes.includes(size) ? 'var(--color-surface)' : 'transparent', opacity: comingSoon ? 0.5 : 1 }}>
+              <input type="checkbox" checked={!comingSoon && selectedSizes.includes(size)} onChange={() => !comingSoon && toggleSize(size)} disabled={comingSoon} style={{ flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>
+                  {size} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 12 }}>({dims})</span>
+                  {comingSoon && <span style={{ fontSize: 10, marginLeft: 8, background: 'var(--color-amber-light)', color: '#633806', padding: '1px 7px', borderRadius: 20, fontWeight: 500 }}>Coming soon</span>}
+                </p>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                  {comingSoon ? 'Available soon' : 'Printing fee: ' + formatMVR(fee) + ' added to buyer price'}
+                </p>
+              </div>
+            </label>
+          ))}
         </div>
       </div>
 
