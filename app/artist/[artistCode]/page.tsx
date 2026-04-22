@@ -91,11 +91,7 @@ function ArtworkCard({ artwork, isTopSeller }: { artwork: any; isTopSeller: bool
   )
 }
 
-function ProfileContent({ profile, artworks, topSellerIds }: {
-  profile: any
-  artworks: any[]
-  topSellerIds: Set<number>
-}) {
+function ProfileContent({ profile, artworks, topSellerIds }: { profile: any; artworks: any[]; topSellerIds: Set<number> }) {
   const displayName = profile.display_name || profile.full_name
   const isClosed    = profile.shop_status === 'closed'
   const socialLinks = getSocialLinks(profile)
@@ -120,7 +116,6 @@ function ProfileContent({ profile, artworks, topSellerIds }: {
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
 
-            {/* Avatar */}
             <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--color-border)' }}>
               <AvatarDisplay profile={profile} size={88} />
             </div>
@@ -146,13 +141,7 @@ function ProfileContent({ profile, artworks, topSellerIds }: {
               {socialLinks.length > 0 && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {socialLinks.map(s => (
-                    
-                      key={s.label}
-                      href={s.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}
-                    >
+                    <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
                       {s.label}
                     </a>
                   ))}
