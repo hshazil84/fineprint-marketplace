@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import Avatar, { genConfig } from 'react-nice-avatar'
@@ -47,8 +47,7 @@ export function ProfileTab({ profile, onSave }: any) {
   const [avatarSex, setAvatarSex]               = useState<'man' | 'woman'>('man')
   const [avatarConfig, setAvatarConfig]         = useState(() => randomConfig('man', AVATAR_COLORS[0].value))
   const [saving, setSaving]                     = useState(false)
-  const avatarRef = useRef<any>(null)
-  const supabase  = createClient()
+  const supabase = createClient()
 
   function regenerate(sex?: 'man' | 'woman', color?: string) {
     const s = sex   ?? avatarSex
@@ -68,24 +67,42 @@ export function ProfileTab({ profile, onSave }: any) {
   async function exportAvatarToPng(): Promise<Blob | null> {
     return new Promise(resolve => {
       try {
-        const svgEl = document.getElementById('nice-avatar-svg')?.querySelector('svg')
+        const container = document.getElementById('nice-avatar-svg')
+        if (!container) { resolve(null); return }
+        const svgEl = container.querySelector('svg')
         if (!svgEl) { resolve(null); return }
-        const svgData   = new XMLSerializer().serializeToString(svgEl)
-        const svgBlob   = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
-        const url       = URL.createObjectURL(svgBlob)
-        const img       = new Image()
+
+        // Clone and fix dimensions
+        const clone = svgEl.cloneNode(true) as SVGElement
+        clone.setAttribute('width', '200')
+        clone.setAttribute('height', '200')
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+
+        // Serialize and clean up namespaces
+        const serializer = new XMLSerializer()
+        let svgStr = serializer.serializeToString(clone)
+        svgStr = svgStr.replace(/NS\d+:/g, '').replace(/xmlns:NS\d+="[^"]*"/g, '')
+
+        const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' })
+        const url = URL.createObjectURL(svgBlob)
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
         img.onload = () => {
-          const canvas  = document.createElement('canvas')
-          canvas.width  = 200
+          const canvas = document.createElement('canvas')
+          canvas.width = 200
           canvas.height = 200
-          const ctx     = canvas.getContext('2d')!
+          const ctx = canvas.getContext('2d')!
           ctx.drawImage(img, 0, 0, 200, 200)
           URL.revokeObjectURL(url)
-          canvas.toBlob(blob => resolve(blob), 'image/png')
+          canvas.toBlob(blob => resolve(blob), 'image/png', 0.95)
         }
-        img.onerror = () => resolve(null)
+        img.onerror = () => {
+          URL.revokeObjectURL(url)
+          resolve(null)
+        }
         img.src = url
-      } catch {
+      } catch (err) {
+        console.error('Avatar export error:', err)
         resolve(null)
       }
     })
@@ -109,15 +126,18 @@ export function ProfileTab({ profile, onSave }: any) {
       } else if (avatarMode === 'illustrated') {
         toast.loading('Saving illustrated avatar...', { id: 'avatar' })
         const blob = await exportAvatarToPng()
-        if (blob) {
-          const path = profile.id + '-avatar.png'
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(path, blob, { upsert: true, contentType: 'image/png' })
-          if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
-          const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-          avatarUrl = data.publicUrl
+        if (!blob) {
+          toast.error('Could not export avatar — please try again or use photo upload', { id: 'avatar' })
+          setSaving(false)
+          return
         }
+        const path = profile.id + '-avatar.png'
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(path, blob, { upsert: true, contentType: 'image/png' })
+        if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
+        const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+        avatarUrl = data.publicUrl + '?t=' + Date.now() // cache bust
         toast.dismiss('avatar')
       }
 
@@ -153,7 +173,6 @@ export function ProfileTab({ profile, onSave }: any) {
 
       {/* Mode tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {/* Upload photo — recommended */}
         <button
           onClick={() => setAvatarMode('upload')}
           style={{
@@ -179,7 +198,6 @@ export function ProfileTab({ profile, onSave }: any) {
           )}
         </button>
 
-        {/* Illustrated */}
         <button
           onClick={() => setAvatarMode('illustrated')}
           style={{
@@ -229,8 +247,7 @@ export function ProfileTab({ profile, onSave }: any) {
           {avatarMode === 'upload' && (
             <>
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
-                Upload a clear photo of yourself or your studio logo.
-                Buyers connect better with a real face.<br />JPG or PNG.
+                Use the same photo or logo you use on your socials — buyers are more likely to trust and remember a face they've seen before.<br />JPG or PNG.
               </p>
               <button
                 onClick={() => document.getElementById('avatar-input')?.click()}
@@ -248,7 +265,6 @@ export function ProfileTab({ profile, onSave }: any) {
 
           {avatarMode === 'illustrated' && (
             <>
-              {/* Male / Female */}
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>Style</p>
               <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                 {([
@@ -275,7 +291,6 @@ export function ProfileTab({ profile, onSave }: any) {
                 ))}
               </div>
 
-              {/* Colour swatches */}
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>Background</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                 {AVATAR_COLORS.map(c => (
@@ -298,7 +313,6 @@ export function ProfileTab({ profile, onSave }: any) {
                 ))}
               </div>
 
-              {/* Regenerate */}
               <button
                 onClick={() => regenerate()}
                 style={{
@@ -328,7 +342,7 @@ export function ProfileTab({ profile, onSave }: any) {
       {avatarMode === 'upload' && !avatarPreview && (
         <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--color-teal-dark)', lineHeight: 1.6 }}>
-            💡 Profiles with a real photo get significantly more trust from buyers. A clear headshot or studio photo works best.
+            💡 Use the same photo or logo from your socials — buyers are more likely to trust and remember a familiar face.
           </p>
         </div>
       )}
@@ -385,4 +399,3 @@ export function ProfileTab({ profile, onSave }: any) {
     </div>
   )
 }
-
