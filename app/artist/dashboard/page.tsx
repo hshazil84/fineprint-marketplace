@@ -402,17 +402,16 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     paintingBy:  artwork.painting_by || '',
     sizes:       artwork.sizes       || ['A4', 'A3'],
   })
-  const [previewFile, setPreviewFile]     = useState<File | null>(null)
-  const [previewThumb, setPreviewThumb]   = useState<string | null>(artwork.preview_url || null)
-  const [hiresFile, setHiresFile]         = useState<File | null>(null)
+  const [previewFile, setPreviewFile]         = useState<File | null>(null)
+  const [previewThumb, setPreviewThumb]       = useState<string | null>(artwork.preview_url || null)
+  const [hiresFile, setHiresFile]             = useState<File | null>(null)
   const [existingGallery, setExistingGallery] = useState<any[]>([])
-  const [galleryFiles, setGalleryFiles]   = useState<(File | null)[]>([null, null, null])
-  const [galleryThumbs, setGalleryThumbs] = useState<(string | null)[]>([null, null, null])
-  const [activeThumb, setActiveThumb]     = useState<number>(0)
-  const [saving, setSaving]               = useState(false)
+  const [galleryFiles, setGalleryFiles]       = useState<(File | null)[]>([null, null, null])
+  const [galleryThumbs, setGalleryThumbs]     = useState<(string | null)[]>([null, null, null])
+  const [activeThumb, setActiveThumb]         = useState<'main' | number>('main')
+  const [saving, setSaving]                   = useState(false)
   const supabase = createClient()
 
-  // Load existing gallery images on mount
   useEffect(() => {
     async function loadGallery() {
       const { data } = await supabase
@@ -425,12 +424,13 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     loadGallery()
   }, [artwork.id])
 
-  // Big preview — what shows large
-  const bigImage = activeThumb === -1
+  const bigImage = activeThumb === 'main'
     ? previewThumb
-    : activeThumb >= 0 && activeThumb < existingGallery.length
+    : typeof activeThumb === 'number' && activeThumb < existingGallery.length
     ? existingGallery[activeThumb]?.url
-    : galleryThumbs[activeThumb - existingGallery.length] || previewThumb
+    : typeof activeThumb === 'number'
+    ? galleryThumbs[activeThumb - existingGallery.length]
+    : previewThumb
 
   function toggleSize(size: string) {
     setForm(prev => ({
@@ -446,7 +446,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     const reader = new FileReader()
     reader.onload = ev => {
       setPreviewThumb(ev.target?.result as string)
-      setActiveThumb(-1)
+      setActiveThumb('main')
     }
     reader.readAsDataURL(file)
   }
@@ -467,26 +467,24 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
   }
 
   function clearNewGallerySlot(slotIndex: number) {
-    const newFiles = [...galleryFiles]
+    const newFiles  = [...galleryFiles]
     const newThumbs = [...galleryThumbs]
-    newFiles[slotIndex] = null
+    newFiles[slotIndex]  = null
     newThumbs[slotIndex] = null
     setGalleryFiles(newFiles)
     setGalleryThumbs(newThumbs)
-    if (activeThumb === existingGallery.length + slotIndex) setActiveThumb(0)
+    if (activeThumb === existingGallery.length + slotIndex) setActiveThumb('main')
   }
 
   async function deleteExistingGalleryImage(img: any) {
-    // Delete from DB
     await supabase.from('artwork_images').delete().eq('id', img.id)
-    // Try delete from storage — extract path from URL
     try {
-      const url    = new URL(img.url)
-      const path   = url.pathname.split('/artwork-previews/')[1]
-      if (path) await supabase.storage.from('artwork-previews').remove([path])
+      const url  = new URL(img.url)
+      const path = url.pathname.split('/artwork-previews/')[1]
+      if (path) await supabase.storage.from('artwork-previews').remove([decodeURIComponent(path)])
     } catch {}
     setExistingGallery(prev => prev.filter(g => g.id !== img.id))
-    if (activeThumb >= existingGallery.length - 1) setActiveThumb(0)
+    setActiveThumb('main')
   }
 
   async function handleSave() {
@@ -501,53 +499,40 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
         sizes:       form.sizes,
       }
 
-      // Upload new preview if changed
       if (previewFile) {
         toast.loading('Uploading preview...', { id: 'edit-upload' })
-        const ext         = previewFile.name.split('.').pop()
-        const previewPath = artwork.sku + '-preview.' + ext
-        const { error: previewError } = await supabase.storage
-          .from('artwork-previews')
-          .upload(previewPath, previewFile, { upsert: true, contentType: previewFile.type })
-        if (previewError) throw previewError
-        const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
+        const ext   = previewFile.name.split('.').pop()
+        const path  = artwork.sku + '-preview.' + ext
+        const { error } = await supabase.storage.from('artwork-previews').upload(path, previewFile, { upsert: true, contentType: previewFile.type })
+        if (error) throw error
+        const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(path)
         updates.preview_url = urlData.publicUrl
         toast.dismiss('edit-upload')
       }
 
-      // Upload new hi-res if changed
       if (hiresFile) {
-        toast.loading('Uploading hi-res file...', { id: 'edit-hires' })
-        const ext       = hiresFile.name.split('.').pop()
-        const hiresPath = artwork.sku + '-hires.' + ext
-        const { error: hiresError } = await supabase.storage
-          .from('artwork-hires')
-          .upload(hiresPath, hiresFile, { upsert: true, contentType: hiresFile.type })
-        if (hiresError) throw hiresError
-        updates.hires_path = hiresPath
+        toast.loading('Uploading hi-res...', { id: 'edit-hires' })
+        const ext   = hiresFile.name.split('.').pop()
+        const path  = artwork.sku + '-hires.' + ext
+        const { error } = await supabase.storage.from('artwork-hires').upload(path, hiresFile, { upsert: true, contentType: hiresFile.type })
+        if (error) throw error
+        updates.hires_path = path
         toast.dismiss('edit-hires')
       }
 
-      // Upload new gallery images
       const hasNewGallery = galleryFiles.some(Boolean)
       if (hasNewGallery) {
-        toast.loading('Uploading gallery images...', { id: 'edit-gallery' })
-        const nextSortOrder = existingGallery.length + 1
+        toast.loading('Uploading gallery...', { id: 'edit-gallery' })
+        const nextSort = existingGallery.length + 1
         for (let i = 0; i < galleryFiles.length; i++) {
           const gFile = galleryFiles[i]
           if (!gFile) continue
           const gExt  = gFile.name.split('.').pop()
-          const gPath = 'gallery/' + artwork.sku + '-gallery-edit-' + Date.now() + '-' + i + '.' + gExt
-          const { error: gError } = await supabase.storage
-            .from('artwork-previews')
-            .upload(gPath, gFile, { contentType: gFile.type })
-          if (gError) { console.error('Gallery upload error:', gError); continue }
+          const gPath = 'gallery/' + artwork.sku + '-gallery-' + Date.now() + '-' + i + '.' + gExt
+          const { error: gErr } = await supabase.storage.from('artwork-previews').upload(gPath, gFile, { contentType: gFile.type })
+          if (gErr) { console.error(gErr); continue }
           const { data: gUrl } = supabase.storage.from('artwork-previews').getPublicUrl(gPath)
-          await supabase.from('artwork_images').insert({
-            artwork_id: artwork.id,
-            url:        gUrl.publicUrl,
-            sort_order: nextSortOrder + i,
-          })
+          await supabase.from('artwork_images').insert({ artwork_id: artwork.id, url: gUrl.publicUrl, sort_order: nextSort + i })
         }
         toast.dismiss('edit-gallery')
       }
@@ -560,85 +545,90 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     }
   }
 
-  // Total available new gallery slots = 3 minus existing count, min 0
   const newSlots = Math.max(0, 3 - existingGallery.length)
 
   return (
     <div style={{ padding: '0 20px 20px', borderTop: '0.5px solid var(--color-border)', background: 'var(--color-background-secondary)' }}>
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
 
-      {/* ── IMAGE SECTION — mirrors artwork page layout ── */}
+      {/* Images section */}
       <div className="form-group">
         <label className="form-label">Images</label>
 
-        {/* Big main preview */}
-        <div style={{
-          aspectRatio: '4/3', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-          background: 'var(--color-surface)', border: '0.5px solid var(--color-border)',
-          marginBottom: 8, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer',
-        }}
-          onClick={() => !bigImage && document.getElementById('edit-preview-input-' + artwork.id)?.click()}
+        {/* Big preview — compact 4:3 */}
+        <div
+          style={{
+            aspectRatio: '4/3',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            background: 'var(--color-surface)',
+            border: '0.5px solid var(--color-border)',
+            marginBottom: 8,
+            position: 'relative',
+            cursor: bigImage ? 'default' : 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => !bigImage && document.getElementById('edit-preview-' + artwork.id)?.click()}
         >
           {bigImage ? (
             <>
               <img src={bigImage} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
-              {/* × button only for main preview slot */}
-              {activeThumb === -1 && previewFile && (
+              {activeThumb === 'main' && previewFile && (
                 <button
-                  onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(artwork.preview_url); setActiveThumb(0) }}
-                  style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(artwork.preview_url) }}
+                  style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 >×</button>
               )}
             </>
           ) : (
             <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              <div style={{ fontSize: 24, marginBottom: 4 }}>+</div>
-              <p style={{ fontSize: 12 }}>Tap to upload preview</p>
+              <div style={{ fontSize: 22, marginBottom: 4 }}>+</div>
+              <p style={{ fontSize: 12 }}>Tap to upload main preview</p>
             </div>
           )}
         </div>
 
-        {/* Thumbnail strip — main + existing gallery + new slots */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, marginBottom: 6 }}>
+        {/* Thumbnail strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 4 }}>
 
-          {/* Main preview thumbnail */}
+          {/* Main thumbnail */}
           <div style={{ position: 'relative' }}>
             <div
-              onClick={() => {
-                setActiveThumb(-1)
-                if (!previewThumb) document.getElementById('edit-preview-input-' + artwork.id)?.click()
-              }}
+              onClick={() => setActiveThumb('main')}
               style={{
-                aspectRatio: '4/3', borderRadius: 'var(--radius-md)', overflow: 'hidden', cursor: 'pointer',
-                border: activeThumb === -1 ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                aspectRatio: '4/3',
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+                cursor: 'pointer',
+                border: activeThumb === 'main' ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                background: 'var(--color-surface)',
                 transition: 'border-color 0.15s',
               }}
             >
-              {previewThumb ? (
-                <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-              ) : (
-                <span style={{ fontSize: 14, color: 'var(--color-text-muted)' }}>+</span>
-              )}
+              {previewThumb
+                ? <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>+</div>
+              }
             </div>
-            {/* Replace button for main */}
             <button
-              onClick={() => document.getElementById('edit-preview-input-' + artwork.id)?.click()}
-              style={{ position: 'absolute', bottom: 3, left: 0, right: 0, fontSize: 9, color: '#fff', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', padding: '2px 0', textAlign: 'center', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}
+              onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
+              style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 9, color: '#fff', background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', padding: '3px 0', textAlign: 'center', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}
             >
-              Main
+              {previewFile ? '✓ Changed' : 'Main · replace'}
             </button>
-            <input type="file" id={'edit-preview-input-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
+            <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
           </div>
 
-          {/* Existing gallery images */}
+          {/* Existing gallery */}
           {existingGallery.map((img, i) => (
             <div key={img.id} style={{ position: 'relative' }}>
               <div
                 onClick={() => setActiveThumb(i)}
                 style={{
-                  aspectRatio: '4/3', borderRadius: 'var(--radius-md)', overflow: 'hidden', cursor: 'pointer',
+                  aspectRatio: '4/3',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
                   border: activeThumb === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
                   background: 'var(--color-surface)',
                   transition: 'border-color 0.15s',
@@ -646,10 +636,9 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
               >
                 <img src={img.url} alt={'gallery ' + (i + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
               </div>
-              {/* Delete existing */}
               <button
                 onClick={() => deleteExistingGalleryImage(img)}
-                style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(163,45,45,0.85)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(163,45,45,0.85)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                 title="Delete"
               >×</button>
             </div>
@@ -664,31 +653,33 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
                 <div
                   onClick={() => {
                     if (thumb) setActiveThumb(existingGallery.length + slotIndex)
-                    else document.getElementById('edit-gallery-input-' + artwork.id + '-' + slotIndex)?.click()
+                    else document.getElementById('edit-gallery-' + artwork.id + '-' + slotIndex)?.click()
                   }}
                   style={{
-                    aspectRatio: '4/3', borderRadius: 'var(--radius-md)', overflow: 'hidden', cursor: 'pointer',
+                    aspectRatio: '4/3',
+                    borderRadius: 'var(--radius-md)',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
                     border: isActive ? '2px solid #1a1a1a' : thumb ? '0.5px solid var(--color-border)' : '0.5px dashed var(--color-border)',
-                    background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--color-surface)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                     transition: 'border-color 0.15s',
                   }}
                 >
-                  {thumb ? (
-                    <img src={thumb} alt={'new gallery ' + slotIndex} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                  ) : (
-                    <span style={{ fontSize: 14, color: 'var(--color-border)' }}>+</span>
-                  )}
+                  {thumb
+                    ? <img src={thumb} alt="new" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                    : <span style={{ fontSize: 20, color: 'var(--color-text-muted)', opacity: 0.4 }}>+</span>
+                  }
                 </div>
                 {thumb && (
                   <button
                     onClick={() => clearNewGallerySlot(slotIndex)}
-                    style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                    title="Remove"
+                    style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                   >×</button>
                 )}
                 <input
                   type="file"
-                  id={'edit-gallery-input-' + artwork.id + '-' + slotIndex}
+                  id={'edit-gallery-' + artwork.id + '-' + slotIndex}
                   accept="image/*"
                   style={{ display: 'none' }}
                   onChange={e => handleNewGallerySelect(slotIndex, e.target.files?.[0] || null)}
@@ -698,42 +689,30 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
           })}
         </div>
 
-        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-          Tap main to replace · tap gallery × to delete · tap empty slot to add
-        </p>
         <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-          Add your watermark to the main preview before uploading
+          Tap thumbnails to preview · red × deletes gallery image · empty slots add new
         </p>
       </div>
 
-      {/* Hi-res file replacement */}
+      {/* Hi-res file */}
       <div className="form-group">
         <label className="form-label">Hi-res print file</label>
-        <div
-          style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
-          onClick={() => !hiresFile && document.getElementById('edit-hires-input-' + artwork.id)?.click()}
-        >
+        <div style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 18 }}>🖨</span>
           <div style={{ flex: 1 }}>
             <p style={{ fontSize: 13, color: hiresFile ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-              {hiresFile ? hiresFile.name : artwork.hires_path ? 'Current: ' + artwork.hires_path : 'No hi-res file'}
+              {hiresFile ? hiresFile.name : artwork.hires_path || 'No file'}
             </p>
-            {hiresFile && (
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                {(hiresFile.size / 1024 / 1024).toFixed(1)} MB
-              </p>
-            )}
+            {hiresFile && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{(hiresFile.size / 1024 / 1024).toFixed(1)} MB</p>}
           </div>
           {hiresFile ? (
             <button
-              type="button"
-              onClick={e => { e.stopPropagation(); setHiresFile(null); (document.getElementById('edit-hires-input-' + artwork.id) as HTMLInputElement).value = '' }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}
+              onClick={() => { setHiresFile(null); (document.getElementById('edit-hires-' + artwork.id) as HTMLInputElement).value = '' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}
             >×</button>
           ) : (
             <button
-              type="button"
-              onClick={e => { e.stopPropagation(); document.getElementById('edit-hires-input-' + artwork.id)?.click() }}
+              onClick={() => document.getElementById('edit-hires-' + artwork.id)?.click()}
               style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)', flexShrink: 0 }}
             >
               Replace
@@ -742,46 +721,38 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
         </div>
         {hiresFile && (
           <button
-            type="button"
-            onClick={() => document.getElementById('edit-hires-input-' + artwork.id)?.click()}
+            onClick={() => document.getElementById('edit-hires-' + artwork.id)?.click()}
             style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
           >
             Change file
           </button>
         )}
-        <input type="file" id={'edit-hires-input-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
-        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-          JPG or PNG · A4 min 2339×1654px · A3 min 3307×2339px
-        </p>
+        <input type="file" id={'edit-hires-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>A4 min 2339×1654px · A3 min 3307×2339px</p>
       </div>
 
       <div className="form-group">
         <label className="form-label">Title</label>
         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
       </div>
-
       <div className="form-group">
         <label className="form-label">Description</label>
         <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
       </div>
-
       <div className="form-group">
         <label className="form-label">Category</label>
         <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
-
       <div className="form-group">
         <label className="form-label">Painting by (optional)</label>
         <input className="form-input" value={form.paintingBy} onChange={e => setForm({ ...form, paintingBy: e.target.value })} placeholder="e.g. Ahmed Naif" />
       </div>
-
       <div className="form-group">
         <label className="form-label">Price (MVR)</label>
         <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} style={{ maxWidth: 120 }} />
       </div>
-
       <div className="form-group">
         <label className="form-label">Available sizes</label>
         <div style={{ display: 'flex', gap: 10 }}>
