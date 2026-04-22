@@ -6,18 +6,7 @@ import { formatMVR, getFromPrice } from '@/lib/pricing'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 import Footer from '@/app/components/Footer'
-
-const AVATAR_COLORS = ['#1D9E75', '#378ADD', '#D85A30', '#7F77DD', '#BA7517', '#993556', '#0F6E56', '#534AB7', '#D4537E', '#639922']
-
-function getInitials(name: string) {
-  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
-}
-
-function getColor(code: string) {
-  let h = 0
-  for (let i = 0; i < code.length; i++) h = code.charCodeAt(i) + ((h << 5) - h)
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-}
+import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 
 function toHref(value: string, prefix: string): string {
   if (!value) return ''
@@ -28,10 +17,10 @@ function toHref(value: string, prefix: string): string {
 function getSocialLinks(profile: any): Array<{ label: string; href: string }> {
   const links: Array<{ label: string; href: string }> = []
   if (profile.instagram) links.push({ label: 'Instagram', href: toHref(profile.instagram, 'https://instagram.com/') })
-  if (profile.tiktok) links.push({ label: 'TikTok', href: toHref(profile.tiktok, 'https://tiktok.com/@') })
-  if (profile.facebook) links.push({ label: 'Facebook', href: toHref(profile.facebook, 'https://') })
-  if (profile.linkedin) links.push({ label: 'LinkedIn', href: toHref(profile.linkedin, 'https://') })
-  if (profile.website) links.push({ label: 'Website', href: toHref(profile.website, 'https://') })
+  if (profile.tiktok)    links.push({ label: 'TikTok',    href: toHref(profile.tiktok,    'https://tiktok.com/@') })
+  if (profile.facebook)  links.push({ label: 'Facebook',  href: toHref(profile.facebook,  'https://') })
+  if (profile.linkedin)  links.push({ label: 'LinkedIn',  href: toHref(profile.linkedin,  'https://') })
+  if (profile.website)   links.push({ label: 'Website',   href: toHref(profile.website,   'https://') })
   return links
 }
 
@@ -54,7 +43,7 @@ function SkeletonShimmer({ style }: { style?: React.CSSProperties }) {
   )
 }
 
-function ArtworkCard({ artwork, isTopSeller }: { artwork: any, isTopSeller: boolean }) {
+function ArtworkCard({ artwork, isTopSeller }: { artwork: any; isTopSeller: boolean }) {
   const [loaded, setLoaded] = useState(false)
   const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
   return (
@@ -102,11 +91,10 @@ function ArtworkCard({ artwork, isTopSeller }: { artwork: any, isTopSeller: bool
   )
 }
 
-function ProfileContent({ profile, artworks, topSellerIds }: { profile: any, artworks: any[], topSellerIds: Set<number> }) {
-  const displayName = profile.display_name || profile.full_name
-  const color = getColor(profile.artist_code || 'FP')
-  const isClosed = profile.shop_status === 'closed'
-  const socialLinks = getSocialLinks(profile)
+function ProfileContent({ profile, artworks, topSellerIds }: { profile: any; artworks: any[]; topSellerIds: Set<number> }) {
+  const displayName  = profile.display_name || profile.full_name
+  const isClosed     = profile.shop_status === 'closed'
+  const socialLinks  = getSocialLinks(profile)
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
@@ -114,28 +102,24 @@ function ProfileContent({ profile, artworks, topSellerIds }: { profile: any, art
         @keyframes shimmer { 0% { background-position: -400px 0 } 100% { background-position: 400px 0 } }
         @media(max-width:768px) {
           .fp-desktop-grid { display: none !important; }
-          .fp-mobile-grid { display: grid !important; }
+          .fp-mobile-grid  { display: grid !important; }
         }
         @media(min-width:769px) {
           .fp-desktop-grid { display: grid !important; }
-          .fp-mobile-grid { display: none !important; }
+          .fp-mobile-grid  { display: none !important; }
         }
       `}</style>
 
       <Header />
 
+      {/* Artist header */}
       <div style={{ borderBottom: '0.5px solid var(--color-border)' }}>
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '40px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
 
+            {/* Avatar — uses AvatarDisplay */}
             <div style={{ width: 88, height: 88, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, border: '2px solid var(--color-border)' }}>
-              {profile.avatar_url ? (
-                <img src={profile.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#fff' }}>
-                  {getInitials(displayName)}
-                </div>
-              )}
+              <AvatarDisplay profile={profile} size={88} />
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -159,8 +143,13 @@ function ProfileContent({ profile, artworks, topSellerIds }: { profile: any, art
               {socialLinks.length > 0 && (
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {socialLinks.map(s => (
-                    <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
-                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                    
+                      key={s.label}
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                    >
                       {s.label}
                     </a>
                   ))}
@@ -176,6 +165,7 @@ function ProfileContent({ profile, artworks, topSellerIds }: { profile: any, art
         </div>
       </div>
 
+      {/* Artworks grid */}
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '32px 24px 80px' }}>
         {isClosed ? (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
@@ -219,13 +209,13 @@ function ProfileContent({ profile, artworks, topSellerIds }: { profile: any, art
 }
 
 export default function ArtistProfilePage() {
-  const params = useParams()
+  const params     = useParams()
   const artistCode = params.artistCode as string
-  const [profile, setProfile] = useState<any>(null)
-  const [artworks, setArtworks] = useState<any[]>([])
+  const [profile, setProfile]           = useState<any>(null)
+  const [artworks, setArtworks]         = useState<any[]>([])
   const [topSellerIds, setTopSellerIds] = useState<Set<number>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  const [loading, setLoading]           = useState(true)
+  const [notFound, setNotFound]         = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
