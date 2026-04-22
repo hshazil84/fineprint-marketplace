@@ -27,6 +27,40 @@ function randomConfig(sex: 'man' | 'woman', bgColor: string) {
   })
 }
 
+// Reusable avatar renderer — use this everywhere in the app
+export function AvatarDisplay({ profile, size = 40 }: { profile: any, size?: number }) {
+  const config = profile?.avatar_config
+  const displayName = profile?.display_name || profile?.full_name || ''
+  const initials = displayName.trim().split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+
+  if (config) {
+    return (
+      <Avatar
+        style={{ width: size, height: size, flexShrink: 0 }}
+        {...(typeof config === 'string' ? JSON.parse(config) : config)}
+      />
+    )
+  }
+  if (profile?.avatar_url) {
+    return (
+      <img
+        src={profile.avatar_url}
+        alt={displayName}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+      />
+    )
+  }
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', flexShrink: 0,
+      background: '#9FE1CB', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.35, fontWeight: 600, color: '#085041',
+    }}>
+      {initials}
+    </div>
+  )
+}
+
 export function ProfileTab({ profile, onSave }: any) {
   const [form, setForm] = useState({
     full_name:    profile.full_name    || '',
@@ -40,13 +74,13 @@ export function ProfileTab({ profile, onSave }: any) {
     website:      profile.website      || '',
   })
 
-  const [avatarMode, setAvatarMode]             = useState<'upload' | 'illustrated'>('upload')
-  const [avatarFile, setAvatarFile]             = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview]       = useState<string | null>(profile.avatar_url || null)
-  const [selectedColor, setSelectedColor]       = useState(AVATAR_COLORS[0].value)
-  const [avatarSex, setAvatarSex]               = useState<'man' | 'woman'>('man')
-  const [avatarConfig, setAvatarConfig]         = useState(() => randomConfig('man', AVATAR_COLORS[0].value))
-  const [saving, setSaving]                     = useState(false)
+  const [avatarMode, setAvatarMode]     = useState<'upload' | 'illustrated'>('upload')
+  const [avatarFile, setAvatarFile]     = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [selectedColor, setSelectedColor] = useState(AVATAR_COLORS[0].value)
+  const [avatarSex, setAvatarSex]       = useState<'man' | 'woman'>('man')
+  const [avatarConfig, setAvatarConfig] = useState(() => randomConfig('man', AVATAR_COLORS[0].value))
+  const [saving, setSaving]             = useState(false)
   const supabase = createClient()
 
   function regenerate(sex?: 'man' | 'woman', color?: string) {
@@ -64,56 +98,14 @@ export function ProfileTab({ profile, onSave }: any) {
     reader.readAsDataURL(file)
   }
 
-  async function exportAvatarToPng(): Promise<Blob | null> {
-    return new Promise(resolve => {
-      try {
-        const container = document.getElementById('nice-avatar-svg')
-        if (!container) { resolve(null); return }
-        const svgEl = container.querySelector('svg')
-        if (!svgEl) { resolve(null); return }
-
-        // Clone and fix dimensions
-        const clone = svgEl.cloneNode(true) as SVGElement
-        clone.setAttribute('width', '200')
-        clone.setAttribute('height', '200')
-        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-
-        // Serialize and clean up namespaces
-        const serializer = new XMLSerializer()
-        let svgStr = serializer.serializeToString(clone)
-        svgStr = svgStr.replace(/NS\d+:/g, '').replace(/xmlns:NS\d+="[^"]*"/g, '')
-
-        const svgBlob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' })
-        const url = URL.createObjectURL(svgBlob)
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          canvas.width = 200
-          canvas.height = 200
-          const ctx = canvas.getContext('2d')!
-          ctx.drawImage(img, 0, 0, 200, 200)
-          URL.revokeObjectURL(url)
-          canvas.toBlob(blob => resolve(blob), 'image/png', 0.95)
-        }
-        img.onerror = () => {
-          URL.revokeObjectURL(url)
-          resolve(null)
-        }
-        img.src = url
-      } catch (err) {
-        console.error('Avatar export error:', err)
-        resolve(null)
-      }
-    })
-  }
-
   async function save() {
     setSaving(true)
     try {
-      let avatarUrl = profile.avatar_url
+      let avatarUrl    = profile.avatar_url
+      let avatarConfigToSave = profile.avatar_config || null
 
       if (avatarMode === 'upload' && avatarFile) {
+        // Upload photo — clear avatar_config
         const ext  = avatarFile.name.split('.').pop()
         const path = profile.id + '.' + ext
         const { error: uploadError } = await supabase.storage
@@ -122,40 +114,30 @@ export function ProfileTab({ profile, onSave }: any) {
         if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
         const { data } = supabase.storage.from('avatars').getPublicUrl(path)
         avatarUrl = data.publicUrl
+        avatarConfigToSave = null // clear illustrated config
 
       } else if (avatarMode === 'illustrated') {
-        toast.loading('Saving illustrated avatar...', { id: 'avatar' })
-        const blob = await exportAvatarToPng()
-        if (!blob) {
-          toast.error('Could not export avatar — please try again or use photo upload', { id: 'avatar' })
-          setSaving(false)
-          return
-        }
-        const path = profile.id + '-avatar.png'
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(path, blob, { upsert: true, contentType: 'image/png' })
-        if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
-        const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-        avatarUrl = data.publicUrl + '?t=' + Date.now() // cache bust
-        toast.dismiss('avatar')
+        // Store config as JSON — no image export needed
+        avatarConfigToSave = avatarConfig
+        avatarUrl = null // clear photo url
       }
 
       const { error: updateError } = await supabase.from('profiles').update({
-        full_name:    form.full_name,
-        display_name: form.display_name || null,
-        bio:          form.bio,
-        location:     form.location,
-        instagram:    form.instagram,
-        linkedin:     form.linkedin,
-        facebook:     form.facebook,
-        tiktok:       form.tiktok,
-        website:      form.website,
-        avatar_url:   avatarUrl,
+        full_name:     form.full_name,
+        display_name:  form.display_name || null,
+        bio:           form.bio,
+        location:      form.location,
+        instagram:     form.instagram,
+        linkedin:      form.linkedin,
+        facebook:      form.facebook,
+        tiktok:        form.tiktok,
+        website:       form.website,
+        avatar_url:    avatarUrl,
+        avatar_config: avatarConfigToSave,
       }).eq('id', profile.id)
       if (updateError) throw updateError
 
-      onSave({ ...form, avatar_url: avatarUrl })
+      onSave({ ...form, avatar_url: avatarUrl, avatar_config: avatarConfigToSave })
       toast.success('Profile saved!')
     } catch (err: any) {
       toast.error(err.message)
@@ -163,6 +145,11 @@ export function ProfileTab({ profile, onSave }: any) {
       setSaving(false)
     }
   }
+
+  // What shows in the preview circle
+  const currentConfig = profile.avatar_config
+    ? (typeof profile.avatar_config === 'string' ? JSON.parse(profile.avatar_config) : profile.avatar_config)
+    : null
 
   return (
     <div className="card" style={{ maxWidth: 520 }}>
@@ -225,18 +212,13 @@ export function ProfileTab({ profile, onSave }: any) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {avatarMode === 'illustrated' ? (
-            <div id="nice-avatar-svg" style={{ width: 96, height: 96 }}>
-              <Avatar
-                style={{ width: 96, height: 96 }}
-                {...avatarConfig}
-              />
-            </div>
+            <Avatar style={{ width: 96, height: 96 }} {...avatarConfig} />
           ) : avatarPreview ? (
-            <img
-              src={avatarPreview}
-              alt="Avatar preview"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            <img src={avatarPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : profile.avatar_url ? (
+            <img src={profile.avatar_url} alt="Current" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : currentConfig ? (
+            <Avatar style={{ width: 96, height: 96 }} {...currentConfig} />
           ) : (
             <div style={{ fontSize: 32, opacity: 0.2 }}>👤</div>
           )}
@@ -256,9 +238,17 @@ export function ProfileTab({ profile, onSave }: any) {
                 {avatarFile ? 'Change photo' : 'Choose photo'}
               </button>
               {avatarFile && (
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                  {avatarFile.name} · {(avatarFile.size / 1024).toFixed(0)} KB
-                </p>
+                <>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
+                    {avatarFile.name} · {(avatarFile.size / 1024).toFixed(0)} KB
+                  </p>
+                  <button
+                    onClick={() => { setAvatarFile(null); setAvatarPreview(null) }}
+                    style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
+                  >
+                    Remove
+                  </button>
+                </>
               )}
             </>
           )}
@@ -331,7 +321,6 @@ export function ProfileTab({ profile, onSave }: any) {
 
       <input type="file" id="avatar-input" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoSelect} />
 
-      {/* Contextual tips */}
       {avatarMode === 'illustrated' && (
         <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
@@ -339,7 +328,7 @@ export function ProfileTab({ profile, onSave }: any) {
           </p>
         </div>
       )}
-      {avatarMode === 'upload' && !avatarPreview && (
+      {avatarMode === 'upload' && !avatarPreview && !profile.avatar_url && (
         <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--color-teal-dark)', lineHeight: 1.6 }}>
             💡 Use the same photo or logo from your socials — buyers are more likely to trust and remember a familiar face.
