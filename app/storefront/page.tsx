@@ -5,6 +5,7 @@ import { formatMVR, getFromPrice } from '@/lib/pricing'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 import Footer from '@/app/components/Footer'
+import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 
 interface Artwork {
   id: number
@@ -28,30 +29,20 @@ interface Artist {
   display_name: string | null
   artist_code: string
   avatar_url: string | null
+  avatar_config?: any
 }
 
 type SortOption = 'newest' | 'price_asc' | 'price_desc' | 'popular'
 
 const SORT_LABELS: Record<SortOption, string> = {
-  newest: 'Newest',
-  price_asc: 'Price: Low → High',
+  newest:     'Newest',
+  price_asc:  'Price: Low → High',
   price_desc: 'Price: High → Low',
-  popular: 'Most popular',
+  popular:    'Most popular',
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE  = 20
 const CATEGORIES = ['All', 'Photography', 'Fine Art', 'Abstract', 'Illustration', 'Digital Art', 'Watercolour', 'Charcoal & Sketch', 'Mixed Media']
-const AVATAR_COLORS = ['#1D9E75', '#378ADD', '#D85A30', '#7F77DD', '#BA7517', '#993556', '#0F6E56', '#534AB7', '#D4537E', '#639922']
-
-function getInitials(name: string) {
-  return name.trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
-}
-
-function getColor(code: string) {
-  let h = 0
-  for (let i = 0; i < code.length; i++) h = code.charCodeAt(i) + ((h << 5) - h)
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
-}
 
 function artistName(profiles: Artwork['profiles']): string {
   return profiles?.display_name || profiles?.full_name || 'Unknown'
@@ -66,20 +57,18 @@ function StarIcon() {
 }
 
 export default function StorefrontPage() {
-  const [artworks, setArtworks] = useState<Artwork[]>([])
-  const [artists, setArtists] = useState<Artist[]>([])
-  const [orderCounts, setOrderCounts] = useState<Record<number, number>>({})
+  const [artworks, setArtworks]         = useState<Artwork[]>([])
+  const [artists, setArtists]           = useState<Artist[]>([])
+  const [orderCounts, setOrderCounts]   = useState<Record<number, number>>({})
   const [topSellerIds, setTopSellerIds] = useState<Set<number>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [loading, setLoading]           = useState(true)
+  const [search, setSearch]             = useState('')
   const [activeCategory, setActiveCategory] = useState('All')
-  const [sort, setSort] = useState<SortOption>('newest')
-  const [page, setPage] = useState(1)
+  const [sort, setSort]                 = useState<SortOption>('newest')
+  const [page, setPage]                 = useState(1)
   const supabase = createClient()
 
   useEffect(() => { fetchAll() }, [])
-
-  // Reset to page 1 when filters change
   useEffect(() => { setPage(1) }, [search, activeCategory, sort])
 
   async function fetchAll() {
@@ -91,7 +80,7 @@ export default function StorefrontPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('profiles')
-        .select('id, full_name, display_name, artist_code, avatar_url')
+        .select('id, full_name, display_name, artist_code, avatar_url, avatar_config')
         .eq('role', 'artist')
         .eq('shop_status', 'open')
         .limit(20),
@@ -101,7 +90,7 @@ export default function StorefrontPage() {
         .eq('status', 'approved'),
     ])
 
-    const allArtworks = (artRes.data || []) as any
+    const allArtworks      = (artRes.data || []) as any
     const filteredArtworks = allArtworks.filter((a: any) => a.profiles?.shop_status !== 'closed')
     setArtworks(filteredArtworks)
     setArtists(artistRes.data || [])
@@ -124,7 +113,6 @@ export default function StorefrontPage() {
 
   const recentSix = artworks.slice(0, 6)
 
-  // Filter
   const filtered = useMemo(() => {
     return artworks.filter(a => {
       const matchSearch = !search ||
@@ -136,7 +124,6 @@ export default function StorefrontPage() {
     })
   }, [artworks, search, activeCategory])
 
-  // Sort
   const sorted = useMemo(() => {
     const arr = [...filtered]
     switch (sort) {
@@ -160,9 +147,8 @@ export default function StorefrontPage() {
     }
   }, [filtered, sort, orderCounts])
 
-  // Paginate
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE)
-  const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const paginated  = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function handlePage(p: number) {
     setPage(p)
@@ -217,27 +203,24 @@ export default function StorefrontPage() {
             <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 56, background: 'linear-gradient(to left, var(--color-bg), transparent)', pointerEvents: 'none', zIndex: 2 }} />
             <div className="artist-belt" style={{ display: 'flex', gap: 12, padding: '12px 40px', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' as any }}>
               {artists.map(artist => {
-                const color = getColor(artist.artist_code || 'FP')
                 const name = artist.display_name || artist.full_name
                 return (
-                  <Link key={artist.id} href={'/artist/' + artist.artist_code} style={{
-                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                    overflow: 'hidden', cursor: 'pointer', display: 'block',
-                    border: '2px solid var(--color-border)',
-                    transition: 'transform 0.18s ease',
-                    textDecoration: 'none',
-                  }}
+                  <Link
+                    key={artist.id}
+                    href={'/artist/' + artist.artist_code}
+                    title={name}
+                    style={{
+                      width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
+                      overflow: 'hidden', cursor: 'pointer', display: 'flex',
+                      alignItems: 'center', justifyContent: 'center',
+                      border: '2px solid var(--color-border)',
+                      transition: 'transform 0.18s ease',
+                      textDecoration: 'none',
+                    }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.12)' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
-                    title={name}
                   >
-                    {artist.avatar_url ? (
-                      <img src={artist.avatar_url} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', backgroundColor: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 500, color: '#fff' }}>
-                        {getInitials(name)}
-                      </div>
-                    )}
+                    <AvatarDisplay profile={artist} size={48} />
                   </Link>
                 )
               })}
@@ -252,7 +235,6 @@ export default function StorefrontPage() {
           <SkeletonGrid />
         ) : (
           <>
-            {/* RECENTLY LISTED — always newest 6, unaffected by sort */}
             {!search && activeCategory === 'All' && sort === 'newest' && recentSix.length > 0 && (
               <div style={{ marginBottom: 40 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -284,7 +266,6 @@ export default function StorefrontPage() {
               <hr style={{ border: 'none', borderTop: '0.5px solid var(--color-border)', marginBottom: 28 }} />
             )}
 
-            {/* SORT + RESULTS HEADER */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
               <h2 style={{ fontSize: 15, fontWeight: 500 }}>
                 {search ? `Results for "${search}"` : activeCategory !== 'All' ? activeCategory : 'All prints'}
@@ -292,7 +273,6 @@ export default function StorefrontPage() {
                   · {sorted.length} {sorted.length === 1 ? 'print' : 'prints'}
                 </span>
               </h2>
-
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {(search || activeCategory !== 'All') && (
                   <button
@@ -336,8 +316,6 @@ export default function StorefrontPage() {
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
-
-                {/* PAGINATION */}
                 {totalPages > 1 && (
                   <Pagination page={page} totalPages={totalPages} onPage={handlePage} />
                 )}
@@ -353,7 +331,6 @@ export default function StorefrontPage() {
 }
 
 function Pagination({ page, totalPages, onPage }: { page: number; totalPages: number; onPage: (p: number) => void }) {
-  // Build page numbers with ellipsis
   function getPages() {
     const pages: (number | '...')[] = []
     if (totalPages <= 7) {
@@ -378,15 +355,7 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 40 }}>
-      {/* Prev */}
-      <button
-        onClick={() => onPage(page - 1)}
-        disabled={page === 1}
-        style={{ ...btnBase, opacity: page === 1 ? 0.35 : 1, padding: '0 12px' }}
-      >
-        ←
-      </button>
-
+      <button onClick={() => onPage(page - 1)} disabled={page === 1} style={{ ...btnBase, opacity: page === 1 ? 0.35 : 1, padding: '0 12px' }}>←</button>
       {getPages().map((p, i) =>
         p === '...' ? (
           <span key={`ellipsis-${i}`} style={{ minWidth: 36, textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>…</span>
@@ -396,25 +365,17 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
             onClick={() => onPage(p as number)}
             style={{
               ...btnBase,
-              background: page === p ? '#1a1a1a' : 'transparent',
-              color: page === p ? '#fff' : 'var(--color-text)',
-              borderColor: page === p ? '#1a1a1a' : 'var(--color-border)',
-              fontWeight: page === p ? 500 : 400,
+              background:   page === p ? '#1a1a1a' : 'transparent',
+              color:        page === p ? '#fff' : 'var(--color-text)',
+              borderColor:  page === p ? '#1a1a1a' : 'var(--color-border)',
+              fontWeight:   page === p ? 500 : 400,
             }}
           >
             {p}
           </button>
         )
       )}
-
-      {/* Next */}
-      <button
-        onClick={() => onPage(page + 1)}
-        disabled={page === totalPages}
-        style={{ ...btnBase, opacity: page === totalPages ? 0.35 : 1, padding: '0 12px' }}
-      >
-        →
-      </button>
+      <button onClick={() => onPage(page + 1)} disabled={page === totalPages} style={{ ...btnBase, opacity: page === totalPages ? 0.35 : 1, padding: '0 12px' }}>→</button>
     </div>
   )
 }
