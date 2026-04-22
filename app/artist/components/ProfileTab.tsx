@@ -39,31 +39,32 @@ function randomFrom(arr: string[]) {
 }
 
 function randomAvatarUrl(gender: 'male' | 'female' | 'hijab', color: string) {
-  const params        = GENDER_PARAMS[gender]
-  const top           = randomFrom(params.topOptions)
-  const facialHair    = randomFrom(params.facialHairOptions)
-  const accessories   = randomFrom(params.accessoriesOptions)
-  const skin          = randomFrom(['tanned','yellow','pale','light','brown','darkBrown','black'])
-  const clothe        = randomFrom(['blazerShirt','blazerSweater','collarSweater','graphicShirt','hoodie','overall','shirtCrewNeck','shirtScoopNeck','shirtVNeck'])
-  const eyes          = randomFrom(['default','happy','hearts','side','squint','surprised','wink'])
-  const mouth         = randomFrom(['default','eating','smile','tongue','twinkle'])
-  const seed          = Math.random().toString(36).slice(2, 8)
-  const clotheColor   = randomFrom(['262E33','65C9FF','5199E4','25557C','E6E6E6','929598','A7FFC4','FFDEB5','FF5C5C','FFFFFF'])
+  const params      = GENDER_PARAMS[gender]
+  const top         = randomFrom(params.topOptions)
+  const facialHair  = randomFrom(params.facialHairOptions)
+  const accessories = randomFrom(params.accessoriesOptions)
+  const skin        = randomFrom(['tanned','yellow','pale','light','brown','darkBrown','black'])
+  const clothe      = randomFrom(['blazerShirt','blazerSweater','collarSweater','graphicShirt','hoodie','overall','shirtCrewNeck','shirtScoopNeck','shirtVNeck'])
+  const eyes        = randomFrom(['default','happy','side','squint','surprised','wink'])
+  const mouth       = randomFrom(['default','smile','twinkle'])
+  const seed        = Math.random().toString(36).slice(2, 8)
 
-  return (
-    `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}` +
-    `&backgroundColor=${color}` +
-    `&backgroundType=solid` +
-    `&top=${top}` +
-    `&facialHair=${facialHair}` +
-    `&accessories=${accessories}` +
-    `&skinColor=${skin}` +
-    `&clotheType=${clothe}` +
-    `&clotheColor=${clotheColor}` +
-    `&eyes=${eyes}` +
-    `&mouth=${mouth}` +
-    `&scale=90`
-  )
+  const params_str = new URLSearchParams({
+    seed,
+    backgroundColor: color,
+    backgroundType:  'solid',
+    top,
+    facialHair,
+    accessories,
+    skin,
+    clotheType:      clothe,
+    eyes,
+    mouth,
+    scale:           '90',
+    radius:          '50',
+  }).toString()
+
+  return `https://api.dicebear.com/7.x/avataaars/png?${params_str}`
 }
 
 export function ProfileTab({ profile, onSave }: any) {
@@ -79,11 +80,11 @@ export function ProfileTab({ profile, onSave }: any) {
     website:      profile.website      || '',
   })
 
-  const [avatarMode, setAvatarMode]       = useState<'illustrated' | 'upload'>('illustrated')
-  const [avatarFile, setAvatarFile]       = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(profile.avatar_url || null)
-  const [selectedColor, setSelectedColor] = useState(AVATAR_COLORS[0].value)
-  const [diceGender, setDiceGender]       = useState<'male' | 'female' | 'hijab'>('male')
+  const [avatarMode, setAvatarMode]             = useState<'upload' | 'illustrated'>('upload')
+  const [avatarFile, setAvatarFile]             = useState<File | null>(null)
+  const [avatarPreview, setAvatarPreview]       = useState<string | null>(profile.avatar_url || null)
+  const [selectedColor, setSelectedColor]       = useState(AVATAR_COLORS[0].value)
+  const [diceGender, setDiceGender]             = useState<'male' | 'female' | 'hijab'>('male')
   const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(
     () => randomAvatarUrl('male', AVATAR_COLORS[0].value)
   )
@@ -100,7 +101,6 @@ export function ProfileTab({ profile, onSave }: any) {
     const file = e.target.files?.[0]
     if (!file) return
     setAvatarFile(file)
-    setAvatarMode('upload')
     const reader = new FileReader()
     reader.onload = ev => setAvatarPreview(ev.target?.result as string)
     reader.readAsDataURL(file)
@@ -125,10 +125,10 @@ export function ProfileTab({ profile, onSave }: any) {
         toast.loading('Saving illustrated avatar...', { id: 'avatar' })
         const res = await fetch(currentAvatarUrl)
         const blob = await res.blob()
-        const path = profile.id + '-avatar.svg'
+        const path = profile.id + '-avatar.png'
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(path, blob, { upsert: true, contentType: 'image/svg+xml' })
+          .upload(path, blob, { upsert: true, contentType: 'image/png' })
         if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
         const { data } = supabase.storage.from('avatars').getPublicUrl(path)
         avatarUrl = data.publicUrl
@@ -168,14 +168,15 @@ export function ProfileTab({ profile, onSave }: any) {
       {/* Mode tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {[
-          { key: 'illustrated', label: '✦ Illustrated' },
           { key: 'upload',      label: '📷 Upload photo' },
+          { key: 'illustrated', label: '✦ Illustrated' },
         ].map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setAvatarMode(key as any)}
             style={{
-              fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+              fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none',
+              cursor: 'pointer', position: 'relative',
               background: avatarMode === key ? '#1a1a1a' : 'var(--color-surface)',
               color: avatarMode === key ? '#fff' : 'var(--color-text-muted)',
               fontWeight: avatarMode === key ? 500 : 400,
@@ -183,6 +184,15 @@ export function ProfileTab({ profile, onSave }: any) {
             }}
           >
             {label}
+            {key === 'upload' && avatarMode !== 'upload' && (
+              <span style={{
+                position: 'absolute', top: -6, right: -4,
+                fontSize: 9, background: '#1D9E75', color: '#fff',
+                padding: '1px 5px', borderRadius: 10, fontWeight: 600, lineHeight: 1.4,
+              }}>
+                recommended
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -216,6 +226,27 @@ export function ProfileTab({ profile, onSave }: any) {
 
         {/* Controls */}
         <div style={{ flex: 1 }}>
+          {avatarMode === 'upload' && (
+            <>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
+                Upload a clear photo of yourself or your studio logo.
+                Buyers connect better with a real face.<br />
+                JPG or PNG recommended.
+              </p>
+              <button
+                onClick={() => document.getElementById('avatar-input')?.click()}
+                style={{ fontSize: 12, padding: '7px 16px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)' }}
+              >
+                {avatarFile ? 'Change photo' : 'Choose photo'}
+              </button>
+              {avatarFile && (
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
+                  {avatarFile.name} · {(avatarFile.size / 1024).toFixed(0)} KB
+                </p>
+              )}
+            </>
+          )}
+
           {avatarMode === 'illustrated' && (
             <>
               {/* Gender / style selector */}
@@ -230,8 +261,7 @@ export function ProfileTab({ profile, onSave }: any) {
                     key={key}
                     onClick={() => {
                       setDiceGender(key)
-                      const url = randomAvatarUrl(key, selectedColor)
-                      setCurrentAvatarUrl(url)
+                      setCurrentAvatarUrl(randomAvatarUrl(key, selectedColor))
                     }}
                     style={{
                       fontSize: 11, padding: '5px 12px', borderRadius: 20,
@@ -284,34 +314,23 @@ export function ProfileTab({ profile, onSave }: any) {
               </button>
             </>
           )}
-
-          {avatarMode === 'upload' && (
-            <>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10, lineHeight: 1.5 }}>
-                Upload a photo of yourself or your studio logo.<br />JPG or PNG recommended.
-              </p>
-              <button
-                onClick={() => document.getElementById('avatar-input')?.click()}
-                style={{ fontSize: 12, padding: '7px 16px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)' }}
-              >
-                {avatarFile ? 'Change photo' : 'Choose photo'}
-              </button>
-              {avatarFile && (
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 6 }}>
-                  {avatarFile.name} · {(avatarFile.size / 1024).toFixed(0)} KB
-                </p>
-              )}
-            </>
-          )}
         </div>
       </div>
 
       <input type="file" id="avatar-input" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoSelect} />
 
+      {/* Contextual tip */}
       {avatarMode === 'illustrated' && (
+        <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+            Not sure what photo to use? An illustrated avatar keeps your profile looking great while you decide. You can always swap to a real photo later.
+          </p>
+        </div>
+      )}
+      {avatarMode === 'upload' && !avatarPreview && (
         <div style={{ background: 'var(--color-teal-light)', border: '0.5px solid var(--color-teal)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--color-teal-dark)', lineHeight: 1.6 }}>
-            ✦ Your illustrated avatar is unique to you — buyers will recognise you across the storefront without using a real photo.
+            💡 Profiles with a real photo get significantly more trust from buyers. A clear headshot or studio photo works best.
           </p>
         </div>
       )}
