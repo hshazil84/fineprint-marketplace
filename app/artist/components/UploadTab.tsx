@@ -393,7 +393,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <div className="form-group">
         <label className="form-label">
           Painting by
-          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>optional, if you represent another artist</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400, marginLeft: 6 }}>optional — for galleries, collectors, or if you represent the artist</span>
         </label>
         <input className="form-input" value={form.paintingBy} onChange={e => setForm({ ...form, paintingBy: e.target.value })} placeholder="e.g. Ahmed Naif" />
       </div>
