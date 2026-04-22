@@ -11,7 +11,7 @@ import { RemittanceModal } from '@/app/artist/components/RemittanceModal'
 import { OffersTab } from '@/app/artist/components/OffersTab'
 import { PayoutsTab } from '@/app/artist/components/PayoutsTab'
 import { ExportTab } from '@/app/artist/components/ExportTab'
-import { ProfileTab } from '@/app/artist/components/ProfileTab'
+import { ProfileTab, AvatarDisplay } from '@/app/artist/components/ProfileTab'
 import { UploadTab } from '@/app/artist/components/UploadTab'
 import { SettingsTab } from '@/app/artist/components/SettingsTab'
 
@@ -50,7 +50,6 @@ export default function ArtistDashboard() {
   }
 
   async function fetchOrders(artistId: string) {
-    // Fetch via order_items (new multi-item orders)
     const { data: itemRows } = await supabase
       .from('order_items')
       .select('*, orders(*), artworks(title, sku)')
@@ -58,37 +57,27 @@ export default function ArtistDashboard() {
       .order('created_at', { ascending: false })
 
     if (itemRows && itemRows.length > 0) {
-      // Group by order, attach artist's items
       const orderMap: Record<number, any> = {}
       for (const item of itemRows) {
         const orderId = item.order_id
         if (!orderMap[orderId]) {
-          orderMap[orderId] = {
-            ...item.orders,
-            myItems: [],
-            artist_earnings: 0,
-          }
+          orderMap[orderId] = { ...item.orders, myItems: [], artist_earnings: 0 }
         }
         orderMap[orderId].myItems.push(item)
         orderMap[orderId].artist_earnings += item.artist_earnings || 0
       }
       const merged = Object.values(orderMap)
-
-      // Also fetch legacy orders (artwork_id directly on order)
       const { data: legacyOrders } = await supabase
         .from('orders')
         .select('*, artworks!inner(title, sku, artist_id)')
         .eq('artworks.artist_id', artistId)
         .order('created_at', { ascending: false })
-
       const legacyIds = new Set(merged.map((o: any) => o.id))
       const legacyOnly = (legacyOrders || []).filter((o: any) => !legacyIds.has(o.id))
-
       setOrders([...merged, ...legacyOnly].sort((a: any, b: any) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       ))
     } else {
-      // Fallback — all legacy orders
       const { data } = await supabase
         .from('orders')
         .select('*, artworks!inner(title, sku, artist_id)')
@@ -135,11 +124,11 @@ export default function ArtistDashboard() {
     return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
   }
 
-  const approvedOrders = orders.filter(o => o.status === 'approved')
-  const activeOrders = orders.filter(o => o.status !== 'rejected')
-  const rejectedOrders = orders.filter(o => o.status === 'rejected')
-  const totalEarnings = approvedOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
-  const paidOut = payouts.filter(p => p.status === 'paid').reduce((s: number, p: any) => s + p.amount, 0)
+  const approvedOrders  = orders.filter(o => o.status === 'approved')
+  const activeOrders    = orders.filter(o => o.status !== 'rejected')
+  const rejectedOrders  = orders.filter(o => o.status === 'rejected')
+  const totalEarnings   = approvedOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+  const paidOut         = payouts.filter(p => p.status === 'paid').reduce((s: number, p: any) => s + p.amount, 0)
   const pendingEarnings = totalEarnings - paidOut
 
   return (
@@ -162,10 +151,10 @@ export default function ArtistDashboard() {
       />
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
+
+        {/* Dashboard header with avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 4 }}>
-          {profile?.avatar_url && (
-            <img src={profile.avatar_url} alt={profile.full_name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-          )}
+          <AvatarDisplay profile={profile} size={48} />
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
@@ -231,8 +220,8 @@ export default function ArtistDashboard() {
               ) : artworks.map(a => {
                 const platformFee = Math.round(a.price * PLATFORM_FEE / 100)
                 const artistEarns = a.price - platformFee
-                const isEditing = editingArtwork?.id === a.id
-                const isDeleting = deleteConfirmId === a.id
+                const isEditing   = editingArtwork?.id === a.id
+                const isDeleting  = deleteConfirmId === a.id
                 return (
                   <div key={a.id} style={{ borderBottom: '0.5px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px' }}>
@@ -301,14 +290,10 @@ export default function ArtistDashboard() {
               {activeOrders.length === 0 ? (
                 <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No orders yet.</p>
               ) : activeOrders.map(o => {
-                const myItems = o.myItems || []
+                const myItems     = o.myItems || []
                 const isMultiItem = myItems.length > 0
-                const title = isMultiItem
-                  ? myItems.map((i: any) => i.artworks?.title).join(', ')
-                  : o.artworks?.title
-                const sizeLabel = isMultiItem
-                  ? myItems.map((i: any) => i.print_size).join(', ')
-                  : o.print_size
+                const title       = isMultiItem ? myItems.map((i: any) => i.artworks?.title).join(', ') : o.artworks?.title
+                const sizeLabel   = isMultiItem ? myItems.map((i: any) => i.print_size).join(', ') : o.print_size
                 return (
                   <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
                     <div>
@@ -341,20 +326,14 @@ export default function ArtistDashboard() {
               <div>
                 <p style={{ fontSize: 13, fontWeight: 500, color: '#A32D2D', marginBottom: 10 }}>
                   Rejected orders
-                  <span style={{ fontWeight: 400, color: '#A32D2D', fontSize: 12, marginLeft: 6 }}>
-                    · payment could not be verified
-                  </span>
+                  <span style={{ fontWeight: 400, color: '#A32D2D', fontSize: 12, marginLeft: 6 }}>· payment could not be verified</span>
                 </p>
                 <div style={{ border: '0.5px solid #F09595', borderRadius: 12, overflow: 'hidden' }}>
                   {rejectedOrders.map(o => {
-                    const myItems = o.myItems || []
+                    const myItems     = o.myItems || []
                     const isMultiItem = myItems.length > 0
-                    const title = isMultiItem
-                      ? myItems.map((i: any) => i.artworks?.title).join(', ')
-                      : o.artworks?.title
-                    const sizeLabel = isMultiItem
-                      ? myItems.map((i: any) => i.print_size).join(', ')
-                      : o.print_size
+                    const title       = isMultiItem ? myItems.map((i: any) => i.artworks?.title).join(', ') : o.artworks?.title
+                    const sizeLabel   = isMultiItem ? myItems.map((i: any) => i.print_size).join(', ') : o.print_size
                     return (
                       <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid #F09595', background: '#FCEBEB', gap: 12 }}>
                         <div>
@@ -421,12 +400,12 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any, onSave: 
     'Digital Art', 'Mixed Media', 'Watercolour', 'Charcoal & Sketch',
   ]
   const [form, setForm] = useState({
-    title: artwork.title || '',
+    title:      artwork.title       || '',
     description: artwork.description || '',
-    price: String(artwork.price || ''),
-    category: artwork.category || 'Photography',
+    price:      String(artwork.price || ''),
+    category:   artwork.category    || 'Photography',
     paintingBy: artwork.painting_by || '',
-    sizes: artwork.sizes || ['A4', 'A3'],
+    sizes:      artwork.sizes       || ['A4', 'A3'],
   })
 
   function toggleSize(size: string) {
