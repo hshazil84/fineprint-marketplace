@@ -9,7 +9,7 @@ import Header from '@/app/components/Header'
 
 export default function CheckoutPage() {
   const router = useRouter()
-  const { items, clear } = useCart()
+  const { items, clear, setQty } = useCart()
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('delivery')
   const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'swipe'>('bank_transfer')
   const [form, setForm] = useState({ name: '', email: '', phone: '', island: '', atoll: '', notes: '' })
@@ -26,7 +26,6 @@ export default function CheckoutPage() {
 
   if (items.length === 0) return null
 
-  // Calculate totals — multiply by quantity
   const itemPrices = items.map(item =>
     calculatePrices(item.artistPrice, item.offerPct || 0, item.offerLabel, deliveryMethod, item.printSize)
   )
@@ -65,7 +64,6 @@ export default function CheckoutPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Expand items by quantity — each qty unit becomes a separate order_item
       const expandedItems = items.flatMap((item, i) => {
         const p = itemPrices[i]
         return Array.from({ length: item.quantity }, () => ({
@@ -197,8 +195,8 @@ export default function CheckoutPage() {
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 14 }}>Delivery method</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
                 {[
-                  { id: 'delivery', title: 'Deliver to me', desc: 'Anywhere in the Maldives', price: '+ MVR 100', priceColor: 'var(--color-text)' },
-                  { id: 'pickup',   title: 'Pick up',       desc: 'Collect from our Male studio', price: 'Free', priceColor: '#1D9E75' },
+                  { id: 'delivery', title: 'Deliver to me',  desc: 'Anywhere in the Maldives',    price: '+ MVR 100', priceColor: 'var(--color-text)' },
+                  { id: 'pickup',   title: 'Pick up',        desc: 'Collect from our Male studio', price: 'Free',      priceColor: '#1D9E75' },
                 ].map(opt => (
                   <div key={opt.id} onClick={() => setDeliveryMethod(opt.id as any)} style={optionStyle(deliveryMethod === opt.id)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -210,6 +208,7 @@ export default function CheckoutPage() {
                   </div>
                 ))}
               </div>
+
               {deliveryMethod === 'delivery' ? (
                 <>
                   <div className="form-group">
@@ -265,16 +264,29 @@ export default function CheckoutPage() {
                     {item.previewUrl && (
                       <img src={item.previewUrl} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
                     )}
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 13, fontWeight: 500 }}>{item.artworkTitle}</p>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.artworkTitle}</p>
                       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>by {item.artistName}</p>
-                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>{sizeLabel}</p>
+                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1, marginBottom: 8 }}>{sizeLabel}</p>
 
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-                        {/* Qty badge */}
-                        <span style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 6, padding: '2px 8px' }}>
-                          Qty {item.quantity}
-                        </span>
+                      {/* Qty controls + price */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+
+                        {/* − qty + */}
+                        <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
+                          <button
+                            onClick={() => setQty(item.artworkId, item.printSize, item.quantity - 1)}
+                            style={{ width: 28, height: 26, background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          >−</button>
+                          <span style={{ minWidth: 26, textAlign: 'center', fontSize: 13, fontWeight: 500, borderLeft: '0.5px solid var(--color-border)', borderRight: '0.5px solid var(--color-border)', padding: '3px 0', lineHeight: '20px' }}>
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => setQty(item.artworkId, item.printSize, item.quantity + 1)}
+                            disabled={item.quantity >= 10}
+                            style={{ width: 28, height: 26, background: 'none', border: 'none', cursor: item.quantity >= 10 ? 'default' : 'pointer', fontSize: 15, color: item.quantity >= 10 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: item.quantity >= 10 ? 0.4 : 1 }}
+                          >+</button>
+                        </div>
 
                         {/* Price */}
                         <div style={{ textAlign: 'right' }}>
@@ -305,8 +317,7 @@ export default function CheckoutPage() {
 
               <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 10, marginTop: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                  <span>Subtotal</span>
-                  <span>{formatMVR(subtotal)}</span>
+                  <span>Subtotal</span><span>{formatMVR(subtotal)}</span>
                 </div>
                 {deliveryMethod === 'delivery' ? (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
@@ -318,8 +329,7 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', marginTop: 8, paddingTop: 10 }}>
-                  <span>Total</span>
-                  <span>{formatMVR(totalPaid)}</span>
+                  <span>Total</span><span>{formatMVR(totalPaid)}</span>
                 </div>
               </div>
             </div>
