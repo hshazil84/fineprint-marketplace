@@ -555,155 +555,161 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
   const newSlots = Math.max(0, 3 - visibleGallery.length)
 
+  // Thumbnail slot helper
+  function ThumbSlot({ children, isActive, onClick }: { children: React.ReactNode; isActive: boolean; onClick: () => void }) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          aspectRatio: '4/3',
+          borderRadius: 8,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          border: isActive ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
+          background: 'var(--color-surface)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'border-color 0.15s',
+          position: 'relative',
+        }}
+      >
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '0 20px 20px', borderTop: '0.5px solid var(--color-border)', background: 'var(--color-background-secondary)' }}>
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
 
       <div style={{ maxWidth: 520 }}>
 
-        {/* Images */}
+        {/* ── IMAGE SECTION ── */}
         <div className="form-group">
           <label className="form-label">Images</label>
 
-          {/* Big left + 3 stacked right */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px', gap: 10, marginBottom: 6 }}>
 
-            {/* Big main image */}
+            {/* ── BIG MAIN IMAGE (left) ── */}
             <div
               style={{
                 aspectRatio: '4/3',
-                borderRadius: 'var(--radius-lg)',
+                borderRadius: 12,
                 overflow: 'hidden',
                 background: 'var(--color-surface)',
                 border: '0.5px solid var(--color-border)',
                 position: 'relative',
-                cursor: bigImage ? 'default' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: bigImage ? 'default' : 'pointer',
               }}
               onClick={() => !bigImage && document.getElementById('edit-preview-' + artwork.id)?.click()}
             >
               {bigImage ? (
-                <>
-                  <img src={bigImage} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
-                  {activeThumb === 'main' && previewFile && (
-                    <button
-                      onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(artwork.preview_url) }}
-                      style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                    >×</button>
-                  )}
-                </>
+                <img
+                  src={bigImage}
+                  alt="preview"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }}
+                />
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                  <div style={{ fontSize: 22, marginBottom: 4 }}>+</div>
+                  <div style={{ fontSize: 24, marginBottom: 4 }}>+</div>
                   <p style={{ fontSize: 11 }}>Main preview</p>
                 </div>
               )}
             </div>
 
-            {/* 3 stacked thumbnails */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* ── 3 STACKED THUMBNAILS (right) ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-              {/* Main thumbnail */}
-              <div style={{ position: 'relative', flex: 1 }}>
-                <div
-                  onClick={() => setActiveThumb('main')}
-                  style={{
-                    aspectRatio: '4/3',
-                    borderRadius: 'var(--radius-md)',
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    border: activeThumb === 'main' ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                    background: 'var(--color-surface)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transition: 'border-color 0.15s',
-                  }}
-                >
+              {/* SLOT 1 — Main */}
+              <div style={{ position: 'relative' }}>
+                <ThumbSlot isActive={activeThumb === 'main'} onClick={() => setActiveThumb('main')}>
                   {previewThumb
                     ? <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                    : <span style={{ fontSize: 16, color: 'var(--color-text-muted)', opacity: 0.4 }}>+</span>
+                    : <span style={{ fontSize: 20, color: 'var(--color-border)' }}>+</span>
                   }
+                </ThumbSlot>
+                {/* Main capsule + replace × */}
+                <div style={{ position: 'absolute', bottom: 4, left: 0, right: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                  <span
+                    onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
+                    style={{ fontSize: 8, color: '#fff', background: 'rgba(0,0,0,0.55)', padding: '2px 7px', borderRadius: 20, cursor: 'pointer', userSelect: 'none' }}
+                  >
+                    {previewFile ? '✓ changed' : 'Main'}
+                  </span>
+                  {previewThumb && (
+                    <span
+                      onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(null); setActiveThumb('main') }}
+                      style={{ fontSize: 9, color: '#fff', background: 'rgba(163,45,45,0.8)', width: 14, height: 14, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', userSelect: 'none' }}
+                    >×</span>
+                  )}
                 </div>
-                <button
-                  onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
-                  style={{ position: 'absolute', bottom: 0, left: 0, right: 0, fontSize: 8, color: '#fff', background: 'rgba(0,0,0,0.45)', border: 'none', cursor: 'pointer', padding: '2px 0', textAlign: 'center', borderRadius: '0 0 var(--radius-md) var(--radius-md)' }}
-                >
-                  {previewFile ? '✓' : 'Main'}
-                </button>
                 <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
               </div>
 
-              {/* Existing gallery */}
-              {visibleGallery.map((img, i) => (
-                <div key={img.id} style={{ position: 'relative', flex: 1 }}>
-                  <div
-                    onClick={() => setActiveThumb(i)}
-                    style={{
-                      aspectRatio: '4/3',
-                      borderRadius: 'var(--radius-md)',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: activeThumb === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                      background: 'var(--color-surface)',
-                      transition: 'border-color 0.15s',
-                    }}
-                  >
-                    <img src={img.url} alt={'gallery ' + (i + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                  </div>
-                  <button
-                    onClick={() => stageDeleteGalleryImage(img)}
-                    style={{ position: 'absolute', top: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: 'rgba(163,45,45,0.85)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                  >×</button>
-                </div>
-              ))}
+              {/* SLOTS 2-4 — Gallery (existing + new) */}
+              {Array.from({ length: 3 }).map((_, i) => {
+                const existingImg = visibleGallery[i]
+                const newThumb    = galleryThumbs[i - visibleGallery.length] ?? null
+                const isExisting  = !!existingImg
+                const isNew       = !isExisting && !!galleryThumbs[i - visibleGallery.length < 0 ? -1 : i - visibleGallery.length]
+                const thumbSrc    = isExisting ? existingImg.url : galleryThumbs[Math.max(0, i - visibleGallery.length)]
+                const isActive    = isExisting ? activeThumb === i : activeThumb === visibleGallery.length + Math.max(0, i - visibleGallery.length)
 
-              {/* New gallery slots */}
-              {Array.from({ length: newSlots }).map((_, slotIndex) => {
-                const thumb    = galleryThumbs[slotIndex]
-                const isActive = activeThumb === visibleGallery.length + slotIndex
                 return (
-                  <div key={'new-' + slotIndex} style={{ position: 'relative', flex: 1 }}>
-                    <div
+                  <div key={i} style={{ position: 'relative' }}>
+                    <ThumbSlot
+                      isActive={isActive}
                       onClick={() => {
-                        if (thumb) setActiveThumb(visibleGallery.length + slotIndex)
-                        else document.getElementById('edit-gallery-' + artwork.id + '-' + slotIndex)?.click()
-                      }}
-                      style={{
-                        aspectRatio: '4/3',
-                        borderRadius: 'var(--radius-md)',
-                        overflow: 'hidden',
-                        cursor: 'pointer',
-                        border: isActive ? '2px solid #1a1a1a' : thumb ? '0.5px solid var(--color-border)' : '0.5px dashed var(--color-border)',
-                        background: 'var(--color-surface)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        transition: 'border-color 0.15s',
+                        if (isExisting) setActiveThumb(i)
+                        else if (thumbSrc) setActiveThumb(visibleGallery.length + Math.max(0, i - visibleGallery.length))
+                        else document.getElementById('edit-gallery-' + artwork.id + '-' + i)?.click()
                       }}
                     >
-                      {thumb
-                        ? <img src={thumb} alt="new" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                        : <span style={{ fontSize: 16, color: 'var(--color-text-muted)', opacity: 0.4 }}>+</span>
+                      {thumbSrc
+                        ? <img src={thumbSrc} alt={'slot ' + i} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        : <span style={{ fontSize: 20, color: 'var(--color-border)' }}>+</span>
                       }
-                    </div>
-                    {thumb && (
+                    </ThumbSlot>
+                    {/* × button — red for existing, dark for new staged */}
+                    {thumbSrc && (
                       <button
-                        onClick={() => clearNewGallerySlot(slotIndex)}
-                        style={{ position: 'absolute', top: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                        onClick={e => {
+                          e.stopPropagation()
+                          if (isExisting) stageDeleteGalleryImage(existingImg)
+                          else {
+                            const slotIndex = Math.max(0, i - visibleGallery.length)
+                            clearNewGallerySlot(slotIndex)
+                          }
+                        }}
+                        style={{
+                          position: 'absolute', top: 4, right: 4,
+                          width: 16, height: 16, borderRadius: '50%',
+                          background: isExisting ? 'rgba(163,45,45,0.85)' : 'rgba(0,0,0,0.55)',
+                          border: 'none', cursor: 'pointer', color: '#fff',
+                          fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          lineHeight: 1,
+                        }}
                       >×</button>
                     )}
                     <input
                       type="file"
-                      id={'edit-gallery-' + artwork.id + '-' + slotIndex}
+                      id={'edit-gallery-' + artwork.id + '-' + i}
                       accept="image/*"
                       style={{ display: 'none' }}
-                      onChange={e => handleNewGallerySelect(slotIndex, e.target.files?.[0] || null)}
+                      onChange={e => {
+                        const slotIndex = Math.max(0, i - visibleGallery.length)
+                        handleNewGallerySelect(slotIndex, e.target.files?.[0] || null)
+                      }}
                     />
                   </div>
                 )
               })}
+
             </div>
           </div>
 
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-            Tap thumbnails to preview · red × removes on save · empty slots add new
+            Tap thumbnail to preview · × removes · empty slot tap to add
           </p>
         </div>
 
