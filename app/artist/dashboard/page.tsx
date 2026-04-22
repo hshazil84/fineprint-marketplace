@@ -604,7 +604,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
                 }}
               >
                 {previewThumb ? (
-                  <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />
+                  <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                 ) : (
                   <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
                     <div style={{ fontSize: 24, marginBottom: 4 }}>+</div>
