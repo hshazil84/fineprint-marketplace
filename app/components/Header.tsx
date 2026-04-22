@@ -28,10 +28,12 @@ export default function Header({
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
   const [mobileSearch, setMobileSearch] = useState('')
   const [cartOpen, setCartOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
   const { count: cartCount } = useCart()
   const mobileSearchRef = useRef<HTMLInputElement>(null)
+  const avatarRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function Header({
         setUser(user)
         const { data: prof } = await supabase
           .from('profiles')
-          .select('full_name, display_name, role')
+          .select('full_name, display_name, role, avatar_url')
           .eq('id', user.id)
           .single()
         setProfile(prof)
@@ -54,6 +56,17 @@ export default function Header({
     })
     return () => subscription.unsubscribe()
   }, [])
+
+  // Close avatar dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (avatarRef.current && !avatarRef.current.contains(e.target as Node)) {
+        setAvatarOpen(false)
+      }
+    }
+    if (avatarOpen) document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [avatarOpen])
 
   useEffect(() => {
     document.body.style.overflow = menuOpen || cartOpen ? 'hidden' : ''
@@ -71,6 +84,7 @@ export default function Header({
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    setAvatarOpen(false)
     window.location.href = '/storefront'
   }
 
@@ -90,11 +104,12 @@ export default function Header({
   }
 
   const displayName = profile?.display_name || profile?.full_name || ''
-  const dashboardHref = profile?.role === 'admin' ? '/admin/dashboard' : profile?.role === 'artist' ? '/artist/dashboard' : '/storefront'
+  const initials = displayName.trim().split(/\s+/).map((w: string) => w[0]).join('').slice(0, 2).toUpperCase()
+  const dashboardHref = profile?.role === 'admin' ? '/admin/dashboard' : '/artist/dashboard'
+  const dashboardLabel = profile?.role === 'admin' ? 'Admin dashboard' : 'My dashboard'
 
   const navLinks = [
     { label: 'Browse artworks', href: '/storefront' },
-    { label: 'Track order', href: '/orders/track' },
     ...(profile?.role === 'artist' ? [{ label: 'My dashboard', href: '/artist/dashboard' }] : []),
     ...(profile?.role === 'admin' ? [{ label: 'Admin', href: '/admin/dashboard' }] : []),
     { label: 'Log in', href: '/auth/login', hideWhenLoggedIn: true },
@@ -136,7 +151,7 @@ export default function Header({
           ) : (
             <>
               {/* ── DESKTOP NAV ── */}
-              <div className="fp-header-desktop" style={{ flex: 1, alignItems: 'center', gap: 12 }}>
+              <div className="fp-header-desktop" style={{ flex: 1, alignItems: 'center', gap: 10 }}>
                 {onSearchChange && (
                   <div style={{ flex: 1, maxWidth: 360, position: 'relative' }}>
                     <svg style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 13, height: 13, opacity: 0.4 }} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -153,12 +168,10 @@ export default function Header({
                     )}
                   </div>
                 )}
-                <div style={{ display: 'flex', gap: 8, marginLeft: 'auto', alignItems: 'center' }}>
-                  <Link href="/orders/track" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                    Track order
-                  </Link>
 
-                  {/* Desktop cart icon */}
+                <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
+
+                  {/* Cart icon */}
                   <button
                     onClick={() => setCartOpen(true)}
                     aria-label="Cart"
@@ -173,21 +186,70 @@ export default function Header({
                   </button>
 
                   {user && profile ? (
-                    <>
-                      {(profile.role === 'admin' || profile.role === 'artist') && (
-                        <Link href={dashboardHref} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                          {profile.role === 'admin' ? 'Admin' : 'Dashboard'}
-                        </Link>
-                      )}
-                      {displayName && (
-                        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {displayName}
-                        </span>
-                      )}
-                      <button onClick={handleSignOut} style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', color: 'var(--color-text)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        Log out
+                    /* ── Avatar dropdown ── */
+                    <div ref={avatarRef} style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setAvatarOpen(o => !o)}
+                        aria-label="Account"
+                        style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px solid var(--color-border)', background: 'none', cursor: 'pointer', padding: 0, overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        {profile.avatar_url ? (
+                          <img src={profile.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }} />
+                        ) : (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text)', background: 'rgba(0,0,0,0.06)', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {initials}
+                          </span>
+                        )}
                       </button>
-                    </>
+
+                      <AnimatePresence>
+                        {avatarOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                            style={{
+                              position: 'absolute', top: 40, right: 0,
+                              background: '#fff',
+                              border: '0.5px solid var(--color-border)',
+                              borderRadius: 12,
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                              minWidth: 180,
+                              zIndex: 200,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {/* Name header */}
+                            <div style={{ padding: '12px 16px 10px', borderBottom: '0.5px solid var(--color-border)' }}>
+                              <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text)' }}>{displayName}</p>
+                              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1, textTransform: 'capitalize' }}>{profile.role}</p>
+                            </div>
+
+                            {/* Dashboard link */}
+                            {(profile.role === 'admin' || profile.role === 'artist') && (
+                              <Link
+                                href={dashboardHref}
+                                onClick={() => setAvatarOpen(false)}
+                                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', fontSize: 13, color: 'var(--color-text)', textDecoration: 'none', borderBottom: '0.5px solid var(--color-border)' }}
+                              >
+                                <DashboardIcon />
+                                {dashboardLabel}
+                              </Link>
+                            )}
+
+                            {/* Log out */}
+                            <button
+                              onClick={handleSignOut}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '10px 16px', fontSize: 13, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' }}
+                            >
+                              <LogOutIcon />
+                              Log out
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   ) : (
                     <>
                       <Link href="/auth/login" style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', color: 'var(--color-text)', textDecoration: 'none' }}>Log in</Link>
@@ -270,7 +332,7 @@ export default function Header({
         </AnimatePresence>
       </nav>
 
-      {/* ── MOBILE FULL-SCREEN MENU OVERLAY ── */}
+      {/* ── MOBILE FULL-SCREEN MENU ── */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
@@ -325,7 +387,6 @@ export default function Header({
         )}
       </AnimatePresence>
 
-      {/* Cart Drawer */}
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   )
@@ -357,6 +418,25 @@ function CartIcon() {
       <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
       <line x1="3" y1="6" x2="21" y2="6" />
       <path d="M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  )
+}
+
+function DashboardIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+      <rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" />
+    </svg>
+  )
+}
+
+function LogOutIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   )
 }
