@@ -33,8 +33,8 @@ export function InvoiceModal({ order, onClose }: { order: any; onClose: () => vo
         setItems([{
           print_size:      order.print_size,
           original_price:  order.original_price  || artwork?.price,
-          offer_pct:       order.offer_pct        || null,
-          offer_label:     order.offer_label      || null,
+          offer_pct:       order.offer_pct > 0 ? order.offer_pct : null,
+          offer_label:     order.offer_pct > 0 ? order.offer_label : null,
           discount_amount: order.discount_amount  || 0,
           print_price:     order.print_price      || order.total_paid,
           printing_fee:    order.printing_fee     || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4'],
@@ -92,12 +92,11 @@ export function InvoiceModal({ order, onClose }: { order: any; onClose: () => vo
     }).join('')
   }
 
-  // Paid stamp SVG string for print window
   const stampHTML = `
-    <div style="position:absolute;top:32px;right:40px;transform:rotate(-18deg);opacity:0.18;pointer-events:none;user-select:none">
-      <div style="border:4px solid #1D9E75;border-radius:8px;padding:6px 18px;display:inline-block">
-        <div style="font-size:32px;font-weight:900;color:#1D9E75;letter-spacing:0.12em;font-family:-apple-system,sans-serif;line-height:1">PAID</div>
-        <div style="font-size:10px;color:#1D9E75;text-align:center;letter-spacing:0.08em;margin-top:2px">${date}</div>
+    <div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);opacity:0.07;pointer-events:none;user-select:none;z-index:10">
+      <div style="border:6px solid #c10000;border-radius:12px;padding:10px 32px;display:inline-block">
+        <div style="font-size:64px;font-weight:900;color:#c10000;letter-spacing:0.16em;line-height:1;font-family:-apple-system,sans-serif">PAID</div>
+        <div style="font-size:13px;color:#c10000;text-align:center;letter-spacing:0.08em;margin-top:4px;font-family:-apple-system,sans-serif">${date}</div>
       </div>
     </div>`
 
@@ -107,9 +106,9 @@ export function InvoiceModal({ order, onClose }: { order: any; onClose: () => vo
     printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${order.invoice_number}</title>
     <style>body{margin:0;padding:24px;font-family:-apple-system,sans-serif;background:#f0f0ec}
     .wrap{max-width:620px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0ddd6;position:relative}
+    .body{padding:24px 32px;position:relative}
     @media print{body{background:#fff}.wrap{border:none;border-radius:0}}</style></head>
     <body><div class="wrap">
-    ${stampHTML}
     <div style="background:#1a1a1a;padding:24px 32px;display:flex;justify-content:space-between">
     <div>
       <div style="font-size:18px;font-weight:600;color:#fff">Fine<span style="color:#9FE1CB">Print</span> Studio</div>
@@ -121,7 +120,8 @@ export function InvoiceModal({ order, onClose }: { order: any; onClose: () => vo
       <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px">${date}</div>
       <div style="margin-top:6px;display:inline-block;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px">Approved</div>
     </div></div>
-    <div style="padding:24px 32px;position:relative">
+    <div class="body">
+    ${stampHTML}
     <table style="width:100%;margin-bottom:20px"><tr>
     <td style="width:50%;vertical-align:top;padding-right:12px">
       <div style="font-size:10px;text-transform:uppercase;color:#aaa;margin-bottom:6px">Billed to</div>
@@ -188,10 +188,23 @@ export function InvoiceModal({ order, onClose }: { order: any; onClose: () => vo
         </div>
 
         {/* Scrollable body */}
-        <div style={{ overflowY: 'auto', padding: 28 }}>
+        <div style={{ overflowY: 'auto', padding: 28, position: 'relative' }}>
 
-          {/* Invoice header block — with PAID stamp */}
-          <div style={{ background: '#1a1a1a', borderRadius: 12, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', overflow: 'hidden' }}>
+          {/* PAID stamp — centered over full invoice body */}
+          <div style={{
+            position: 'absolute', top: '40%', left: '50%',
+            transform: 'translate(-50%, -50%) rotate(-18deg)',
+            opacity: 0.07, pointerEvents: 'none', userSelect: 'none',
+            zIndex: 10,
+          }}>
+            <div style={{ border: '6px solid #c10000', borderRadius: 12, padding: '10px 32px', display: 'inline-block' }}>
+              <div style={{ fontSize: 64, fontWeight: 900, color: '#c10000', letterSpacing: '0.16em', lineHeight: 1 }}>PAID</div>
+              <div style={{ fontSize: 13, color: '#c10000', textAlign: 'center', letterSpacing: '0.08em', marginTop: 4 }}>{date}</div>
+            </div>
+          </div>
+
+          {/* Invoice header block — no stamp here anymore */}
+          <div style={{ background: '#1a1a1a', borderRadius: 12, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Fine<span style={{ color: '#9FE1CB' }}>Print</span> Studio</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>fineprintmv.com · hello@fineprintmv.com</div>
@@ -202,23 +215,6 @@ export function InvoiceModal({ order, onClose }: { order: any; onClose: () => vo
               <div style={{ fontSize: 14, fontWeight: 600, color: '#fff', fontFamily: 'monospace' }}>{order.invoice_number}</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 3 }}>{date}</div>
               <div style={{ marginTop: 6, display: 'inline-block', background: '#EAF3DE', color: '#3B6D11', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 20 }}>Approved</div>
-            </div>
-
-            {/* PAID stamp — overlaid on header */}
-            <div style={{
-              position: 'absolute', top: '50%', left: '50%',
-              transform: 'translate(-50%, -50%) rotate(-18deg)',
-              opacity: 0.22, pointerEvents: 'none', userSelect: 'none',
-            }}>
-              <div style={{
-                border: '3px solid #9FE1CB',
-                borderRadius: 8,
-                padding: '4px 16px',
-                display: 'inline-block',
-              }}>
-                <div style={{ fontSize: 28, fontWeight: 900, color: '#9FE1CB', letterSpacing: '0.14em', lineHeight: 1 }}>PAID</div>
-                <div style={{ fontSize: 9, color: '#9FE1CB', textAlign: 'center', letterSpacing: '0.06em', marginTop: 2 }}>{date}</div>
-              </div>
             </div>
           </div>
 
