@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES } from '@/lib/pricing'
 import { useCart } from '@/lib/cart'
+import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
@@ -35,7 +36,6 @@ export default function ArtworkPage() {
     setActiveImage(data.preview_url)
     if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[0])
 
-    // Fetch gallery images
     const { data: gallery } = await supabase
       .from('artwork_images')
       .select('*')
@@ -114,7 +114,6 @@ export default function ArtworkPage() {
 
           {/* LEFT — image + gallery strip */}
           <div>
-            {/* Main image */}
             <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative', marginBottom: galleryImages.length > 0 ? 10 : 0 }}>
               {activeImage ? (
                 <img
@@ -127,9 +126,7 @@ export default function ArtworkPage() {
                   No preview available
                 </div>
               )}
-              {/* Overlay to prevent right-click save */}
               <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
-              {/* Offer badge */}
               {artwork.offer_pct ? (
                 <div style={{ position: 'absolute', top: 14, left: 14, background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, zIndex: 20, pointerEvents: 'none' }}>
                   {artwork.offer_pct}% off
@@ -137,7 +134,6 @@ export default function ArtworkPage() {
               ) : null}
             </div>
 
-            {/* Thumbnail strip — only shown if gallery images exist */}
             {allThumbnails.length > 1 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + allThumbnails.length + ', 1fr)', gap: 8 }}>
                 {allThumbnails.map((thumb, i) => (
@@ -149,20 +145,13 @@ export default function ArtworkPage() {
                       borderRadius: 'var(--radius-md)',
                       overflow: 'hidden',
                       cursor: 'pointer',
-                      border: activeImage === thumb.url
-                        ? '2px solid #1a1a1a'
-                        : '0.5px solid var(--color-border)',
+                      border: activeImage === thumb.url ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
                       transition: 'border-color 0.15s',
                       background: 'var(--color-surface)',
                       position: 'relative',
                     }}
                   >
-                    <img
-                      src={thumb.url}
-                      alt={'View ' + (i + 1)}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
-                    />
-                    {/* Overlay to prevent right-click */}
+                    <img src={thumb.url} alt={'View ' + (i + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                     <div style={{ position: 'absolute', inset: 0 }} onContextMenu={e => e.preventDefault()} />
                   </div>
                 ))}
@@ -237,7 +226,6 @@ export default function ArtworkPage() {
               {orderSKU}
             </span>
 
-            {/* Buttons */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
               <button
                 className="btn btn-primary btn-full"
@@ -248,18 +236,13 @@ export default function ArtworkPage() {
                 {alreadyInCart ? 'Added to cart ✓' : 'Add to cart'}
               </button>
               <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>
-                  Checkout
-                </button>
-                <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>
-                  Continue shopping
-                </button>
+                <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>Checkout</button>
+                <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>Continue shopping</button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* More by this artist */}
         {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 20 }}>
@@ -303,22 +286,20 @@ function ArtistModal({ artist, onClose, artworks }: any) {
   return (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 600, overflow: 'hidden', position: 'relative' }}>
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>×</button>
         <div style={{ padding: '24px 24px 0' }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 20 }}>
-            <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', flexShrink: 0, background: '#9FE1CB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 500, color: '#085041' }}>
-              {artist.avatar_url
-                ? <img src={artist.avatar_url} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : displayName.split(' ').map((w: string) => w[0]).join('').toUpperCase()
-              }
-            </div>
+
+            {/* ── Artist avatar ── */}
+            <AvatarDisplay profile={artist} size={64} />
+
             <div>
               <p style={{ fontSize: 18, fontWeight: 500 }}>{displayName}</p>
-              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{artist.location}</p>
-              <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.6 }}>{artist.bio}</p>
+              {artist.location && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{artist.location}</p>}
+              {artist.bio && <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 6, lineHeight: 1.6 }}>{artist.bio}</p>}
               {artist.instagram && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 6 }}>{artist.instagram}</p>}
             </div>
           </div>
