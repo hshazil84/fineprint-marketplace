@@ -18,53 +18,50 @@ const AVATAR_COLORS = [
 
 const GENDER_PARAMS = {
   male: {
-    topOptions:         ['shortHairShortFlat','shortHairShortRound','shortHairShortWaved','shortHairDreads01','shortHairFrizzle','shortHairTheCaesar','shortHairTheCaesarSidePart'],
-    facialHairOptions:  ['beardLight','beardMajestic','beardMedium','blank'],
-    accessoriesOptions: ['blank','prescription01','prescription02','round','sunglasses','wayfarers'],
+    top: ['shortHairShortFlat','shortHairShortRound','shortHairShortWaved','shortHairDreads01','shortHairFrizzle','shortHairTheCaesar'],
+    facialHair: ['beardLight','beardMajestic','beardMedium','blank','blank','blank'],
   },
   female: {
-    topOptions:         ['longHairBigHair','longHairBob','longHairCurly','longHairStraight','longHairStraight2','longHairShavedSides','longHairMiaWallace'],
-    facialHairOptions:  ['blank'],
-    accessoriesOptions: ['blank','prescription01','prescription02','round','sunglasses','wayfarers'],
+    top: ['longHairBigHair','longHairBob','longHairCurly','longHairStraight','longHairStraight2','longHairMiaWallace','longHairShavedSides'],
+    facialHair: ['blank'],
   },
   hijab: {
-    topOptions:         ['hijab'],
-    facialHairOptions:  ['blank'],
-    accessoriesOptions: ['blank','prescription01','prescription02','round'],
+    top: ['hijab'],
+    facialHair: ['blank'],
   },
 }
+
+const CLOTHING = ['blazerAndShirt','blazerAndSweater','collarAndSweater','graphicShirt','hoodie','overall','shirtCrewNeck','shirtScoopNeck','shirtVNeck']
+const ACCESSORIES = ['blank','blank','blank','prescription01','prescription02','round','sunglasses','wayfarers']
+const SKIN_COLORS = ['tanned','yellow','pale','light','brown','darkBrown','black']
 
 function randomFrom(arr: string[]) {
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
 function randomAvatarUrl(gender: 'male' | 'female' | 'hijab', color: string) {
-  const params      = GENDER_PARAMS[gender]
-  const top         = randomFrom(params.topOptions)
-  const facialHair  = randomFrom(params.facialHairOptions)
-  const accessories = randomFrom(params.accessoriesOptions)
-  const skin        = randomFrom(['tanned','yellow','pale','light','brown','darkBrown','black'])
-  const clothe      = randomFrom(['blazerShirt','blazerSweater','collarSweater','graphicShirt','hoodie','overall','shirtCrewNeck','shirtScoopNeck','shirtVNeck'])
-  const eyes        = randomFrom(['default','happy','side','squint','surprised','wink'])
-  const mouth       = randomFrom(['default','smile','twinkle'])
-  const seed        = Math.random().toString(36).slice(2, 8)
+  const p       = GENDER_PARAMS[gender]
+  const top     = randomFrom(p.top)
+  const facial  = randomFrom(p.facialHair)
+  const clothe  = randomFrom(CLOTHING)
+  const acc     = randomFrom(ACCESSORIES)
+  const skin    = randomFrom(SKIN_COLORS)
+  const seed    = Math.random().toString(36).slice(2, 10)
 
-  const params_str = new URLSearchParams({
+  const q = new URLSearchParams({
     seed,
-    backgroundColor: color,
-    backgroundType:  'solid',
+    backgroundColor:  color,
+    backgroundType:   'solid',
     top,
-    facialHair,
-    accessories,
-    skin,
-    clotheType:      clothe,
-    eyes,
-    mouth,
-    scale:           '90',
-    radius:          '50',
-  }).toString()
+    facialHair:       facial,
+    clothing:         clothe,
+    accessories:      acc,
+    skinColor:        skin,
+    radius:           '50',
+    scale:            '85',
+  })
 
-  return `https://api.dicebear.com/7.x/avataaars/png?${params_str}`
+  return `https://api.dicebear.com/9.x/avataaars/png?${q.toString()}`
 }
 
 export function ProfileTab({ profile, onSave }: any) {
@@ -92,8 +89,8 @@ export function ProfileTab({ profile, onSave }: any) {
   const supabase = createClient()
 
   function regenerate(gender?: 'male' | 'female' | 'hijab', color?: string) {
-    const g = gender || diceGender
-    const c = color  || selectedColor
+    const g = gender ?? diceGender
+    const c = color  ?? selectedColor
     setCurrentAvatarUrl(randomAvatarUrl(g, c))
   }
 
@@ -249,7 +246,7 @@ export function ProfileTab({ profile, onSave }: any) {
 
           {avatarMode === 'illustrated' && (
             <>
-              {/* Gender / style selector */}
+              {/* Style selector */}
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>Style</p>
               <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
                 {([
@@ -261,7 +258,7 @@ export function ProfileTab({ profile, onSave }: any) {
                     key={key}
                     onClick={() => {
                       setDiceGender(key)
-                      setCurrentAvatarUrl(randomAvatarUrl(key, selectedColor))
+                      regenerate(key, selectedColor)
                     }}
                     style={{
                       fontSize: 11, padding: '5px 12px', borderRadius: 20,
@@ -286,7 +283,7 @@ export function ProfileTab({ profile, onSave }: any) {
                     title={c.label}
                     onClick={() => {
                       setSelectedColor(c.value)
-                      setCurrentAvatarUrl(randomAvatarUrl(diceGender, c.value))
+                      regenerate(diceGender, c.value)
                     }}
                     style={{
                       width: 24, height: 24, borderRadius: '50%',
@@ -319,11 +316,11 @@ export function ProfileTab({ profile, onSave }: any) {
 
       <input type="file" id="avatar-input" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoSelect} />
 
-      {/* Contextual tip */}
+      {/* Contextual tips */}
       {avatarMode === 'illustrated' && (
         <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 20 }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-            Not sure what photo to use? An illustrated avatar keeps your profile looking great while you decide. You can always swap to a real photo later.
+            Not sure what photo to use? Pick an illustrated avatar for now — you can always swap to a real photo later.
           </p>
         </div>
       )}
