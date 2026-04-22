@@ -1,67 +1,30 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+import Avatar, { genConfig } from 'react-nice-avatar'
 
 const AVATAR_COLORS = [
-  { label: 'Sky',      value: 'b6e3f4' },
-  { label: 'Peach',    value: 'ffdfbf' },
-  { label: 'Lavender', value: 'c0aede' },
-  { label: 'Mint',     value: 'd1f4e0' },
-  { label: 'Rose',     value: 'ffd6e0' },
-  { label: 'Sand',     value: 'f5e6c8' },
-  { label: 'Lilac',    value: 'e8d5f5' },
-  { label: 'Teal',     value: 'a8e6e2' },
-  { label: 'Butter',   value: 'fff3b0' },
-  { label: 'Slate',    value: 'd4d8e2' },
+  { label: 'Sky',      value: '#b6e3f4' },
+  { label: 'Peach',    value: '#ffdfbf' },
+  { label: 'Lavender', value: '#c0aede' },
+  { label: 'Mint',     value: '#d1f4e0' },
+  { label: 'Rose',     value: '#ffd6e0' },
+  { label: 'Sand',     value: '#f5e6c8' },
+  { label: 'Lilac',    value: '#e8d5f5' },
+  { label: 'Teal',     value: '#a8e6e2' },
+  { label: 'Butter',   value: '#fff3b0' },
+  { label: 'Slate',    value: '#d4d8e2' },
 ]
 
-const GENDER_PARAMS = {
-  male: {
-    top: ['shortHairShortFlat','shortHairShortRound','shortHairShortWaved','shortHairDreads01','shortHairFrizzle','shortHairTheCaesar'],
-    facialHair: ['beardLight','beardMajestic','beardMedium','blank','blank','blank'],
-  },
-  female: {
-    top: ['longHairBigHair','longHairBob','longHairCurly','longHairStraight','longHairStraight2','longHairMiaWallace','longHairShavedSides'],
-    facialHair: ['blank'],
-  },
-  hijab: {
-    top: ['hijab'],
-    facialHair: ['blank'],
-  },
-}
-
-const CLOTHING = ['blazerAndShirt','blazerAndSweater','collarAndSweater','graphicShirt','hoodie','overall','shirtCrewNeck','shirtScoopNeck','shirtVNeck']
-const ACCESSORIES = ['blank','blank','blank','prescription01','prescription02','round','sunglasses','wayfarers']
-const SKIN_COLORS = ['tanned','yellow','pale','light','brown','darkBrown','black']
-
-function randomFrom(arr: string[]) {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
-function randomAvatarUrl(gender: 'male' | 'female' | 'hijab', color: string) {
-  const p       = GENDER_PARAMS[gender]
-  const top     = randomFrom(p.top)
-  const facial  = randomFrom(p.facialHair)
-  const clothe  = randomFrom(CLOTHING)
-  const acc     = randomFrom(ACCESSORIES)
-  const skin    = randomFrom(SKIN_COLORS)
-  const seed    = Math.random().toString(36).slice(2, 10)
-
-  const q = new URLSearchParams({
-    seed,
-    backgroundColor:  color,
-    backgroundType:   'solid',
-    top,
-    facialHair:       facial,
-    clothing:         clothe,
-    accessories:      acc,
-    skinColor:        skin,
-    radius:           '50',
-    scale:            '85',
+function randomConfig(sex: 'man' | 'woman', bgColor: string) {
+  return genConfig({
+    sex,
+    bgColor,
+    hairStyle: sex === 'man'
+      ? (['normal','thick','mohawk'] as const)[Math.floor(Math.random() * 3)]
+      : (['womanLong','womanShort'] as const)[Math.floor(Math.random() * 2)],
   })
-
-  return `https://api.dicebear.com/9.x/avataaars/png?${q.toString()}`
 }
 
 export function ProfileTab({ profile, onSave }: any) {
@@ -81,17 +44,16 @@ export function ProfileTab({ profile, onSave }: any) {
   const [avatarFile, setAvatarFile]             = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview]       = useState<string | null>(profile.avatar_url || null)
   const [selectedColor, setSelectedColor]       = useState(AVATAR_COLORS[0].value)
-  const [diceGender, setDiceGender]             = useState<'male' | 'female' | 'hijab'>('male')
-  const [currentAvatarUrl, setCurrentAvatarUrl] = useState<string>(
-    () => randomAvatarUrl('male', AVATAR_COLORS[0].value)
-  )
-  const [saving, setSaving] = useState(false)
-  const supabase = createClient()
+  const [avatarSex, setAvatarSex]               = useState<'man' | 'woman'>('man')
+  const [avatarConfig, setAvatarConfig]         = useState(() => randomConfig('man', AVATAR_COLORS[0].value))
+  const [saving, setSaving]                     = useState(false)
+  const avatarRef = useRef<any>(null)
+  const supabase  = createClient()
 
-  function regenerate(gender?: 'male' | 'female' | 'hijab', color?: string) {
-    const g = gender ?? diceGender
-    const c = color  ?? selectedColor
-    setCurrentAvatarUrl(randomAvatarUrl(g, c))
+  function regenerate(sex?: 'man' | 'woman', color?: string) {
+    const s = sex   ?? avatarSex
+    const c = color ?? selectedColor
+    setAvatarConfig(randomConfig(s, c))
   }
 
   function handlePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -103,13 +65,39 @@ export function ProfileTab({ profile, onSave }: any) {
     reader.readAsDataURL(file)
   }
 
+  async function exportAvatarToPng(): Promise<Blob | null> {
+    return new Promise(resolve => {
+      try {
+        const svgEl = document.getElementById('nice-avatar-svg')?.querySelector('svg')
+        if (!svgEl) { resolve(null); return }
+        const svgData   = new XMLSerializer().serializeToString(svgEl)
+        const svgBlob   = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+        const url       = URL.createObjectURL(svgBlob)
+        const img       = new Image()
+        img.onload = () => {
+          const canvas  = document.createElement('canvas')
+          canvas.width  = 200
+          canvas.height = 200
+          const ctx     = canvas.getContext('2d')!
+          ctx.drawImage(img, 0, 0, 200, 200)
+          URL.revokeObjectURL(url)
+          canvas.toBlob(blob => resolve(blob), 'image/png')
+        }
+        img.onerror = () => resolve(null)
+        img.src = url
+      } catch {
+        resolve(null)
+      }
+    })
+  }
+
   async function save() {
     setSaving(true)
     try {
       let avatarUrl = profile.avatar_url
 
       if (avatarMode === 'upload' && avatarFile) {
-        const ext = avatarFile.name.split('.').pop()
+        const ext  = avatarFile.name.split('.').pop()
         const path = profile.id + '.' + ext
         const { error: uploadError } = await supabase.storage
           .from('avatars')
@@ -120,15 +108,16 @@ export function ProfileTab({ profile, onSave }: any) {
 
       } else if (avatarMode === 'illustrated') {
         toast.loading('Saving illustrated avatar...', { id: 'avatar' })
-        const res = await fetch(currentAvatarUrl)
-        const blob = await res.blob()
-        const path = profile.id + '-avatar.png'
-        const { error: uploadError } = await supabase.storage
-          .from('avatars')
-          .upload(path, blob, { upsert: true, contentType: 'image/png' })
-        if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
-        const { data } = supabase.storage.from('avatars').getPublicUrl(path)
-        avatarUrl = data.publicUrl
+        const blob = await exportAvatarToPng()
+        if (blob) {
+          const path = profile.id + '-avatar.png'
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(path, blob, { upsert: true, contentType: 'image/png' })
+          if (uploadError) throw new Error('Avatar upload failed: ' + uploadError.message)
+          const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+          avatarUrl = data.publicUrl
+        }
         toast.dismiss('avatar')
       }
 
@@ -160,38 +149,51 @@ export function ProfileTab({ profile, onSave }: any) {
       <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>Your public profile</p>
 
       {/* ── AVATAR SECTION ── */}
-      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Profile picture</p>
+      <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 12 }}>Profile picture</p>
 
       {/* Mode tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {[
-          { key: 'upload',      label: '📷 Upload photo' },
-          { key: 'illustrated', label: '✦ Illustrated' },
-        ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setAvatarMode(key as any)}
-            style={{
-              fontSize: 12, padding: '6px 14px', borderRadius: 20, border: 'none',
-              cursor: 'pointer', position: 'relative',
-              background: avatarMode === key ? '#1a1a1a' : 'var(--color-surface)',
-              color: avatarMode === key ? '#fff' : 'var(--color-text-muted)',
-              fontWeight: avatarMode === key ? 500 : 400,
-              transition: 'all 0.15s',
-            }}
-          >
-            {label}
-            {key === 'upload' && avatarMode !== 'upload' && (
-              <span style={{
-                position: 'absolute', top: -6, right: -4,
-                fontSize: 9, background: '#1D9E75', color: '#fff',
-                padding: '1px 5px', borderRadius: 10, fontWeight: 600, lineHeight: 1.4,
-              }}>
-                recommended
-              </span>
-            )}
-          </button>
-        ))}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {/* Upload photo — recommended */}
+        <button
+          onClick={() => setAvatarMode('upload')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 12, padding: '7px 14px', borderRadius: 20,
+            border: avatarMode === 'upload' ? 'none' : '0.5px solid var(--color-border)',
+            cursor: 'pointer',
+            background: avatarMode === 'upload' ? '#1a1a1a' : 'var(--color-surface)',
+            color: avatarMode === 'upload' ? '#fff' : 'var(--color-text-muted)',
+            fontWeight: avatarMode === 'upload' ? 500 : 400,
+            transition: 'all 0.15s',
+          }}
+        >
+          📷 Upload photo
+          {avatarMode !== 'upload' && (
+            <span style={{
+              fontSize: 9, background: '#1D9E75', color: '#fff',
+              padding: '2px 6px', borderRadius: 10, fontWeight: 600,
+              lineHeight: 1.4, letterSpacing: '0.02em',
+            }}>
+              recommended
+            </span>
+          )}
+        </button>
+
+        {/* Illustrated */}
+        <button
+          onClick={() => setAvatarMode('illustrated')}
+          style={{
+            fontSize: 12, padding: '7px 14px', borderRadius: 20,
+            border: avatarMode === 'illustrated' ? 'none' : '0.5px solid var(--color-border)',
+            cursor: 'pointer',
+            background: avatarMode === 'illustrated' ? '#1a1a1a' : 'var(--color-surface)',
+            color: avatarMode === 'illustrated' ? '#fff' : 'var(--color-text-muted)',
+            fontWeight: avatarMode === 'illustrated' ? 500 : 400,
+            transition: 'all 0.15s',
+          }}
+        >
+          ✦ Illustrated
+        </button>
       </div>
 
       {/* Avatar preview + controls */}
@@ -201,15 +203,16 @@ export function ProfileTab({ profile, onSave }: any) {
         <div style={{
           width: 96, height: 96, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
           border: '2px solid var(--color-border)',
-          background: avatarMode === 'illustrated' ? '#' + selectedColor : 'var(--color-surface)',
+          background: 'var(--color-surface)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {avatarMode === 'illustrated' ? (
-            <img
-              src={currentAvatarUrl}
-              alt="Avatar preview"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            <div id="nice-avatar-svg" style={{ width: 96, height: 96 }}>
+              <Avatar
+                style={{ width: 96, height: 96 }}
+                {...avatarConfig}
+              />
+            </div>
           ) : avatarPreview ? (
             <img
               src={avatarPreview}
@@ -217,7 +220,7 @@ export function ProfileTab({ profile, onSave }: any) {
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
-            <div style={{ fontSize: 32, opacity: 0.3 }}>👤</div>
+            <div style={{ fontSize: 32, opacity: 0.2 }}>👤</div>
           )}
         </div>
 
@@ -227,8 +230,7 @@ export function ProfileTab({ profile, onSave }: any) {
             <>
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
                 Upload a clear photo of yourself or your studio logo.
-                Buyers connect better with a real face.<br />
-                JPG or PNG recommended.
+                Buyers connect better with a real face.<br />JPG or PNG.
               </p>
               <button
                 onClick={() => document.getElementById('avatar-input')?.click()}
@@ -246,26 +248,25 @@ export function ProfileTab({ profile, onSave }: any) {
 
           {avatarMode === 'illustrated' && (
             <>
-              {/* Style selector */}
+              {/* Male / Female */}
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>Style</p>
-              <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
                 {([
-                  { key: 'male',   label: '👦 Male' },
-                  { key: 'female', label: '👧 Female' },
-                  { key: 'hijab',  label: '🧕 Hijab' },
+                  { key: 'man',   label: '👦 Male' },
+                  { key: 'woman', label: '👧 Female' },
                 ] as const).map(({ key, label }) => (
                   <button
                     key={key}
                     onClick={() => {
-                      setDiceGender(key)
+                      setAvatarSex(key)
                       regenerate(key, selectedColor)
                     }}
                     style={{
                       fontSize: 11, padding: '5px 12px', borderRadius: 20,
-                      border: diceGender === key ? 'none' : '0.5px solid var(--color-border)',
+                      border: avatarSex === key ? 'none' : '0.5px solid var(--color-border)',
                       cursor: 'pointer',
-                      background: diceGender === key ? '#1a1a1a' : 'var(--color-surface)',
-                      color: diceGender === key ? '#fff' : 'var(--color-text-muted)',
+                      background: avatarSex === key ? '#1a1a1a' : 'var(--color-surface)',
+                      color: avatarSex === key ? '#fff' : 'var(--color-text-muted)',
                       transition: 'all 0.15s',
                     }}
                   >
@@ -283,11 +284,11 @@ export function ProfileTab({ profile, onSave }: any) {
                     title={c.label}
                     onClick={() => {
                       setSelectedColor(c.value)
-                      regenerate(diceGender, c.value)
+                      setAvatarConfig(prev => ({ ...prev, bgColor: c.value }))
                     }}
                     style={{
                       width: 24, height: 24, borderRadius: '50%',
-                      background: '#' + c.value,
+                      background: c.value,
                       border: selectedColor === c.value ? '2.5px solid #1a1a1a' : '1.5px solid var(--color-border)',
                       cursor: 'pointer', padding: 0, flexShrink: 0,
                       boxShadow: selectedColor === c.value ? '0 0 0 2px #fff, 0 0 0 4px #1a1a1a' : 'none',
