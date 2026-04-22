@@ -412,22 +412,24 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </div>
 
       {/* Print sizes */}
-      <div className="form-group">
-        <label className="form-label">Available print sizes</label>
-        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10 }}>Select which sizes you will offer for this artwork</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[
-            { size: 'A4', dims: '210 x 297 mm', fee: PRINTING_FEES['A4'] },
-            { size: 'A3', dims: '297 x 420 mm', fee: PRINTING_FEES['A3'] },
-          ].map(({ size, dims, fee }) => (
-            <label key={size} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 14px', border: selectedSizes.includes(size) ? '0.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: selectedSizes.includes(size) ? 'var(--color-surface)' : 'transparent' }}>
-              <input type="checkbox" checked={selectedSizes.includes(size)} onChange={() => toggleSize(size)} style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <p style={{ fontSize: 13, fontWeight: 500 }}>{size} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 12 }}>({dims})</span></p>
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Printing fee: {formatMVR(fee)} added to buyer price</p>
-              </div>
-            </label>
-          ))}
+      {[
+        { size: 'A4', dims: '210 x 297 mm', fee: PRINTING_FEES['A4'], comingSoon: false },
+        { size: 'A3', dims: '297 x 420 mm', fee: PRINTING_FEES['A3'], comingSoon: false },
+        { size: 'A2', dims: '420 x 594 mm', fee: 0, comingSoon: true },
+      ].map(({ size, dims, fee, comingSoon }) => (
+        <label key={size} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: comingSoon ? 'not-allowed' : 'pointer', padding: '10px 14px', border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: comingSoon ? 'rgba(0,0,0,0.02)' : selectedSizes.includes(size) ? 'var(--color-surface)' : 'transparent', opacity: comingSoon ? 0.5 : 1 }}>
+          <input type="checkbox" checked={!comingSoon && selectedSizes.includes(size)} onChange={() => !comingSoon && toggleSize(size)} disabled={comingSoon} style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, fontWeight: 500 }}>
+              {size} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 12 }}>({dims})</span>
+              {comingSoon && <span style={{ fontSize: 10, marginLeft: 8, background: 'var(--color-amber-light)', color: '#633806', padding: '1px 7px', borderRadius: 20, fontWeight: 500 }}>Coming soon</span>}
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+              {comingSoon ? 'Available soon' : 'Printing fee: ' + formatMVR(fee) + ' added to buyer price'}
+            </p>
+          </div>
+        </label>
+      ))}
         </div>
       </div>
 
