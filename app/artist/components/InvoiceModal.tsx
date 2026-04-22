@@ -13,30 +13,28 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
   const buyerAddress = order.delivery_method === 'pickup'
     ? 'Pickup — FinePrint Studio, Malé'
     : `${order.delivery_island || ''}, ${order.delivery_atoll || ''}, Maldives`
-  const isSwipe = order.payment_method === 'swipe'
+  const isSwipe     = order.payment_method === 'swipe'
   const displayName = profile?.display_name || profile?.full_name || ''
 
   useEffect(() => {
     async function loadItems() {
-      // Fetch only this artist's items from this order
       const { data: orderItems } = await supabase
         .from('order_items')
-        .select('*, artworks(title, sku)')
+        .select('*, artworks(title, sku, price)')
         .eq('order_id', order.id)
         .eq('artist_id', profile.id)
 
       if (orderItems && orderItems.length > 0) {
         setMyItems(orderItems)
       } else {
-        // Legacy fallback — single item order
         setMyItems([{
           print_size:      order.print_size,
-          original_price:  order.original_price,
-          offer_pct:       order.offer_pct,
-          offer_label:     order.offer_label,
-          discount_amount: order.discount_amount,
-          print_price:     order.print_price,
-          printing_fee:    order.printing_fee || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4'],
+          original_price:  order.original_price  || order.artworks?.price,
+          offer_pct:       order.offer_pct > 0   ? order.offer_pct   : null,
+          offer_label:     order.offer_pct > 0   ? order.offer_label : null,
+          discount_amount: order.discount_amount  || 0,
+          print_price:     order.print_price      || order.total_paid,
+          printing_fee:    order.printing_fee     || PRINTING_FEES[order.print_size] || PRINTING_FEES['A4'],
           artist_earnings: order.artist_earnings,
           artworks:        order.artworks,
         }])
@@ -47,23 +45,33 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
 
   const myEarnings = myItems.reduce((s, i) => s + (i.artist_earnings || 0), 0)
 
+  const stampHTML = `
+    <div style="position:absolute;top:40%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);opacity:0.07;pointer-events:none;user-select:none;z-index:10">
+      <div style="border:6px solid #c10000;border-radius:12px;padding:10px 32px;display:inline-block">
+        <div style="font-size:64px;font-weight:900;color:#c10000;letter-spacing:0.16em;line-height:1;font-family:-apple-system,sans-serif">PAID</div>
+        <div style="font-size:13px;color:#c10000;text-align:center;letter-spacing:0.08em;margin-top:4px;font-family:-apple-system,sans-serif">${date}</div>
+      </div>
+    </div>`
+
   function buildPrintHTML() {
     const lineItems = myItems.map(item => {
       const hasOffer    = item.offer_pct && item.offer_pct > 0
       const printingFee = item.printing_fee || PRINTING_FEES[item.print_size] || PRINTING_FEES['A4']
+      const origPrice   = item.original_price || 0
+      const printPrice  = item.print_price || 0
       const itemSku     = item.artworks?.sku ? item.artworks.sku + '-' + item.print_size : order.order_sku
       return `
         <tr style="border-bottom:1px solid #f4f4f0">
           <td style="padding:12px 0;vertical-align:top">
             <div style="font-size:13px;font-weight:500;color:#222">${item.artworks?.title || ''}</div>
             <div style="font-size:11px;color:#aaa;font-family:monospace;margin-top:2px">${itemSku}</div>
-            ${hasOffer ? `<div style="font-size:11px;color:#c05030;margin-top:2px">${item.offer_label} ${item.offer_pct}% off</div>` : ''}
+            ${hasOffer ? `<div style="font-size:11px;color:#c05030;margin-top:2px">${item.offer_label} −${item.offer_pct}%</div>` : ''}
           </td>
           <td style="padding:12px 0;font-size:13px;color:#444;vertical-align:top">${displayName}</td>
           <td style="padding:12px 0;font-size:13px;color:#444;vertical-align:top">${item.print_size}</td>
           <td style="padding:12px 0;text-align:right;vertical-align:top">
-            ${hasOffer ? `<div style="font-size:12px;color:#aaa;text-decoration:line-through">MVR ${item.original_price}</div>` : ''}
-            <div style="font-size:13px;font-weight:500;color:#222">MVR ${item.print_price}</div>
+            ${hasOffer ? `<div style="font-size:12px;color:#aaa;text-decoration:line-through">MVR ${origPrice}</div>` : ''}
+            <div style="font-size:13px;font-weight:500;color:#222">MVR ${printPrice}</div>
           </td>
         </tr>`
     }).join('')
@@ -71,19 +79,22 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
     const subtotalRows = myItems.map(item => {
       const hasOffer    = item.offer_pct && item.offer_pct > 0
       const printingFee = item.printing_fee || PRINTING_FEES[item.print_size] || PRINTING_FEES['A4']
+      const origPrice   = item.original_price || 0
+      const discAmount  = item.discount_amount || 0
       return `
         ${myItems.length > 1 ? `<tr><td colspan="2" style="color:#aaa;padding:6px 0 2px;font-size:11px;text-transform:uppercase">${item.artworks?.title || ''}</td></tr>` : ''}
         ${hasOffer
-          ? `<tr><td style="color:#888;padding:3px 0;font-size:12px">Artwork price</td><td style="text-align:right;font-size:12px;color:#aaa;text-decoration:line-through">MVR ${item.original_price}</td></tr>
-             <tr><td style="color:#c05030;padding:3px 0;font-size:12px">${item.offer_label} (${item.offer_pct}% off)</td><td style="text-align:right;font-size:12px;color:#c05030">- MVR ${item.discount_amount}</td></tr>`
-          : `<tr><td style="color:#888;padding:3px 0;font-size:12px">Artwork price</td><td style="text-align:right;font-size:12px">MVR ${item.original_price}</td></tr>`
+          ? `<tr><td style="color:#888;padding:3px 0;font-size:12px">Artwork price</td><td style="text-align:right;font-size:12px;color:#aaa;text-decoration:line-through">MVR ${origPrice}</td></tr>
+             <tr><td style="color:#c05030;padding:3px 0;font-size:12px">${item.offer_label} (−${item.offer_pct}%)</td><td style="text-align:right;font-size:12px;color:#c05030">− MVR ${discAmount}</td></tr>`
+          : `<tr><td style="color:#888;padding:3px 0;font-size:12px">Artwork price</td><td style="text-align:right;font-size:12px">MVR ${origPrice}</td></tr>`
         }
-        <tr><td style="color:#888;padding:3px 0;font-size:12px">${item.print_size} giclee printing</td><td style="text-align:right;font-size:12px">MVR ${printingFee}</td></tr>`
+        <tr><td style="color:#888;padding:3px 0;font-size:12px">${item.print_size} giclée printing</td><td style="text-align:right;font-size:12px">MVR ${printingFee}</td></tr>`
     }).join('')
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${order.invoice_number}</title>
     <style>body{margin:0;padding:24px;font-family:-apple-system,sans-serif;background:#f0f0ec}
     .wrap{max-width:600px;margin:0 auto;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e0ddd6}
+    .body{padding:24px 32px;position:relative}
     @media print{body{background:#fff}.wrap{border:none;border-radius:0}}</style></head>
     <body><div class="wrap">
     <div style="background:#1a1a1a;padding:24px 32px;display:flex;justify-content:space-between">
@@ -97,7 +108,8 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
       <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:3px">${date}</div>
       <div style="margin-top:6px;display:inline-block;background:#EAF3DE;color:#3B6D11;font-size:11px;font-weight:600;padding:2px 10px;border-radius:20px">Approved</div>
     </div></div>
-    <div style="padding:24px 32px">
+    <div class="body">
+    ${stampHTML}
     <table style="width:100%;margin-bottom:20px"><tr>
     <td style="width:50%;vertical-align:top;padding-right:12px">
       <div style="font-size:10px;text-transform:uppercase;color:#aaa;margin-bottom:6px">Billed to</div>
@@ -158,18 +170,31 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
           <p style={{ fontSize: 13, color: '#fff', fontFamily: 'monospace' }}>{order.invoice_number}</p>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={printInvoice} style={{ background: '#9FE1CB', color: '#085041', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-              Print / Save PDF
+              🖨 Print / Save PDF
             </button>
             <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12, cursor: 'pointer' }}>
-              Close
+              ✕ Close
             </button>
           </div>
         </div>
 
         {/* Body */}
-        <div style={{ padding: 28, maxHeight: '80vh', overflowY: 'auto' }}>
+        <div style={{ padding: 28, maxHeight: '80vh', overflowY: 'auto', position: 'relative' }}>
 
-          {/* Invoice header */}
+          {/* PAID stamp — centered over full invoice body */}
+          <div style={{
+            position: 'absolute', top: '40%', left: '50%',
+            transform: 'translate(-50%, -50%) rotate(-18deg)',
+            opacity: 0.07, pointerEvents: 'none', userSelect: 'none',
+            zIndex: 10,
+          }}>
+            <div style={{ border: '6px solid #c10000', borderRadius: 12, padding: '10px 32px', display: 'inline-block' }}>
+              <div style={{ fontSize: 64, fontWeight: 900, color: '#c10000', letterSpacing: '0.16em', lineHeight: 1 }}>PAID</div>
+              <div style={{ fontSize: 13, color: '#c10000', textAlign: 'center', letterSpacing: '0.08em', marginTop: 4 }}>{date}</div>
+            </div>
+          </div>
+
+          {/* Invoice header block */}
           <div style={{ background: '#1a1a1a', borderRadius: 12, padding: '20px 24px', marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Fine<span style={{ color: '#9FE1CB' }}>Print</span> Studio</div>
@@ -197,7 +222,7 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
             </div>
           </div>
 
-          {/* Your items */}
+          {/* Line items */}
           <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#aaa', marginBottom: 8 }}>
             Your items in this order
           </p>
@@ -211,20 +236,22 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
             </thead>
             <tbody>
               {myItems.map((item, i) => {
-                const hasOffer = item.offer_pct && item.offer_pct > 0
-                const itemSku  = item.artworks?.sku ? item.artworks.sku + '-' + item.print_size : order.order_sku
+                const hasOffer   = item.offer_pct && item.offer_pct > 0
+                const origPrice  = item.original_price || 0
+                const printPrice = item.print_price || 0
+                const itemSku    = item.artworks?.sku ? item.artworks.sku + '-' + item.print_size : order.order_sku
                 return (
                   <tr key={i} style={{ borderBottom: '1px solid #f4f4f0' }}>
                     <td style={{ padding: '12px 0', verticalAlign: 'top' }}>
                       <p style={{ fontSize: 13, color: '#222', fontWeight: 500, margin: 0 }}>{item.artworks?.title}</p>
                       <p style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace', marginTop: 2 }}>{itemSku}</p>
-                      {hasOffer && <p style={{ fontSize: 11, color: '#c05030', marginTop: 2 }}>{item.offer_label} {item.offer_pct}% off</p>}
+                      {hasOffer && <p style={{ fontSize: 11, color: '#c05030', marginTop: 2 }}>{item.offer_label} −{item.offer_pct}%</p>}
                     </td>
                     <td style={{ padding: '12px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{displayName}</td>
                     <td style={{ padding: '12px 0', fontSize: 13, color: '#444', verticalAlign: 'top' }}>{item.print_size}</td>
                     <td style={{ padding: '12px 0', textAlign: 'right', verticalAlign: 'top' }}>
-                      {hasOffer && <p style={{ fontSize: 12, color: '#aaa', textDecoration: 'line-through', margin: 0 }}>MVR {item.original_price}</p>}
-                      <p style={{ fontSize: 13, color: '#222', fontWeight: 500, margin: 0 }}>MVR {item.print_price}</p>
+                      {hasOffer && <p style={{ fontSize: 12, color: '#aaa', textDecoration: 'line-through', margin: 0 }}>MVR {origPrice}</p>}
+                      <p style={{ fontSize: 13, color: '#222', fontWeight: 500, margin: 0 }}>MVR {printPrice}</p>
                     </td>
                   </tr>
                 )
@@ -232,27 +259,46 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
             </tbody>
           </table>
 
-          {/* Earnings */}
+          {/* Earnings breakdown */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
             <table style={{ width: 240, borderCollapse: 'collapse' }}>
               <tbody>
                 {myItems.map((item, i) => {
                   const hasOffer    = item.offer_pct && item.offer_pct > 0
                   const printingFee = item.printing_fee || PRINTING_FEES[item.print_size] || PRINTING_FEES['A4']
+                  const origPrice   = item.original_price || 0
+                  const discAmount  = item.discount_amount || 0
                   return (
-                    <tr key={i}>
+                    <React.Fragment key={i}>
+                      {myItems.length > 1 && (
+                        <tr>
+                          <td colSpan={2} style={{ color: '#aaa', padding: '6px 0 2px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            {item.artworks?.title}
+                          </td>
+                        </tr>
+                      )}
                       {hasOffer ? (
                         <>
-                          <td style={{ color: '#888', padding: '3px 0', fontSize: 12 }}>Original price</td>
-                          <td style={{ textAlign: 'right', fontSize: 12, color: '#aaa', textDecoration: 'line-through' }}>MVR {item.original_price}</td>
+                          <tr>
+                            <td style={{ color: '#888', padding: '3px 0', fontSize: 12 }}>Artwork price</td>
+                            <td style={{ textAlign: 'right', fontSize: 12, color: '#aaa', textDecoration: 'line-through' }}>MVR {origPrice}</td>
+                          </tr>
+                          <tr>
+                            <td style={{ color: '#c05030', padding: '3px 0', fontSize: 12 }}>{item.offer_label} (−{item.offer_pct}%)</td>
+                            <td style={{ textAlign: 'right', fontSize: 12, color: '#c05030' }}>− MVR {discAmount}</td>
+                          </tr>
                         </>
                       ) : (
-                        <>
+                        <tr>
                           <td style={{ color: '#888', padding: '3px 0', fontSize: 12 }}>Artwork price</td>
-                          <td style={{ textAlign: 'right', fontSize: 12 }}>MVR {item.original_price}</td>
-                        </>
+                          <td style={{ textAlign: 'right', fontSize: 12 }}>MVR {origPrice}</td>
+                        </tr>
                       )}
-                    </tr>
+                      <tr>
+                        <td style={{ color: '#888', padding: '3px 0', fontSize: 12 }}>{item.print_size} giclée printing</td>
+                        <td style={{ textAlign: 'right', fontSize: 12 }}>MVR {printingFee}</td>
+                      </tr>
+                    </React.Fragment>
                   )
                 })}
                 <tr style={{ borderTop: '1px solid #e8e8e4' }}>
@@ -275,5 +321,3 @@ export function InvoiceModal({ order, profile, onClose }: { order: any; profile:
     </div>
   )
 }
-
-
