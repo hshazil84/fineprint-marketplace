@@ -152,7 +152,6 @@ export default function ArtistDashboard() {
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
 
-        {/* Dashboard header with avatar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 4 }}>
           <AvatarDisplay profile={profile} size={48} />
           <div>
@@ -160,13 +159,9 @@ export default function ArtistDashboard() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
               {profile?.shop_status === 'closed' ? (
-                <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
-                  Shop closed
-                </span>
+                <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>Shop closed</span>
               ) : (
-                <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>
-                  Shop open
-                </span>
+                <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>Shop open</span>
               )}
             </div>
           </div>
@@ -394,19 +389,24 @@ export default function ArtistDashboard() {
   )
 }
 
-function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any, onSave: (updates: any) => void, onCancel: () => void }) {
+function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: (updates: any) => void; onCancel: () => void }) {
   const CATEGORIES = [
     'Photography', 'Fine Art', 'Abstract', 'Illustration',
     'Digital Art', 'Mixed Media', 'Watercolour', 'Charcoal & Sketch',
   ]
   const [form, setForm] = useState({
-    title:      artwork.title       || '',
+    title:       artwork.title       || '',
     description: artwork.description || '',
-    price:      String(artwork.price || ''),
-    category:   artwork.category    || 'Photography',
-    paintingBy: artwork.painting_by || '',
-    sizes:      artwork.sizes       || ['A4', 'A3'],
+    price:       String(artwork.price || ''),
+    category:    artwork.category    || 'Photography',
+    paintingBy:  artwork.painting_by || '',
+    sizes:       artwork.sizes       || ['A4', 'A3'],
   })
+  const [previewFile, setPreviewFile]   = useState<File | null>(null)
+  const [previewThumb, setPreviewThumb] = useState<string | null>(artwork.preview_url || null)
+  const [hiresFile, setHiresFile]       = useState<File | null>(null)
+  const [saving, setSaving]             = useState(false)
+  const supabase = createClient()
 
   function toggleSize(size: string) {
     setForm(prev => ({
@@ -415,31 +415,93 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any, onSave: 
     }))
   }
 
+  function handlePreviewSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPreviewFile(file)
+    const reader = new FileReader()
+    reader.onload = ev => setPreviewThumb(ev.target?.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const updates: any = {
+        title:       form.title,
+        description: form.description,
+        price:       parseInt(form.price) || artwork.price,
+        category:    form.category,
+        painting_by: form.paintingBy || null,
+        sizes:       form.sizes,
+      }
+
+      // Upload new preview if changed
+      if (previewFile) {
+        toast.loading('Uploading preview...', { id: 'edit-upload' })
+        const ext         = previewFile.name.split('.').pop()
+        const previewPath = artwork.sku + '-preview.' + ext
+        const { error: previewError } = await supabase.storage
+          .from('artwork-previews')
+          .upload(previewPath, previewFile, { upsert: true, contentType: previewFile.type })
+        if (previewError) throw previewError
+        const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
+        updates.preview_url = urlData.publicUrl
+        toast.dismiss('edit-upload')
+      }
+
+      // Upload new hi-res if changed
+      if (hiresFile) {
+        toast.loading('Uploading hi-res file...', { id: 'edit-hires' })
+        const ext       = hiresFile.name.split('.').pop()
+        const hiresPath = artwork.sku + '-hires.' + ext
+        const { error: hiresError } = await supabase.storage
+          .from('artwork-hires')
+          .upload(hiresPath, hiresFile, { upsert: true, contentType: hiresFile.type })
+        if (hiresError) throw hiresError
+        updates.hires_path = hiresPath
+        toast.dismiss('edit-hires')
+      }
+
+      onSave(updates)
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div style={{ padding: '0 20px 20px', borderTop: '0.5px solid var(--color-border)', background: 'var(--color-background-secondary)' }}>
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
+
       <div className="form-group">
         <label className="form-label">Title</label>
         <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
       </div>
+
       <div className="form-group">
         <label className="form-label">Description</label>
         <textarea className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
       </div>
+
       <div className="form-group">
         <label className="form-label">Category</label>
         <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
+
       <div className="form-group">
         <label className="form-label">Painting by (optional)</label>
         <input className="form-input" value={form.paintingBy} onChange={e => setForm({ ...form, paintingBy: e.target.value })} placeholder="e.g. Ahmed Naif" />
       </div>
+
       <div className="form-group">
         <label className="form-label">Price (MVR)</label>
         <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} style={{ maxWidth: 120 }} />
       </div>
+
       <div className="form-group">
         <label className="form-label">Available sizes</label>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -451,11 +513,96 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any, onSave: 
           ))}
         </div>
       </div>
+
+      {/* Preview image replacement */}
+      <div className="form-group">
+        <label className="form-label">Preview image</label>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {previewThumb && (
+            <img src={previewThumb} alt="preview" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '0.5px solid var(--color-border)' }} />
+          )}
+          <div>
+            <button
+              type="button"
+              onClick={() => document.getElementById('edit-preview-input-' + artwork.id)?.click()}
+              style={{ fontSize: 12, padding: '6px 14px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)', display: 'block', marginBottom: 4 }}
+            >
+              {previewFile ? 'Change preview' : 'Replace preview image'}
+            </button>
+            {previewFile && (
+              <>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{previewFile.name} · {(previewFile.size / 1024).toFixed(0)} KB</p>
+                <button
+                  type="button"
+                  onClick={() => { setPreviewFile(null); setPreviewThumb(artwork.preview_url) }}
+                  style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  Cancel change
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        <input type="file" id={'edit-preview-input-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+          Add your watermark before uploading · JPG or PNG
+        </p>
+      </div>
+
+      {/* Hi-res file replacement */}
+      <div className="form-group">
+        <label className="form-label">Hi-res print file</label>
+        <div
+          style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 }}
+          onClick={() => !hiresFile && document.getElementById('edit-hires-input-' + artwork.id)?.click()}
+        >
+          <span style={{ fontSize: 18 }}>🖨</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ fontSize: 13, color: hiresFile ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+              {hiresFile ? hiresFile.name : artwork.hires_path ? 'Current: ' + artwork.hires_path : 'No hi-res file'}
+            </p>
+            {hiresFile && (
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                {(hiresFile.size / 1024 / 1024).toFixed(1)} MB
+              </p>
+            )}
+          </div>
+          {hiresFile ? (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); setHiresFile(null); (document.getElementById('edit-hires-input-' + artwork.id) as HTMLInputElement).value = '' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1, flexShrink: 0 }}
+            >×</button>
+          ) : (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); document.getElementById('edit-hires-input-' + artwork.id)?.click() }}
+              style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)', flexShrink: 0 }}
+            >
+              Replace
+            </button>
+          )}
+        </div>
+        {hiresFile && (
+          <button
+            type="button"
+            onClick={() => document.getElementById('edit-hires-input-' + artwork.id)?.click()}
+            style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
+          >
+            Change file
+          </button>
+        )}
+        <input type="file" id={'edit-hires-input-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
+          JPG or PNG · A4 min 2339×1654px · A3 min 3307×2339px
+        </p>
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => onSave({ title: form.title, description: form.description, price: parseInt(form.price) || artwork.price, category: form.category, painting_by: form.paintingBy || null, sizes: form.sizes })}>
-          Save changes
+        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save changes'}
         </button>
-        <button className="btn btn-sm" style={{ fontSize: 12 }} onClick={onCancel}>Cancel</button>
+        <button className="btn btn-sm" style={{ fontSize: 12 }} onClick={onCancel} disabled={saving}>Cancel</button>
       </div>
     </div>
   )
