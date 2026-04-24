@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES, PAPER_OPTIONS, getPapersByCategory, getPaperAddOn, DEFAULT_PAPER } from '@/lib/pricing'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
+import { usePagination, PAGE_SIZES } from '@/lib/pagination'
+import { Pagination } from '@/app/components/Pagination'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 import { InvoiceModal } from '@/app/artist/components/InvoiceModal'
@@ -24,13 +26,13 @@ function Divider() {
 
 export default function ArtistDashboard() {
   const router = useRouter()
-  const [tab, setTab] = useState('listings')
-  const [profile, setProfile] = useState<any>(null)
-  const [artworks, setArtworks] = useState<any[]>([])
-  const [orders, setOrders] = useState<any[]>([])
-  const [payouts, setPayouts] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [tab, setTab]                       = useState('listings')
+  const [profile, setProfile]               = useState<any>(null)
+  const [artworks, setArtworks]             = useState<any[]>([])
+  const [orders, setOrders]                 = useState<any[]>([])
+  const [payouts, setPayouts]               = useState<any[]>([])
+  const [loading, setLoading]               = useState(true)
+  const [selectedOrder, setSelectedOrder]   = useState<any>(null)
   const [selectedPayout, setSelectedPayout] = useState<any>(null)
   const [editingArtwork, setEditingArtwork] = useState<any>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
@@ -173,10 +175,10 @@ export default function ArtistDashboard() {
 
         <div className="grid-4" style={{ marginBottom: 24, marginTop: 20 }}>
           {[
-            ['Total listings', artworks.length],
+            ['Total listings',  artworks.length],
             ['Orders received', approvedOrders.length],
-            ['Pending payout', formatMVR(pendingEarnings)],
-            ['Total earned', formatMVR(totalEarnings)],
+            ['Pending payout',  formatMVR(pendingEarnings)],
+            ['Total earned',    formatMVR(totalEarnings)],
           ].map(([label, value]) => (
             <div
               key={label as string}
@@ -206,161 +208,30 @@ export default function ArtistDashboard() {
           ))}
         </div>
 
+        {/* ── LISTINGS TAB ── */}
         {tab === 'listings' && (
-          <div>
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-              {artworks.length === 0 ? (
-                <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No listings yet. Upload your first artwork!</p>
-              ) : artworks.map(a => {
-                const platformFee = Math.round(a.price * PLATFORM_FEE / 100)
-                const artistEarns = a.price - platformFee
-                const isEditing   = editingArtwork?.id === a.id
-                const isDeleting  = deleteConfirmId === a.id
-                const remaining   = a.edition_size ? a.edition_size - (a.editions_sold || 0) : null
-                return (
-                  <div key={a.id} style={{ borderBottom: '0.5px solid var(--color-border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px' }}>
-                      {a.preview_url && (
-                        <img src={a.preview_url} alt={a.title} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0, opacity: a.status === 'hidden' ? 0.4 : 1 }} />
-                      )}
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span className="sku-tag">{a.sku}</span>
-                          <span className={'badge badge-' + a.status}>{a.status}</span>
-                          {a.category && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{a.category}</span>}
-                          {a.offer_label && <span className="offer-tag">{a.offer_label} {a.offer_pct}% off</span>}
-                          {a.paper_type && a.paper_type !== DEFAULT_PAPER && (
-                            <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>{a.paper_type}</span>
-                          )}
-                          {a.edition_size && (
-                            <span style={{ fontSize: 10, background: remaining === 0 ? '#FCEBEB' : '#f0f0ec', color: remaining === 0 ? '#A32D2D' : 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 20 }}>
-                              {remaining === 0 ? 'Sold out' : remaining + ' of ' + a.edition_size + ' left'}
-                            </span>
-                          )}
-                        </div>
-                        {a.painting_by && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Painting by {a.painting_by}</p>}
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(artistEarns)}</p>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>your earnings</p>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, padding: '0 20px 14px', flexWrap: 'wrap' }}>
-                      <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setEditingArtwork(isEditing ? null : a)}>
-                        {isEditing ? 'Cancel edit' : 'Edit'}
-                      </button>
-                      {a.status !== 'pending' && (
-                        <button
-                          className="btn btn-sm"
-                          style={{ fontSize: 11, background: a.status === 'hidden' ? 'var(--color-teal-light)' : 'var(--color-background-secondary)', color: a.status === 'hidden' ? 'var(--color-teal-dark)' : 'var(--color-text-muted)', border: 'none' }}
-                          onClick={() => toggleHide(a)}
-                        >
-                          {a.status === 'hidden' ? 'Show listing' : 'Hide listing'}
-                        </button>
-                      )}
-                      <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => setDeleteConfirmId(isDeleting ? null : a.id)}>
-                        Delete
-                      </button>
-                    </div>
-                    {isDeleting && (
-                      <div style={{ padding: '0 20px 14px' }}>
-                        <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                          <p style={{ fontSize: 13, color: '#A32D2D' }}>Permanently delete this listing? This cannot be undone.</p>
-                          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                            <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setDeleteConfirmId(null)}>Cancel</button>
-                            <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => deleteArtwork(a.id)}>Yes, delete</button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    {isEditing && (
-                      <EditArtworkForm artwork={a} onSave={updates => saveEdit(a.id, updates)} onCancel={() => setEditingArtwork(null)} />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <ArtistListingsTab
+            artworks={artworks}
+            editingArtwork={editingArtwork}
+            deleteConfirmId={deleteConfirmId}
+            setEditingArtwork={setEditingArtwork}
+            setDeleteConfirmId={setDeleteConfirmId}
+            onToggleHide={toggleHide}
+            onDelete={deleteArtwork}
+            onSaveEdit={saveEdit}
+          />
         )}
 
-        {tab === 'offers' && <OffersTab artworks={artworks} onRefresh={() => init()} />}
-        {tab === 'upload' && <UploadTab profile={profile} nextSeq={artworks.length + 1} onSuccess={() => { setTab('listings'); init() }} />}
+        {tab === 'offers'  && <OffersTab artworks={artworks} onRefresh={() => init()} />}
+        {tab === 'upload'  && <UploadTab profile={profile} nextSeq={artworks.length + 1} onSuccess={() => { setTab('listings'); init() }} />}
 
+        {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
-          <div>
-            <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: rejectedOrders.length > 0 ? 20 : 0 }}>
-              {activeOrders.length === 0 ? (
-                <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No orders yet.</p>
-              ) : activeOrders.map(o => {
-                const myItems     = o.myItems || []
-                const isMultiItem = myItems.length > 0
-                const title       = isMultiItem ? myItems.map((i: any) => i.artworks?.title).join(', ') : o.artworks?.title
-                const sizeLabel   = isMultiItem ? myItems.map((i: any) => i.print_size).join(', ') : o.print_size
-                return (
-                  <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 500 }}>{title} — {sizeLabel}</p>
-                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                        {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
-                      </p>
-                      <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
-                      {o.status === 'approved' && (
-                        <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11, display: 'block' }} onClick={() => setSelectedOrder(o)}>
-                          View invoice
-                        </button>
-                      )}
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <span className={'badge badge-' + o.status}>{o.status}</span>
-                      <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(o.artist_earnings)}</p>
-                      {isMultiItem && (
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          {myItems.length} item{myItems.length !== 1 ? 's' : ''}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {rejectedOrders.length > 0 && (
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 500, color: '#A32D2D', marginBottom: 10 }}>
-                  Rejected orders
-                  <span style={{ fontWeight: 400, color: '#A32D2D', fontSize: 12, marginLeft: 6 }}>· payment could not be verified</span>
-                </p>
-                <div style={{ border: '0.5px solid #F09595', borderRadius: 12, overflow: 'hidden' }}>
-                  {rejectedOrders.map(o => {
-                    const myItems     = o.myItems || []
-                    const isMultiItem = myItems.length > 0
-                    const title       = isMultiItem ? myItems.map((i: any) => i.artworks?.title).join(', ') : o.artworks?.title
-                    const sizeLabel   = isMultiItem ? myItems.map((i: any) => i.print_size).join(', ') : o.print_size
-                    return (
-                      <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid #F09595', background: '#FCEBEB', gap: 12 }}>
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D' }}>{title} — {sizeLabel}</p>
-                          <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 2, opacity: 0.7 }}>
-                            {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
-                          </p>
-                          <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
-                          <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 6, lineHeight: 1.5 }}>
-                            Payment could not be verified. Contact{' '}
-                            <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a>
-                            {' '}if you think this is a mistake.
-                          </p>
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <span className="badge badge-rejected">rejected</span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <ArtistOrdersTab
+            activeOrders={activeOrders}
+            rejectedOrders={rejectedOrders}
+            onViewInvoice={setSelectedOrder}
+          />
         )}
 
         {tab === 'payouts' && (
@@ -373,13 +244,227 @@ export default function ArtistDashboard() {
           />
         )}
 
-        {tab === 'export' && <ExportTab onExport={handleExport} orders={orders} />}
-        {tab === 'profile' && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
+        {tab === 'export'   && <ExportTab onExport={handleExport} orders={orders} />}
+        {tab === 'profile'  && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
         {tab === 'settings' && <SettingsTab profile={profile} onProfileUpdate={(updates: any) => setProfile({ ...profile, ...updates })} />}
       </div>
 
       {selectedOrder  && <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />}
       {selectedPayout && <RemittanceModal payout={selectedPayout} profile={profile} onClose={() => setSelectedPayout(null)} />}
+    </div>
+  )
+}
+
+// ── Artist listings tab with pagination ───────────────────────────────────
+function ArtistListingsTab({ artworks, editingArtwork, deleteConfirmId, setEditingArtwork, setDeleteConfirmId, onToggleHide, onDelete, onSaveEdit }: any) {
+  const [search, setSearch] = useState('')
+
+  const filtered = artworks.filter((a: any) =>
+    !search ||
+    a.title?.toLowerCase().includes(search.toLowerCase()) ||
+    a.sku?.toLowerCase().includes(search.toLowerCase()) ||
+    a.category?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(filtered, PAGE_SIZES.listings)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        <input
+          className="form-input"
+          placeholder="Search listings..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, fontSize: 13 }}
+        />
+        {search && (
+          <button className="btn btn-sm" onClick={() => setSearch('')}>Clear ×</button>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {paginated.length === 0 ? (
+          <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>
+            {filtered.length === 0 && artworks.length > 0 ? 'No listings match your search.' : 'No listings yet. Upload your first artwork!'}
+          </p>
+        ) : paginated.map((a: any) => {
+          const platformFee = Math.round(a.price * PLATFORM_FEE / 100)
+          const artistEarns = a.price - platformFee
+          const isEditing   = editingArtwork?.id === a.id
+          const isDeleting  = deleteConfirmId === a.id
+          const remaining   = a.edition_size ? a.edition_size - (a.editions_sold || 0) : null
+          return (
+            <div key={a.id} style={{ borderBottom: '0.5px solid var(--color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px' }}>
+                {a.preview_url && (
+                  <img src={a.preview_url} alt={a.title} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0, opacity: a.status === 'hidden' ? 0.4 : 1 }} />
+                )}
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span className="sku-tag">{a.sku}</span>
+                    <span className={'badge badge-' + a.status}>{a.status}</span>
+                    {a.category && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{a.category}</span>}
+                    {a.offer_label && <span className="offer-tag">{a.offer_label} {a.offer_pct}% off</span>}
+                    {a.paper_type && a.paper_type !== DEFAULT_PAPER && (
+                      <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>{a.paper_type}</span>
+                    )}
+                    {a.edition_size && (
+                      <span style={{ fontSize: 10, background: remaining === 0 ? '#FCEBEB' : '#f0f0ec', color: remaining === 0 ? '#A32D2D' : 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 20 }}>
+                        {remaining === 0 ? 'Sold out' : remaining + ' of ' + a.edition_size + ' left'}
+                      </span>
+                    )}
+                  </div>
+                  {a.painting_by && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Painting by {a.painting_by}</p>}
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(artistEarns)}</p>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>your earnings</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, padding: '0 20px 14px', flexWrap: 'wrap' }}>
+                <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setEditingArtwork(isEditing ? null : a)}>
+                  {isEditing ? 'Cancel edit' : 'Edit'}
+                </button>
+                {a.status !== 'pending' && (
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: 11, background: a.status === 'hidden' ? 'var(--color-teal-light)' : 'var(--color-background-secondary)', color: a.status === 'hidden' ? 'var(--color-teal-dark)' : 'var(--color-text-muted)', border: 'none' }}
+                    onClick={() => onToggleHide(a)}
+                  >
+                    {a.status === 'hidden' ? 'Show listing' : 'Hide listing'}
+                  </button>
+                )}
+                <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => setDeleteConfirmId(isDeleting ? null : a.id)}>
+                  Delete
+                </button>
+              </div>
+              {isDeleting && (
+                <div style={{ padding: '0 20px 14px' }}>
+                  <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                    <p style={{ fontSize: 13, color: '#A32D2D' }}>Permanently delete this listing? This cannot be undone.</p>
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setDeleteConfirmId(null)}>Cancel</button>
+                      <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => onDelete(a.id)}>Yes, delete</button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {isEditing && (
+                <EditArtworkForm artwork={a} onSave={updates => onSaveEdit(a.id, updates)} onCancel={() => setEditingArtwork(null)} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <Pagination page={page} totalPages={totalPages} total={total} startIndex={startIndex} endIndex={endIndex} onPage={setPage} />
+    </div>
+  )
+}
+
+// ── Artist orders tab with pagination ─────────────────────────────────────
+function ArtistOrdersTab({ activeOrders, rejectedOrders, onViewInvoice }: any) {
+  const [search, setSearch] = useState('')
+
+  const filteredActive = activeOrders.filter((o: any) =>
+    !search ||
+    o.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
+    o.order_sku?.toLowerCase().includes(search.toLowerCase()) ||
+    o.myItems?.some((i: any) => i.artworks?.title?.toLowerCase().includes(search.toLowerCase()))
+  )
+
+  const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(filteredActive, PAGE_SIZES.orders)
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        <input
+          className="form-input"
+          placeholder="Search invoice, SKU, artwork..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, fontSize: 13 }}
+        />
+        {search && <button className="btn btn-sm" onClick={() => setSearch('')}>Clear ×</button>}
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: rejectedOrders.length > 0 ? 20 : 0 }}>
+        {paginated.length === 0 ? (
+          <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>
+            {filteredActive.length === 0 && activeOrders.length > 0 ? 'No orders match your search.' : 'No orders yet.'}
+          </p>
+        ) : paginated.map((o: any) => {
+          const myItems     = o.myItems || []
+          const isMultiItem = myItems.length > 0
+          const title       = isMultiItem ? myItems.map((i: any) => i.artworks?.title).join(', ') : o.artworks?.title
+          const sizeLabel   = isMultiItem ? myItems.map((i: any) => i.print_size).join(', ') : o.print_size
+          return (
+            <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 500 }}>{title} — {sizeLabel}</p>
+                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                  {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
+                </p>
+                <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                {o.status === 'approved' && (
+                  <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11, display: 'block' }} onClick={() => onViewInvoice(o)}>
+                    View invoice
+                  </button>
+                )}
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <span className={'badge badge-' + o.status}>{o.status}</span>
+                <p style={{ fontSize: 13, fontWeight: 500, marginTop: 4 }}>{formatMVR(o.artist_earnings)}</p>
+                {isMultiItem && (
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                    {myItems.length} item{myItems.length !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <Pagination page={page} totalPages={totalPages} total={total} startIndex={startIndex} endIndex={endIndex} onPage={setPage} />
+
+      {rejectedOrders.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, color: '#A32D2D', marginBottom: 10 }}>
+            Rejected orders
+            <span style={{ fontWeight: 400, color: '#A32D2D', fontSize: 12, marginLeft: 6 }}>· payment could not be verified</span>
+          </p>
+          <div style={{ border: '0.5px solid #F09595', borderRadius: 12, overflow: 'hidden' }}>
+            {rejectedOrders.map((o: any) => {
+              const myItems     = o.myItems || []
+              const isMultiItem = myItems.length > 0
+              const title       = isMultiItem ? myItems.map((i: any) => i.artworks?.title).join(', ') : o.artworks?.title
+              const sizeLabel   = isMultiItem ? myItems.map((i: any) => i.print_size).join(', ') : o.print_size
+              return (
+                <div key={o.id} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid #F09595', background: '#FCEBEB', gap: 12 }}>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D' }}>{title} — {sizeLabel}</p>
+                    <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 2, opacity: 0.7 }}>
+                      {o.invoice_number} · {new Date(o.created_at).toLocaleDateString()}
+                    </p>
+                    <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{o.order_sku}</span>
+                    <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 6, lineHeight: 1.5 }}>
+                      Payment could not be verified. Contact{' '}
+                      <a href="mailto:hello@fineprintmv.com" style={{ color: '#A32D2D' }}>hello@fineprintmv.com</a>
+                      {' '}if you think this is a mistake.
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <span className="badge badge-rejected">rejected</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -547,15 +632,12 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
   return (
     <div style={{ padding: '0 20px 20px', borderTop: '0.5px solid var(--color-border)', background: 'var(--color-background-secondary)' }}>
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
-
       <div style={{ maxWidth: 520 }}>
 
         {/* ── IMAGES ── */}
         <div className="form-group">
           <label className="form-label">Images</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px', gap: 10, marginBottom: 6 }}>
-
-            {/* Big left */}
             <div
               onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
               style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
@@ -579,8 +661,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
               )}
               <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
             </div>
-
-            {/* 3 stacked right */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[0, 1, 2].map(i => {
                 const existingImg = visibleGallery[i]
@@ -645,7 +725,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
-        {/* ── DETAILS ── */}
+        {/* Details */}
         <div className="form-group">
           <label className="form-label">Title</label>
           <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
@@ -682,12 +762,11 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
-        {/* ── PAPER TYPE ── */}
+        {/* Paper type */}
         <div style={{ marginBottom: 6 }}>
           <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>Paper type</p>
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>All prints use Hahnemühle archival papers. Upgrade for a premium feel.</p>
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
           {Object.entries(papersByCategory).map(([category, papers]) => (
             <div key={category}>
@@ -722,7 +801,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
             </div>
           ))}
         </div>
-
         {selectedPaper && (selectedPaper.addOn['A4'] > 0 || selectedPaper.addOn['A3'] > 0) && (
           <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
             <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
@@ -733,21 +811,17 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
-        {/* ── LIMITED EDITION ── */}
+        {/* Limited edition */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
               <p style={{ fontSize: 13, fontWeight: 500 }}>Limited edition</p>
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Cap how many prints can be sold.</p>
             </div>
-            <div
-              onClick={() => setIsLimited(v => !v)}
-              style={{ width: 44, height: 26, borderRadius: 13, background: isLimited ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
-            >
+            <div onClick={() => setIsLimited(v => !v)} style={{ width: 44, height: 26, borderRadius: 13, background: isLimited ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 3, left: isLimited ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </div>
           </div>
-
           {isLimited && (
             <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px' }}>
               {artwork.edition_size && (
@@ -759,15 +833,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
               )}
               <label className="form-label" style={{ marginBottom: 6 }}>Edition size</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <input
-                  className="form-input"
-                  type="number"
-                  min={artwork.editions_sold || 1}
-                  max="999"
-                  value={editionSize}
-                  onChange={e => setEditionSize(e.target.value)}
-                  style={{ maxWidth: 100 }}
-                />
+                <input className="form-input" type="number" min={artwork.editions_sold || 1} max="999" value={editionSize} onChange={e => setEditionSize(e.target.value)} style={{ maxWidth: 100 }} />
                 <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>prints</span>
               </div>
               {artwork.editions_sold > 0 && (
@@ -785,7 +851,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
           </button>
           <button className="btn btn-sm" style={{ fontSize: 12 }} onClick={onCancel} disabled={saving}>Cancel</button>
         </div>
-
       </div>
     </div>
   )
