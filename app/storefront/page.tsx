@@ -8,27 +8,29 @@ import Footer from '@/app/components/Footer'
 import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 
 interface Artwork {
-  id: number
-  sku: string
-  title: string
-  price: number
-  preview_url: string
-  sizes: string[]
-  offer_label: string | null
-  offer_pct: number | null
-  category: string | null
-  painting_by: string | null
-  artist_id: string
-  created_at: string
-  profiles: { full_name: string; artist_code: string; avatar_url: string | null; display_name: string | null; shop_status: string | null }
+  id:            number
+  sku:           string
+  title:         string
+  price:         number
+  preview_url:   string
+  sizes:         string[]
+  offer_label:   string | null
+  offer_pct:     number | null
+  category:      string | null
+  painting_by:   string | null
+  artist_id:     string
+  created_at:    string
+  edition_size:  number | null
+  editions_sold: number | null
+  profiles:      { full_name: string; artist_code: string; avatar_url: string | null; display_name: string | null; shop_status: string | null }
 }
 
 interface Artist {
-  id: string
-  full_name: string
+  id:           string
+  full_name:    string
   display_name: string | null
-  artist_code: string
-  avatar_url: string | null
+  artist_code:  string
+  avatar_url:   string | null
   avatar_config?: any
 }
 
@@ -54,6 +56,22 @@ function StarIcon() {
       <polygon points="8,1 10,6 15,6 11,9.5 12.5,15 8,12 3.5,15 5,9.5 1,6 6,6" />
     </svg>
   )
+}
+
+function EditionBadge({ artwork, small = false }: { artwork: Artwork; small?: boolean }) {
+  const remaining = artwork.edition_size ? artwork.edition_size - (artwork.editions_sold || 0) : null
+  if (remaining === null) return null
+  if (remaining === 0) return (
+    <div style={{ position: 'absolute', bottom: small ? 6 : 8, left: small ? 6 : 8, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: small ? 9 : 10, padding: '2px 7px', borderRadius: 20, pointerEvents: 'none' }}>
+      Sold out
+    </div>
+  )
+  if (remaining <= 10) return (
+    <div style={{ position: 'absolute', bottom: small ? 6 : 8, left: small ? 6 : 8, background: '#FAEEDA', color: '#633806', fontSize: small ? 9 : 10, padding: '2px 7px', borderRadius: 20, pointerEvents: 'none', border: '0.5px solid #EF9F27' }}>
+      {remaining} left
+    </div>
+  )
+  return null
 }
 
 export default function StorefrontPage() {
@@ -91,7 +109,7 @@ export default function StorefrontPage() {
     ])
 
     const allArtworks      = (artRes.data || []) as any
-    const filteredArtworks = allArtworks.filter((a: any) => a.profiles?.shop_status !== 'closed')
+    const filteredArtworks = allArtworks.filter((a: any) => !a.profiles || a.profiles?.shop_status !== 'closed')
     setArtworks(filteredArtworks)
     setArtists(artistRes.data || [])
 
@@ -209,14 +227,7 @@ export default function StorefrontPage() {
                     key={artist.id}
                     href={'/artist/' + artist.artist_code}
                     title={name}
-                    style={{
-                      width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                      overflow: 'hidden', cursor: 'pointer', display: 'flex',
-                      alignItems: 'center', justifyContent: 'center',
-                      border: '2px solid var(--color-border)',
-                      transition: 'transform 0.18s ease',
-                      textDecoration: 'none',
-                    }}
+                    style={{ width: 48, height: 48, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-border)', transition: 'transform 0.18s ease', textDecoration: 'none' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1.12)' }}
                     onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = 'scale(1)' }}
                   >
@@ -247,11 +258,7 @@ export default function StorefrontPage() {
                   ))}
                 </div>
                 <div className="fp-mobile-only" style={{ display: 'none' }}>
-                  <div className="mobile-swipe" style={{
-                    display: 'flex', gap: 12,
-                    overflowX: 'auto', scrollSnapType: 'x mandatory',
-                    WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none',
-                  }}>
+                  <div className="mobile-swipe" style={{ display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none' }}>
                     {recentSix.map(artwork => (
                       <div key={artwork.id} style={{ flex: '0 0 calc(100vw - 48px)', scrollSnapAlign: 'start' }}>
                         <ArtworkCard43 artwork={artwork} isNew={false} isTopSeller={topSellerIds.has(artwork.id)} />
@@ -275,24 +282,12 @@ export default function StorefrontPage() {
               </h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {(search || activeCategory !== 'All') && (
-                  <button
-                    onClick={() => { setSearch(''); setActiveCategory('All') }}
-                    style={{ fontSize: 12, color: '#1D9E75', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                  >
+                  <button onClick={() => { setSearch(''); setActiveCategory('All') }} style={{ fontSize: 12, color: '#1D9E75', background: 'none', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     Clear ×
                   </button>
                 )}
-                <select
-                  value={sort}
-                  onChange={e => setSort(e.target.value as SortOption)}
-                  style={{
-                    fontSize: 12, padding: '5px 10px', borderRadius: 20,
-                    border: '0.5px solid var(--color-border)',
-                    background: 'transparent', color: 'var(--color-text)',
-                    cursor: 'pointer', outline: 'none',
-                    fontFamily: 'var(--font-body)',
-                  }}
-                >
+                <select value={sort} onChange={e => setSort(e.target.value as SortOption)}
+                  style={{ fontSize: 12, padding: '5px 10px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', outline: 'none', fontFamily: 'var(--font-body)' }}>
                   {Object.entries(SORT_LABELS).map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
@@ -301,9 +296,7 @@ export default function StorefrontPage() {
             </div>
 
             {sorted.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-muted)', fontSize: 14 }}>
-                No artworks found.
-              </div>
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--color-text-muted)', fontSize: 14 }}>No artworks found.</div>
             ) : (
               <>
                 <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
@@ -316,9 +309,7 @@ export default function StorefrontPage() {
                     <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
                   ))}
                 </div>
-                {totalPages > 1 && (
-                  <Pagination page={page} totalPages={totalPages} onPage={handlePage} />
-                )}
+                {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPage={handlePage} />}
               </>
             )}
           </>
@@ -360,17 +351,7 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
         p === '...' ? (
           <span key={`ellipsis-${i}`} style={{ minWidth: 36, textAlign: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>…</span>
         ) : (
-          <button
-            key={p}
-            onClick={() => onPage(p as number)}
-            style={{
-              ...btnBase,
-              background:   page === p ? '#1a1a1a' : 'transparent',
-              color:        page === p ? '#fff' : 'var(--color-text)',
-              borderColor:  page === p ? '#1a1a1a' : 'var(--color-border)',
-              fontWeight:   page === p ? 500 : 400,
-            }}
-          >
+          <button key={p} onClick={() => onPage(p as number)} style={{ ...btnBase, background: page === p ? '#1a1a1a' : 'transparent', color: page === p ? '#fff' : 'var(--color-text)', borderColor: page === p ? '#1a1a1a' : 'var(--color-border)', fontWeight: page === p ? 500 : 400 }}>
             {p}
           </button>
         )
@@ -417,6 +398,7 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
               {artwork.category}
             </div>
           )}
+          <EditionBadge artwork={artwork} />
         </div>
         <div style={{ padding: '12px 14px 14px' }}>
           <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 2, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
@@ -463,6 +445,7 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
               <StarIcon />Top
             </div>
           )}
+          <EditionBadge artwork={artwork} small />
         </div>
         <div style={{ padding: '9px 10px 10px' }}>
           <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 1, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
