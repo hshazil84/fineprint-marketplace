@@ -21,9 +21,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     const description = a.description
       ? a.description.slice(0, 155)
       : 'Giclee art print on Hahnemuhle archival paper. Order online and receive anywhere in the Maldives.'
-    const siteUrl = 'https://shop.fineprintmv.com'
-    const pageUrl     = siteUrl + '/artwork/' + params.id
-    const ogImageUrl  = siteUrl + '/artwork/' + params.id + '/opengraph-image'
+    const pageUrl = 'https://shop.fineprintmv.com/artwork/' + params.id
 
     return {
       title,
@@ -34,26 +32,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
         url:      pageUrl,
         siteName: 'FinePrint Studio',
         type:     'website',
-        images: [
-          {
-            url:    a.preview_url,
-            width:  1200,
-            height: 630,
-            alt:    a.title + ' by ' + artistName,
-          },
-          {
-            url:    ogImageUrl,
-            width:  1200,
-            height: 630,
-            alt:    a.title + ' by ' + artistName + ' — FinePrint Studio',
-          },
-        ],
+        images:   a.preview_url ? [{
+          url:    a.preview_url,
+          width:  1200,
+          height: 630,
+          alt:    a.title + ' by ' + artistName,
+        }] : [],
       },
       twitter: {
         card:        'summary_large_image',
         title,
         description,
-        images: [a.preview_url],
+        images:      a.preview_url ? [a.preview_url] : [],
       },
     }
   } catch {
