@@ -7,16 +7,23 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   try {
     const res = await fetch(
       url + '/rest/v1/artworks?id=eq.' + params.id + '&select=title,price,preview_url,description,sku,profiles:artist_id(full_name,display_name)&limit=1',
-      { headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }, cache: 'no-store' }
+      {
+        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key },
+        cache: 'no-store',
+      }
     )
     const rows = await res.json()
     const a    = rows?.[0]
     if (!a) return { title: 'FinePrint Studio' }
 
-    const artistName = a.profiles?.display_name || a.profiles?.full_name || ''
-    const title      = a.title + ' by ' + artistName + ' — FinePrint Studio'
-    const description = (a.description || 'Giclée art print on Hahnemühle archival paper.').slice(0, 155)
-    const imageUrl   = process.env.NEXT_PUBLIC_SITE_URL + '/artwork/' + params.id + '/opengraph-image'
+    const artistName  = a.profiles?.display_name || a.profiles?.full_name || ''
+    const title       = a.title + ' by ' + artistName + ' — FinePrint Studio'
+    const description = a.description
+      ? a.description.slice(0, 155)
+      : 'Giclee art print on Hahnemuhle archival paper. Order online and receive anywhere in the Maldives.'
+    const siteUrl     = process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.fineprintmv.com'
+    const pageUrl     = siteUrl + '/artwork/' + params.id
+    const ogImageUrl  = siteUrl + '/artwork/' + params.id + '/opengraph-image'
 
     return {
       title,
@@ -24,16 +31,29 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       openGraph: {
         title,
         description,
-        url:    process.env.NEXT_PUBLIC_SITE_URL + '/artwork/' + params.id,
-        images: [{ url: imageUrl, width: 1200, height: 630, alt: a.title }],
-        type:   'website',
+        url:      pageUrl,
         siteName: 'FinePrint Studio',
+        type:     'website',
+        images: [
+          {
+            url:    a.preview_url,
+            width:  1200,
+            height: 630,
+            alt:    a.title + ' by ' + artistName,
+          },
+          {
+            url:    ogImageUrl,
+            width:  1200,
+            height: 630,
+            alt:    a.title + ' by ' + artistName + ' — FinePrint Studio',
+          },
+        ],
       },
       twitter: {
         card:        'summary_large_image',
         title,
         description,
-        images:      [imageUrl],
+        images: [a.preview_url],
       },
     }
   } catch {
