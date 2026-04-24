@@ -4,6 +4,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
+import { usePagination, PAGE_SIZES } from '@/lib/pagination'
+import { Pagination } from '@/app/components/Pagination'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 import { SlipModal } from '@/app/admin/components/SlipModal'
@@ -16,7 +18,7 @@ const TABS = ['orders', 'artists', 'listings', 'offers', 'customers', 'export']
 const ORDER_STATUSES = ['pending', 'approved', 'printing', 'ready', 'completed', 'rejected']
 
 function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }: any) {
-  const [updating, setUpdating] = useState(false)
+  const [updating, setUpdating]   = useState(false)
   const [sendEmail, setSendEmail] = useState(true)
   const artistDisplay = order.artworks?.profiles?.display_name || order.artworks?.profiles?.full_name
 
@@ -24,7 +26,7 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }
     if (newStatus === order.status) return
     setUpdating(true)
     const shouldSendEmail = sendEmail && newStatus === 'ready'
-    const res = await fetch('/api/orders/status', {
+    const res  = await fetch('/api/orders/status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ invoiceNumber: order.invoice_number, status: newStatus, sendEmail: shouldSendEmail }),
@@ -208,6 +210,13 @@ function AdminDashboard() {
   const [invoiceOrder, setInvoiceOrder]     = useState<any>(null)
   const [remittancePayout, setRemittancePayout] = useState<any>(null)
   const [notifyingId, setNotifyingId]       = useState<number | null>(null)
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+  const [orderSearch, setOrderSearch]       = useState('')
+  const [orderStatus, setOrderStatus]       = useState('all')
+  const [listingSearch, setListingSearch]   = useState('')
+  const [listingStatus, setListingStatus]   = useState('all')
+
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -261,15 +270,13 @@ function AdminDashboard() {
       .is('notified_at', null)
     if (data) {
       const counts: Record<number, number> = {}
-      data.forEach((w: any) => {
-        counts[w.artwork_id] = (counts[w.artwork_id] || 0) + 1
-      })
+      data.forEach((w: any) => { counts[w.artwork_id] = (counts[w.artwork_id] || 0) + 1 })
       setWaitlistCounts(counts)
     }
   }
 
   async function handleOrderAction(invoiceNumber: string, action: 'approve' | 'reject') {
-    const res = await fetch('/api/orders/approve', {
+    const res  = await fetch('/api/orders/approve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ invoiceNumber, action }),
@@ -291,11 +298,8 @@ function AdminDashboard() {
 
   async function downloadHires(hiresPath: string) {
     const { data } = await supabase.storage.from('artwork-hires').createSignedUrl(hiresPath, 60)
-    if (data?.signedUrl) {
-      window.open(data.signedUrl, '_blank')
-    } else {
-      toast.error('Could not generate download link')
-    }
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    else toast.error('Could not generate download link')
   }
 
   async function handleExport(from: string, to: string, artist: string) {
@@ -324,18 +328,38 @@ function AdminDashboard() {
     }
   }
 
-  if (loading) {
-    return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
-  }
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
 
-  const pendingOrders  = orders.filter(o => o.status === 'pending')
-  const pendingPayouts = payouts.filter(p => p.status === 'pending')
-  const paidPayouts    = payouts.filter(p => p.status === 'paid')
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const pendingOrders    = orders.filter(o => o.status === 'pending')
+  const pendingPayouts   = payouts.filter(p => p.status === 'pending')
+  const paidPayouts      = payouts.filter(p => p.status === 'paid')
   const withdrawRequests = artists.filter(a => a.withdraw_requested)
-  const closedShops    = artists.filter(a => a.shop_status === 'closed')
-  const aprRevenue     = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.original_price, 0)
-  const aprComm        = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
-  const totalWaiting   = Object.values(waitlistCounts).reduce((s, c) => s + c, 0)
+  const closedShops      = artists.filter(a => a.shop_status === 'closed')
+  const aprRevenue       = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.original_price, 0)
+  const aprComm          = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
+  const totalWaiting     = Object.values(waitlistCounts).reduce((s, c) => s + c, 0)
+
+  // ── Filtered lists for pagination ─────────────────────────────────────────
+  const filteredOrders = orders.filter(o => {
+    const matchSearch = !orderSearch ||
+      o.invoice_number?.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      o.buyer_name?.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      o.artworks?.title?.toLowerCase().includes(orderSearch.toLowerCase()) ||
+      o.order_sku?.toLowerCase().includes(orderSearch.toLowerCase())
+    const matchStatus = orderStatus === 'all' || o.status === orderStatus
+    return matchSearch && matchStatus
+  })
+
+  const filteredArtworks = artworks.filter(a => {
+    const matchSearch = !listingSearch ||
+      a.title?.toLowerCase().includes(listingSearch.toLowerCase()) ||
+      a.sku?.toLowerCase().includes(listingSearch.toLowerCase()) ||
+      a.profiles?.full_name?.toLowerCase().includes(listingSearch.toLowerCase()) ||
+      a.profiles?.display_name?.toLowerCase().includes(listingSearch.toLowerCase())
+    const matchStatus = listingStatus === 'all' || a.status === listingStatus
+    return matchSearch && matchStatus
+  })
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
@@ -371,13 +395,11 @@ function AdminDashboard() {
             {withdrawRequests.length} artist{withdrawRequests.length > 1 ? 's have' : ' has'} requested to withdraw. Check the Artists tab.
           </div>
         )}
-
         {closedShops.length > 0 && (
           <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#633806' }}>
             {closedShops.length} artist{closedShops.length > 1 ? 's have' : ' has'} temporarily closed their shop.
           </div>
         )}
-
         {totalWaiting > 0 && (
           <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56' }}>
             {totalWaiting} buyer{totalWaiting !== 1 ? 's' : ''} waiting on sold-out artworks. Check the Listings tab to notify them.
@@ -389,50 +411,42 @@ function AdminDashboard() {
             <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
               {t === 'orders' && pendingOrders.length > 0 && (
-                <span style={{ marginLeft: 6, background: 'var(--color-red)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
-                  {pendingOrders.length}
-                </span>
+                <span style={{ marginLeft: 6, background: 'var(--color-red)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{pendingOrders.length}</span>
               )}
               {t === 'artists' && pendingPayouts.length > 0 && (
-                <span style={{ marginLeft: 6, background: 'var(--color-teal)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
-                  {pendingPayouts.length}
-                </span>
+                <span style={{ marginLeft: 6, background: 'var(--color-teal)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{pendingPayouts.length}</span>
               )}
               {t === 'listings' && totalWaiting > 0 && (
-                <span style={{ marginLeft: 6, background: '#1D9E75', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
-                  {totalWaiting}
-                </span>
+                <span style={{ marginLeft: 6, background: '#1D9E75', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{totalWaiting}</span>
               )}
             </button>
           ))}
         </div>
 
+        {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {orders.length === 0 ? (
-              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No orders yet.</p>
-            ) : orders.map(o => (
-              <OrderRow
-                key={o.id}
-                order={o}
-                onAction={handleOrderAction}
-                onStatusChange={fetchOrders}
-                onViewInvoice={() => setInvoiceOrder(o)}
-                onViewSlip={() => setSelectedOrder(o)}
-              />
-            ))}
-          </div>
+          <OrdersTab
+            orders={filteredOrders}
+            allOrders={orders}
+            orderSearch={orderSearch}
+            setOrderSearch={setOrderSearch}
+            orderStatus={orderStatus}
+            setOrderStatus={setOrderStatus}
+            onAction={handleOrderAction}
+            onStatusChange={fetchOrders}
+            onViewInvoice={setInvoiceOrder}
+            onViewSlip={setSelectedOrder}
+          />
         )}
 
+        {/* ── ARTISTS TAB ── */}
         {tab === 'artists' && (
           <div>
             {pendingPayouts.length > 0 && (
               <div style={{ marginBottom: 24 }}>
                 <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
                   Pending payout requests
-                  <span style={{ marginLeft: 8, background: 'var(--color-teal)', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>
-                    {pendingPayouts.length}
-                  </span>
+                  <span style={{ marginLeft: 8, background: 'var(--color-teal)', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>{pendingPayouts.length}</span>
                 </p>
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {pendingPayouts.map(p => (
@@ -507,22 +521,18 @@ function AdminDashboard() {
               {artists.length === 0 ? (
                 <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No artists yet.</p>
               ) : artists.map(a => {
-                const artistOrders    = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
+                const artistOrders     = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
                 const artistPayoutsArr = payouts.filter(p => p.artist_id === a.id && p.status === 'paid')
-                const totalEarned     = artistOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
-                const totalPaid       = artistPayoutsArr.reduce((s: number, p: any) => s + p.amount, 0)
-                const artworkCount    = artworks.filter(w => w.artist_id === a.id).length
+                const totalEarned      = artistOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+                const totalPaid        = artistPayoutsArr.reduce((s: number, p: any) => s + p.amount, 0)
+                const artworkCount     = artworks.filter(w => w.artist_id === a.id).length
                 return (
                   <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{a.display_name || a.full_name}</p>
-                        {a.shop_status === 'closed' && (
-                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>
-                        )}
-                        {a.withdraw_requested && (
-                          <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
-                        )}
+                        {a.shop_status === 'closed' && <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>}
+                        {a.withdraw_requested && <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>}
                       </div>
                       <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
                         FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales
@@ -539,78 +549,27 @@ function AdminDashboard() {
           </div>
         )}
 
+        {/* ── LISTINGS TAB ── */}
         {tab === 'listings' && (
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {artworks.length === 0 ? (
-              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No listings yet.</p>
-            ) : artworks.map(a => {
-              const waitCount = waitlistCounts[a.id] || 0
-              const remaining = a.edition_size ? a.edition_size - (a.editions_sold || 0) : null
-              const isSoldOut = remaining === 0
-              return (
-                <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                  {a.preview_url && (
-                    <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
-                  )}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                      <span className="sku-tag">{a.sku}</span>
-                      <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
-                      <span className={'badge badge-' + a.status}>{a.status}</span>
-                      {a.edition_size && (
-                        <span style={{ fontSize: 10, background: isSoldOut ? '#FCEBEB' : '#f0f0ec', color: isSoldOut ? '#A32D2D' : 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 20 }}>
-                          {isSoldOut ? 'Sold out' : remaining + ' of ' + a.edition_size + ' left'}
-                        </span>
-                      )}
-                      {a.paper_type && a.paper_type !== 'Photo Luster' && (
-                        <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>
-                          {a.paper_type}
-                        </span>
-                      )}
-                    </div>
-                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                      by {a.profiles?.display_name || a.profiles?.full_name} · {formatMVR(a.price)}
-                      {a.offer_label ? ' · ' + a.offer_label + ' ' + a.offer_pct + '% off' : ''}
-                    </p>
-                    {waitCount > 0 && (
-                      <p style={{ fontSize: 11, color: '#1D9E75', marginTop: 4 }}>
-                        {waitCount} buyer{waitCount !== 1 ? 's' : ''} on waitlist
-                      </p>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexDirection: 'column' }}>
-                    {a.hires_path && (
-                      <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>Hi-res</button>
-                    )}
-                    {a.status === 'pending' && (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
-                        <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
-                      </div>
-                    )}
-                    {waitCount > 0 && (
-                      <button
-                        className="btn btn-sm"
-                        style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', border: 'none', whiteSpace: 'nowrap' }}
-                        onClick={() => handleNotifyWaitlist(a.id, a.title)}
-                        disabled={notifyingId === a.id}
-                      >
-                        {notifyingId === a.id ? 'Notifying...' : 'Notify ' + waitCount}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <ListingsTab
+            artworks={filteredArtworks}
+            allArtworks={artworks}
+            listingSearch={listingSearch}
+            setListingSearch={setListingSearch}
+            listingStatus={listingStatus}
+            setListingStatus={setListingStatus}
+            waitlistCounts={waitlistCounts}
+            notifyingId={notifyingId}
+            onArtworkAction={handleArtworkAction}
+            onDownloadHires={downloadHires}
+            onNotifyWaitlist={handleNotifyWaitlist}
+          />
         )}
 
         {tab === 'offers' && (
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: 'rgba(0,0,0,0.02)' }}>
-              <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-                Your commission is always based on the original price regardless of artist discounts.
-              </p>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Your commission is always based on the original price regardless of artist discounts.</p>
             </div>
             {artworks.filter(a => a.offer_pct).length === 0 ? (
               <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No active offers.</p>
@@ -629,13 +588,160 @@ function AdminDashboard() {
         )}
 
         {tab === 'customers' && <CustomersTab />}
-        {tab === 'export' && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
+        {tab === 'export'    && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
       </div>
 
       {selectedOrder    && <SlipModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }} />}
       {selectedPayout   && <PayoutModal payout={selectedPayout} onClose={() => setSelectedPayout(null)} onPaid={() => { fetchPayouts(); fetchOrders() }} />}
       {invoiceOrder     && <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
       {remittancePayout && <RemittanceModal payout={remittancePayout} onClose={() => setRemittancePayout(null)} />}
+    </div>
+  )
+}
+
+// ── Orders tab with pagination + search + filter ──────────────────────────
+function OrdersTab({ orders, allOrders, orderSearch, setOrderSearch, orderStatus, setOrderStatus, onAction, onStatusChange, onViewInvoice, onViewSlip }: any) {
+  const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(orders, PAGE_SIZES.orders)
+
+  return (
+    <div>
+      {/* Search + filter bar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <input
+          className="form-input"
+          placeholder="Search invoice, buyer, artwork..."
+          value={orderSearch}
+          onChange={e => setOrderSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 200, fontSize: 13 }}
+        />
+        <select
+          className="form-input"
+          value={orderStatus}
+          onChange={e => setOrderStatus(e.target.value)}
+          style={{ fontSize: 13, maxWidth: 150 }}
+        >
+          <option value="all">All statuses</option>
+          {ORDER_STATUSES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+        </select>
+        {(orderSearch || orderStatus !== 'all') && (
+          <button className="btn btn-sm" onClick={() => { setOrderSearch(''); setOrderStatus('all') }}>Clear ×</button>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {paginated.length === 0 ? (
+          <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            {orders.length === 0 && allOrders.length > 0 ? 'No orders match your search.' : 'No orders yet.'}
+          </p>
+        ) : paginated.map((o: any) => (
+          <OrderRow
+            key={o.id}
+            order={o}
+            onAction={onAction}
+            onStatusChange={onStatusChange}
+            onViewInvoice={() => onViewInvoice(o)}
+            onViewSlip={() => onViewSlip(o)}
+          />
+        ))}
+      </div>
+
+      <Pagination page={page} totalPages={totalPages} total={total} startIndex={startIndex} endIndex={endIndex} onPage={setPage} />
+    </div>
+  )
+}
+
+// ── Listings tab with pagination + search + filter ────────────────────────
+function ListingsTab({ artworks, allArtworks, listingSearch, setListingSearch, listingStatus, setListingStatus, waitlistCounts, notifyingId, onArtworkAction, onDownloadHires, onNotifyWaitlist }: any) {
+  const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(artworks, PAGE_SIZES.listings)
+
+  return (
+    <div>
+      {/* Search + filter bar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <input
+          className="form-input"
+          placeholder="Search title, SKU, artist..."
+          value={listingSearch}
+          onChange={e => setListingSearch(e.target.value)}
+          style={{ flex: 1, minWidth: 200, fontSize: 13 }}
+        />
+        <select
+          className="form-input"
+          value={listingStatus}
+          onChange={e => setListingStatus(e.target.value)}
+          style={{ fontSize: 13, maxWidth: 150 }}
+        >
+          <option value="all">All statuses</option>
+          {['pending', 'approved', 'rejected', 'hidden'].map(s => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+          ))}
+        </select>
+        {(listingSearch || listingStatus !== 'all') && (
+          <button className="btn btn-sm" onClick={() => { setListingSearch(''); setListingStatus('all') }}>Clear ×</button>
+        )}
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {paginated.length === 0 ? (
+          <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
+            {artworks.length === 0 && allArtworks.length > 0 ? 'No listings match your search.' : 'No listings yet.'}
+          </p>
+        ) : paginated.map((a: any) => {
+          const waitCount = waitlistCounts[a.id] || 0
+          const remaining = a.edition_size ? a.edition_size - (a.editions_sold || 0) : null
+          const isSoldOut = remaining === 0
+          return (
+            <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+              {a.preview_url && (
+                <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
+              )}
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                  <span className="sku-tag">{a.sku}</span>
+                  <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
+                  <span className={'badge badge-' + a.status}>{a.status}</span>
+                  {a.edition_size && (
+                    <span style={{ fontSize: 10, background: isSoldOut ? '#FCEBEB' : '#f0f0ec', color: isSoldOut ? '#A32D2D' : 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 20 }}>
+                      {isSoldOut ? 'Sold out' : remaining + ' of ' + a.edition_size + ' left'}
+                    </span>
+                  )}
+                  {a.paper_type && a.paper_type !== 'Photo Luster' && (
+                    <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>{a.paper_type}</span>
+                  )}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                  by {a.profiles?.display_name || a.profiles?.full_name} · {formatMVR(a.price)}
+                  {a.offer_label ? ' · ' + a.offer_label + ' ' + a.offer_pct + '% off' : ''}
+                </p>
+                {waitCount > 0 && (
+                  <p style={{ fontSize: 11, color: '#1D9E75', marginTop: 4 }}>{waitCount} buyer{waitCount !== 1 ? 's' : ''} on waitlist</p>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexDirection: 'column' }}>
+                {a.hires_path && <button className="btn btn-sm" onClick={() => onDownloadHires(a.hires_path)}>Hi-res</button>}
+                {a.status === 'pending' && (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button className="btn btn-sm btn-success" onClick={() => onArtworkAction(a.id, 'approved')}>Approve</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => onArtworkAction(a.id, 'rejected')}>Reject</button>
+                  </div>
+                )}
+                {waitCount > 0 && (
+                  <button
+                    className="btn btn-sm"
+                    style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', border: 'none', whiteSpace: 'nowrap' }}
+                    onClick={() => onNotifyWaitlist(a.id, a.title)}
+                    disabled={notifyingId === a.id}
+                  >
+                    {notifyingId === a.id ? 'Notifying...' : 'Notify ' + waitCount}
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <Pagination page={page} totalPages={totalPages} total={total} startIndex={startIndex} endIndex={endIndex} onPage={setPage} />
     </div>
   )
 }
