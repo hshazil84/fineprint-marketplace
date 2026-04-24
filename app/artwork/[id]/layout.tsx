@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
       : 'Giclee art print on Hahnemuhle archival paper. Order online and receive anywhere in the Maldives.'
     const siteUrl     = 'https://shop.fineprintmv.com'
     const pageUrl     = siteUrl + '/artwork/' + params.id
-    const ogImageUrl  = siteUrl + '/artwork/' + params.id + '/opengraph-image'
+    const ogImageUrl = 'https://shop.fineprintmv.com/api/og?id=' + params.id
 
     return {
       title,
