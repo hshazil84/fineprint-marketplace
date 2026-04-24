@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { formatMVR } from '@/lib/pricing'
+import { formatMVR, PRINTING_FEES, PAPER_OPTIONS, getPapersByCategory, getPaperAddOn, DEFAULT_PAPER } from '@/lib/pricing'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
@@ -17,6 +17,10 @@ import { SettingsTab } from '@/app/artist/components/SettingsTab'
 
 const PLATFORM_FEE = 5
 const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile', 'settings']
+
+function Divider() {
+  return <div style={{ height: '0.5px', background: 'var(--color-border)', margin: '20px 0' }} />
+}
 
 export default function ArtistDashboard() {
   const router = useRouter()
@@ -60,9 +64,7 @@ export default function ArtistDashboard() {
       const orderMap: Record<number, any> = {}
       for (const item of itemRows) {
         const orderId = item.order_id
-        if (!orderMap[orderId]) {
-          orderMap[orderId] = { ...item.orders, myItems: [], artist_earnings: 0 }
-        }
+        if (!orderMap[orderId]) orderMap[orderId] = { ...item.orders, myItems: [], artist_earnings: 0 }
         orderMap[orderId].myItems.push(item)
         orderMap[orderId].artist_earnings += item.artist_earnings || 0
       }
@@ -72,7 +74,7 @@ export default function ArtistDashboard() {
         .select('*, artworks!inner(title, sku, artist_id)')
         .eq('artworks.artist_id', artistId)
         .order('created_at', { ascending: false })
-      const legacyIds = new Set(merged.map((o: any) => o.id))
+      const legacyIds  = new Set(merged.map((o: any) => o.id))
       const legacyOnly = (legacyOrders || []).filter((o: any) => !legacyIds.has(o.id))
       setOrders([...merged, ...legacyOnly].sort((a: any, b: any) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -93,7 +95,7 @@ export default function ArtistDashboard() {
   }
 
   async function handleExport(from: string, to: string) {
-    const res = await fetch('/api/export?type=artist&from=' + from + '&to=' + to)
+    const res  = await fetch('/api/export?type=artist&from=' + from + '&to=' + to)
     const text = await res.text()
     downloadCSVFile(text, dateRangeFilename(from, to, 'fineprint_my_sales'))
     toast.success('CSV downloaded!')
@@ -140,10 +142,7 @@ export default function ArtistDashboard() {
             <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
               {profile?.display_name || profile?.full_name}
             </span>
-            <button
-              className="btn btn-sm"
-              onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}
-            >
+            <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>
               Log out
             </button>
           </div>
@@ -217,6 +216,7 @@ export default function ArtistDashboard() {
                 const artistEarns = a.price - platformFee
                 const isEditing   = editingArtwork?.id === a.id
                 const isDeleting  = deleteConfirmId === a.id
+                const remaining   = a.edition_size ? a.edition_size - (a.editions_sold || 0) : null
                 return (
                   <div key={a.id} style={{ borderBottom: '0.5px solid var(--color-border)' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px' }}>
@@ -230,6 +230,14 @@ export default function ArtistDashboard() {
                           <span className={'badge badge-' + a.status}>{a.status}</span>
                           {a.category && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{a.category}</span>}
                           {a.offer_label && <span className="offer-tag">{a.offer_label} {a.offer_pct}% off</span>}
+                          {a.paper_type && a.paper_type !== DEFAULT_PAPER && (
+                            <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>{a.paper_type}</span>
+                          )}
+                          {a.edition_size && (
+                            <span style={{ fontSize: 10, background: remaining === 0 ? '#FCEBEB' : '#f0f0ec', color: remaining === 0 ? '#A32D2D' : 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 20 }}>
+                              {remaining === 0 ? 'Sold out' : remaining + ' of ' + a.edition_size + ' left'}
+                            </span>
+                          )}
                         </div>
                         {a.painting_by && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Painting by {a.painting_by}</p>}
                       </div>
@@ -366,25 +374,12 @@ export default function ArtistDashboard() {
         )}
 
         {tab === 'export' && <ExportTab onExport={handleExport} orders={orders} />}
-
-        {tab === 'profile' && (
-          <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />
-        )}
-
-        {tab === 'settings' && (
-          <SettingsTab
-            profile={profile}
-            onProfileUpdate={(updates: any) => setProfile({ ...profile, ...updates })}
-          />
-        )}
+        {tab === 'profile' && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
+        {tab === 'settings' && <SettingsTab profile={profile} onProfileUpdate={(updates: any) => setProfile({ ...profile, ...updates })} />}
       </div>
 
-      {selectedOrder && (
-        <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />
-      )}
-      {selectedPayout && (
-        <RemittanceModal payout={selectedPayout} profile={profile} onClose={() => setSelectedPayout(null)} />
-      )}
+      {selectedOrder  && <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />}
+      {selectedPayout && <RemittanceModal payout={selectedPayout} profile={profile} onClose={() => setSelectedPayout(null)} />}
     </div>
   )
 }
@@ -402,16 +397,22 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     paintingBy:  artwork.painting_by || '',
     sizes:       artwork.sizes       || ['A4', 'A3'],
   })
-  const [previewFile, setPreviewFile]             = useState<File | null>(null)
-  const [previewThumb, setPreviewThumb]           = useState<string | null>(artwork.preview_url || null)
-  const [hiresFile, setHiresFile]                 = useState<File | null>(null)
-  const [existingGallery, setExistingGallery]     = useState<any[]>([])
+  const [paperType, setPaperType]               = useState<string>(artwork.paper_type || DEFAULT_PAPER)
+  const [isLimited, setIsLimited]               = useState<boolean>(!!artwork.edition_size)
+  const [editionSize, setEditionSize]           = useState<string>(String(artwork.edition_size || '50'))
+  const [previewFile, setPreviewFile]           = useState<File | null>(null)
+  const [previewThumb, setPreviewThumb]         = useState<string | null>(artwork.preview_url || null)
+  const [hiresFile, setHiresFile]               = useState<File | null>(null)
+  const [existingGallery, setExistingGallery]   = useState<any[]>([])
   const [deletedGalleryIds, setDeletedGalleryIds] = useState<number[]>([])
-  const [galleryFiles, setGalleryFiles]           = useState<(File | null)[]>([null, null, null])
-  const [galleryThumbs, setGalleryThumbs]         = useState<(string | null)[]>([null, null, null])
-  const [activeThumb, setActiveThumb]             = useState<'main' | number>('main')
-  const [saving, setSaving]                       = useState(false)
+  const [galleryFiles, setGalleryFiles]         = useState<(File | null)[]>([null, null, null])
+  const [galleryThumbs, setGalleryThumbs]       = useState<(string | null)[]>([null, null, null])
+  const [activeThumb, setActiveThumb]           = useState<'main' | number>('main')
+  const [saving, setSaving]                     = useState(false)
   const supabase = createClient()
+
+  const papersByCategory = getPapersByCategory()
+  const selectedPaper    = PAPER_OPTIONS.find(p => p.name === paperType)
 
   useEffect(() => {
     async function loadGallery() {
@@ -447,35 +448,24 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     if (!file) return
     setPreviewFile(file)
     const reader = new FileReader()
-    reader.onload = ev => {
-      setPreviewThumb(ev.target?.result as string)
-      setActiveThumb('main')
-    }
+    reader.onload = ev => { setPreviewThumb(ev.target?.result as string); setActiveThumb('main') }
     reader.readAsDataURL(file)
   }
 
   function handleNewGallerySelect(slotIndex: number, file: File | null) {
     if (!file) return
-    const newFiles = [...galleryFiles]
-    newFiles[slotIndex] = file
-    setGalleryFiles(newFiles)
+    const newFiles = [...galleryFiles]; newFiles[slotIndex] = file; setGalleryFiles(newFiles)
     const reader = new FileReader()
     reader.onload = ev => {
-      const newThumbs = [...galleryThumbs]
-      newThumbs[slotIndex] = ev.target?.result as string
-      setGalleryThumbs(newThumbs)
-      setActiveThumb(visibleGallery.length + slotIndex)
+      const newThumbs = [...galleryThumbs]; newThumbs[slotIndex] = ev.target?.result as string
+      setGalleryThumbs(newThumbs); setActiveThumb(visibleGallery.length + slotIndex)
     }
     reader.readAsDataURL(file)
   }
 
   function clearNewGallerySlot(slotIndex: number) {
-    const newFiles  = [...galleryFiles]
-    const newThumbs = [...galleryThumbs]
-    newFiles[slotIndex]  = null
-    newThumbs[slotIndex] = null
-    setGalleryFiles(newFiles)
-    setGalleryThumbs(newThumbs)
+    const newFiles = [...galleryFiles]; newFiles[slotIndex] = null; setGalleryFiles(newFiles)
+    const newThumbs = [...galleryThumbs]; newThumbs[slotIndex] = null; setGalleryThumbs(newThumbs)
     if (activeThumb === visibleGallery.length + slotIndex) setActiveThumb('main')
   }
 
@@ -488,12 +478,14 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     setSaving(true)
     try {
       const updates: any = {
-        title:       form.title,
-        description: form.description,
-        price:       parseInt(form.price) || artwork.price,
-        category:    form.category,
-        painting_by: form.paintingBy || null,
-        sizes:       form.sizes,
+        title:        form.title,
+        description:  form.description,
+        price:        parseInt(form.price) || artwork.price,
+        category:     form.category,
+        painting_by:  form.paintingBy || null,
+        sizes:        form.sizes,
+        paper_type:   paperType,
+        edition_size: isLimited ? parseInt(editionSize) || null : null,
       }
 
       for (const id of deletedGalleryIds) {
@@ -509,8 +501,8 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
       if (previewFile) {
         toast.loading('Uploading preview...', { id: 'edit-upload' })
-        const ext   = previewFile.name.split('.').pop()
-        const path  = artwork.sku + '-preview.' + ext
+        const ext  = previewFile.name.split('.').pop()
+        const path = artwork.sku + '-preview.' + ext
         const { error } = await supabase.storage.from('artwork-previews').upload(path, previewFile, { upsert: true, contentType: previewFile.type })
         if (error) throw error
         const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(path)
@@ -520,16 +512,15 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
       if (hiresFile) {
         toast.loading('Uploading hi-res...', { id: 'edit-hires' })
-        const ext   = hiresFile.name.split('.').pop()
-        const path  = artwork.sku + '-hires.' + ext
+        const ext  = hiresFile.name.split('.').pop()
+        const path = artwork.sku + '-hires.' + ext
         const { error } = await supabase.storage.from('artwork-hires').upload(path, hiresFile, { upsert: true, contentType: hiresFile.type })
         if (error) throw error
         updates.hires_path = path
         toast.dismiss('edit-hires')
       }
 
-      const hasNewGallery = galleryFiles.some(Boolean)
-      if (hasNewGallery) {
+      if (galleryFiles.some(Boolean)) {
         toast.loading('Uploading gallery...', { id: 'edit-gallery' })
         const nextSort = visibleGallery.length + 1
         for (let i = 0; i < galleryFiles.length; i++) {
@@ -553,141 +544,79 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     }
   }
 
-  const newSlots = Math.max(0, 3 - visibleGallery.length)
-
-  // Thumbnail slot helper
-  function ThumbSlot({ children, isActive, onClick }: { children: React.ReactNode; isActive: boolean; onClick: () => void }) {
-    return (
-      <div
-        onClick={onClick}
-        style={{
-          aspectRatio: '4/3',
-          borderRadius: 8,
-          overflow: 'hidden',
-          cursor: 'pointer',
-          border: isActive ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
-          background: 'var(--color-surface)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'border-color 0.15s',
-          position: 'relative',
-        }}
-      >
-        {children}
-      </div>
-    )
-  }
-
   return (
     <div style={{ padding: '0 20px 20px', borderTop: '0.5px solid var(--color-border)', background: 'var(--color-background-secondary)' }}>
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
 
       <div style={{ maxWidth: 520 }}>
 
-          {/* ── IMAGE SECTION ── */}
-          <div className="form-group">
-            <label className="form-label">Images</label>
-          
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px', gap: 10, marginBottom: 6 }}>
-          
-              {/* LEFT — big main image */}
-              <div
-                onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
-                style={{
-                  aspectRatio: '4/3',
-                  borderRadius: 12,
-                  overflow: 'hidden',
-                  background: 'var(--color-surface)',
-                  border: '0.5px solid var(--color-border)',
-                  position: 'relative',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-              >
-                {previewThumb ? (
-                  <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-                    <div style={{ fontSize: 24, marginBottom: 4 }}>+</div>
-                    <p style={{ fontSize: 11 }}>Tap to upload main preview</p>
-                  </div>
-                )}
-          
-                {/* Main capsule — top left */}
-                <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 11, fontWeight: 500, padding: '3px 10px', borderRadius: 20, pointerEvents: 'none' }}>
-                  {previewFile ? '✓ Changed' : 'Main'}
-                </div>
-          
-                {/* × to clear — top right */}
-                {previewThumb && (
-                  <button
-                    onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(null); setActiveThumb('main') }}
-                    style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                  >×</button>
-                )}
-                <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
-              </div>
-          
-              {/* RIGHT — 3 gallery slots stacked */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[0, 1, 2].map(i => {
-                  const existingImg = visibleGallery[i]
-                  const newFile     = galleryFiles[i - visibleGallery.length < 0 ? -1 : i - visibleGallery.length]
-                  const newThumb    = visibleGallery.length <= i ? galleryThumbs[i - visibleGallery.length] : null
-                  const thumbSrc    = existingImg ? existingImg.url : newThumb
-                  const isExisting  = !!existingImg
-          
-                  return (
-                    <div key={i} style={{ position: 'relative' }}>
-                      <div
-                        onClick={() => {
-                          if (thumbSrc) setActiveThumb(isExisting ? i : visibleGallery.length + (i - visibleGallery.length))
-                          else document.getElementById('edit-gallery-' + artwork.id + '-' + i)?.click()
-                        }}
-                        style={{
-                          aspectRatio: '4/3',
-                          borderRadius: 8,
-                          overflow: 'hidden',
-                          cursor: 'pointer',
-                          border: '0.5px solid var(--color-border)',
-                          background: 'var(--color-surface)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}
-                      >
-                        {thumbSrc
-                          ? <img src={thumbSrc} alt={'gallery ' + i} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                          : <span style={{ fontSize: 20, color: 'var(--color-border)' }}>+</span>
-                        }
-                      </div>
-                      {thumbSrc && (
-                        <button
-                          onClick={e => {
-                            e.stopPropagation()
-                            if (isExisting) stageDeleteGalleryImage(existingImg)
-                            else clearNewGallerySlot(i - visibleGallery.length)
-                          }}
-                          style={{ position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: '50%', background: isExisting ? 'rgba(163,45,45,0.85)' : 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
-                        >×</button>
-                      )}
-                      <input
-                        type="file"
-                        id={'edit-gallery-' + artwork.id + '-' + i}
-                        accept="image/*"
-                        style={{ display: 'none' }}
-                        onChange={e => handleNewGallerySelect(i - visibleGallery.length < 0 ? 0 : i - visibleGallery.length, e.target.files?.[0] || null)}
-                      />
-                    </div>
-                  )
-                })}
-              </div>
-          
-            </div>
-          
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
-              Tap main image to replace · gallery × removes on save · + to add
-            </p>
-          </div>
+        {/* ── IMAGES ── */}
+        <div className="form-group">
+          <label className="form-label">Images</label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px', gap: 10, marginBottom: 6 }}>
 
-        {/* Hi-res file */}
+            {/* Big left */}
+            <div
+              onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
+              style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+            >
+              {previewThumb ? (
+                <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                  <div style={{ fontSize: 24, marginBottom: 4 }}>+</div>
+                  <p style={{ fontSize: 11 }}>Tap to upload</p>
+                </div>
+              )}
+              <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 20, pointerEvents: 'none' }}>
+                {previewFile ? '✓ Changed' : 'Main'}
+              </div>
+              {previewThumb && (
+                <button
+                  onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(null); setActiveThumb('main') }}
+                  style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >×</button>
+              )}
+              <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={handlePreviewSelect} />
+            </div>
+
+            {/* 3 stacked right */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[0, 1, 2].map(i => {
+                const existingImg = visibleGallery[i]
+                const newThumb    = visibleGallery.length <= i ? galleryThumbs[i - visibleGallery.length] : null
+                const thumbSrc    = existingImg ? existingImg.url : newThumb
+                const isExisting  = !!existingImg
+                return (
+                  <div key={i} style={{ position: 'relative' }}>
+                    <div
+                      onClick={() => {
+                        if (thumbSrc) setActiveThumb(isExisting ? i : visibleGallery.length + (i - visibleGallery.length))
+                        else document.getElementById('edit-gallery-' + artwork.id + '-' + i)?.click()
+                      }}
+                      style={{ aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: '0.5px solid var(--color-border)', background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {thumbSrc
+                        ? <img src={thumbSrc} alt={'g' + i} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        : <span style={{ fontSize: 18, color: 'var(--color-border)' }}>+</span>
+                      }
+                    </div>
+                    {thumbSrc && (
+                      <button
+                        onClick={e => { e.stopPropagation(); if (isExisting) stageDeleteGalleryImage(existingImg); else clearNewGallerySlot(i - visibleGallery.length) }}
+                        style={{ position: 'absolute', top: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: isExisting ? 'rgba(163,45,45,0.85)' : 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                      >×</button>
+                    )}
+                    <input type="file" id={'edit-gallery-' + artwork.id + '-' + i} accept="image/*" style={{ display: 'none' }} onChange={e => handleNewGallerySelect(i - visibleGallery.length < 0 ? 0 : i - visibleGallery.length, e.target.files?.[0] || null)} />
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Tap main to replace · red × removes on save · + to add</p>
+        </div>
+
+        {/* Hi-res */}
         <div className="form-group">
           <label className="form-label">Hi-res print file</label>
           <div style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -699,27 +628,24 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
               {hiresFile && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{(hiresFile.size / 1024 / 1024).toFixed(1)} MB</p>}
             </div>
             {hiresFile ? (
-              <button
-                onClick={() => { setHiresFile(null); (document.getElementById('edit-hires-' + artwork.id) as HTMLInputElement).value = '' }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}
-              >×</button>
+              <button onClick={() => { setHiresFile(null); (document.getElementById('edit-hires-' + artwork.id) as HTMLInputElement).value = '' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button>
             ) : (
-              <button
-                onClick={() => document.getElementById('edit-hires-' + artwork.id)?.click()}
-                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)', flexShrink: 0 }}
-              >Replace</button>
+              <button onClick={() => document.getElementById('edit-hires-' + artwork.id)?.click()}
+                style={{ fontSize: 11, padding: '5px 12px', borderRadius: 20, border: '0.5px solid var(--color-border)', background: 'none', cursor: 'pointer', color: 'var(--color-text)', flexShrink: 0 }}>Replace</button>
             )}
           </div>
           {hiresFile && (
-            <button
-              onClick={() => document.getElementById('edit-hires-' + artwork.id)?.click()}
-              style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
-            >Change file</button>
+            <button onClick={() => document.getElementById('edit-hires-' + artwork.id)?.click()}
+              style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}>Change file</button>
           )}
           <input type="file" id={'edit-hires-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>A4 min 2339×1654px · A3 min 3307×2339px</p>
         </div>
 
+        <Divider />
+
+        {/* ── DETAILS ── */}
         <div className="form-group">
           <label className="form-label">Title</label>
           <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
@@ -735,7 +661,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
           </select>
         </div>
         <div className="form-group">
-          <label className="form-label">Painting by (optional)</label>
+          <label className="form-label">Painting by <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 11 }}>optional</span></label>
           <input className="form-input" value={form.paintingBy} onChange={e => setForm({ ...form, paintingBy: e.target.value })} placeholder="e.g. Ahmed Naif" />
         </div>
         <div className="form-group">
@@ -752,6 +678,105 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
               </label>
             ))}
           </div>
+        </div>
+
+        <Divider />
+
+        {/* ── PAPER TYPE ── */}
+        <div style={{ marginBottom: 6 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>Paper type</p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>All prints use Hahnemühle archival papers. Upgrade for a premium feel.</p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+          {Object.entries(papersByCategory).map(([category, papers]) => (
+            <div key={category}>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {papers.map(paper => {
+                  const isSelected = paperType === paper.name
+                  const addOnA4    = paper.addOn['A4'] || 0
+                  const addOnA3    = paper.addOn['A3'] || 0
+                  const hasPremium = addOnA4 > 0 || addOnA3 > 0
+                  return (
+                    <div
+                      key={paper.name}
+                      onClick={() => setPaperType(paper.name)}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 10, cursor: 'pointer', background: isSelected ? 'var(--color-surface)' : 'transparent', transition: 'all 0.15s' }}
+                    >
+                      <div style={{ width: 16, height: 16, borderRadius: '50%', border: isSelected ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0, marginTop: 2, transition: 'all 0.15s' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
+                          {!hasPremium
+                            ? <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>
+                            : <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>+{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3</span>
+                          }
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3, lineHeight: 1.5 }}>{paper.description}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {selectedPaper && (selectedPaper.addOn['A4'] > 0 || selectedPaper.addOn['A3'] > 0) && (
+          <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
+              ℹ️ <strong>{selectedPaper.name}</strong> adds a paper upgrade fee to the buyer's total. This does not affect your earnings.
+            </p>
+          </div>
+        )}
+
+        <Divider />
+
+        {/* ── LIMITED EDITION ── */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div>
+              <p style={{ fontSize: 13, fontWeight: 500 }}>Limited edition</p>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Cap how many prints can be sold.</p>
+            </div>
+            <div
+              onClick={() => setIsLimited(v => !v)}
+              style={{ width: 44, height: 26, borderRadius: 13, background: isLimited ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
+            >
+              <div style={{ position: 'absolute', top: 3, left: isLimited ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+            </div>
+          </div>
+
+          {isLimited && (
+            <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px' }}>
+              {artwork.edition_size && (
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, color: 'var(--color-text-muted)' }}>
+                  <span>Edition size: <strong style={{ color: 'var(--color-text)' }}>{artwork.edition_size}</strong></span>
+                  <span>Sold: <strong style={{ color: 'var(--color-text)' }}>{artwork.editions_sold || 0}</strong></span>
+                  <span>Remaining: <strong style={{ color: artwork.edition_size - (artwork.editions_sold || 0) === 0 ? '#A32D2D' : '#1D9E75' }}>{artwork.edition_size - (artwork.editions_sold || 0)}</strong></span>
+                </div>
+              )}
+              <label className="form-label" style={{ marginBottom: 6 }}>Edition size</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={artwork.editions_sold || 1}
+                  max="999"
+                  value={editionSize}
+                  onChange={e => setEditionSize(e.target.value)}
+                  style={{ maxWidth: 100 }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>prints</span>
+              </div>
+              {artwork.editions_sold > 0 && (
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 8 }}>
+                  ⚠️ Minimum {artwork.editions_sold} — cannot set lower than already sold.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
