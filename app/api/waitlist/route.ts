@@ -16,7 +16,6 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient()
 
-    // Check artwork exists and is actually sold out
     const { data: artwork } = await supabase
       .from('artworks')
       .select('id, title, edition_size, editions_sold')
@@ -27,8 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Artwork not found' }, { status: 404 })
     }
 
-    // Insert — unique constraint on (artwork_id, email) handles duplicates gracefully
-    const { error } = await 
+    const { error } = await supabase
       .from('waitlist')
       .upsert({ artwork_id: artworkId, email }, { onConflict: 'artwork_id,email', ignoreDuplicates: true })
 
