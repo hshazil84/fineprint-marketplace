@@ -3,11 +3,6 @@ import { Metadata } from 'next'
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-function resizeImage(imageUrl: string): string {
-  if (!imageUrl) return imageUrl
-  return imageUrl + '?width=1200&height=630&resize=cover'
-}
-
 export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
   try {
     const res = await fetch(
@@ -26,8 +21,9 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     const description = a.description
       ? a.description.slice(0, 155)
       : 'Giclee art print on Hahnemuhle archival paper. Order online and receive anywhere in the Maldives.'
-    const pageUrl     = 'https://shop.fineprintmv.com/artwork/' + params.id
-    const imageUrl    = a.preview_url ? resizeImage(a.preview_url) : ''
+    const siteUrl     = 'https://shop.fineprintmv.com'
+    const pageUrl     = siteUrl + '/artwork/' + params.id
+    const ogImageUrl  = siteUrl + '/artwork/' + params.id + '/opengraph-image'
 
     return {
       title,
@@ -38,18 +34,18 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
         url:      pageUrl,
         siteName: 'FinePrint Studio',
         type:     'website',
-        images:   imageUrl ? [{
-          url:    imageUrl,
+        images:   [{
+          url:    ogImageUrl,
           width:  1200,
           height: 630,
           alt:    a.title + ' by ' + artistName,
-        }] : [],
+        }],
       },
       twitter: {
         card:        'summary_large_image',
         title,
         description,
-        images:      imageUrl ? [imageUrl] : [],
+        images:      [ogImageUrl],
       },
     }
   } catch {
