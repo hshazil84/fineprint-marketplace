@@ -19,10 +19,7 @@ export default async function OgImage({ params }: { params: { id: string } }) {
     const res = await fetch(
       url + '/rest/v1/artworks?id=eq.' + params.id + '&select=title,price,preview_url,sku,profiles:artist_id(full_name,display_name)&limit=1',
       {
-        headers: {
-          'apikey':        key,
-          'Authorization': 'Bearer ' + key,
-        },
+        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key },
         cache: 'no-store',
       }
     )
@@ -61,11 +58,10 @@ export default async function OgImage({ params }: { params: { id: string } }) {
         {/* Right — details */}
         <div style={{ flex: 1, padding: '48px 44px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
 
-          {/* Logo */}
-          <div style={{ display: 'flex' }}>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', letterSpacing: '-0.02em' }}>Fine</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#1D9E75', letterSpacing: '-0.02em' }}>Print</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: '#1a1a1a', letterSpacing: '-0.02em' }}>&nbsp;Studio</span>
+          {/* Logo — reconstructed from SVG paths as text since SVG not supported in ImageResponse */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 0 }}>
+            <span style={{ fontSize: 22, fontWeight: 600, color: '#2C2C2A', letterSpacing: '-0.03em', fontFamily: 'sans-serif' }}>fineprint</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: '#2C2C2A', letterSpacing: '-0.03em', fontFamily: 'sans-serif' }}>studio</span>
           </div>
 
           {/* Title + artist + price */}
@@ -77,20 +73,24 @@ export default async function OgImage({ params }: { params: { id: string } }) {
               <p style={{ fontSize: 17, color: '#777', margin: 0 }}>by {artistName}</p>
             ) : null}
             {sku ? (
-              <p style={{ fontSize: 13, color: '#aaa', margin: 0, fontFamily: 'monospace' }}>{sku}</p>
+              <p style={{ fontSize: 12, color: '#bbb', margin: 0 }}>{sku}</p>
             ) : null}
             {price ? (
-              <div style={{ display: 'flex', marginTop: 6 }}>
-                <span style={{ fontSize: 22, fontWeight: 600, color: '#1a1a1a', background: '#f0f0ec', padding: '6px 14px', borderRadius: 8 }}>
+              <div style={{ display: 'flex', marginTop: 8 }}>
+                <span style={{ fontSize: 22, fontWeight: 600, color: '#1a1a1a', background: '#f0f0ec', padding: '6px 16px', borderRadius: 8 }}>
                   {price}
                 </span>
               </div>
             ) : null}
           </div>
 
-          {/* Bottom */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ width: 36, height: 3, background: '#1D9E75', borderRadius: 2 }} />
+          {/* Bottom — rainbow bar + tagline */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Rainbow gradient bar — matches logo */}
+            <div style={{
+              width: 120, height: 4, borderRadius: 2,
+              background: 'linear-gradient(to right, #00adee, #fff100, #f05a28, #be1e2d)',
+            }} />
             <p style={{ fontSize: 12, color: '#aaa', margin: 0, lineHeight: 1.5 }}>
               Giclée prints on Hahnemühle archival paper
             </p>
