@@ -75,7 +75,7 @@ export default function StorefrontPage() {
     const [artRes, artistRes, orderRes] = await Promise.all([
       supabase
         .from('artworks')
-        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, profiles:artist_id(full_name, artist_code, avatar_url, display_name, shop_status)')
+        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, edition_size, editions_sold, profiles:artist_id(full_name, artist_code, avatar_url, display_name, shop_status)')
         .eq('status', 'approved')
         .order('created_at', { ascending: false }),
       supabase
