@@ -17,7 +17,7 @@ import { CustomersTab } from '@/app/admin/components/CustomersTab'
 const TABS = ['orders', 'artists', 'listings', 'offers', 'customers', 'export']
 const ORDER_STATUSES = ['pending', 'approved', 'printing', 'ready', 'completed', 'rejected']
 
-function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }: any) {
+function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip, onPrintLabel }: any) {
   const [updating, setUpdating]   = useState(false)
   const [sendEmail, setSendEmail] = useState(true)
   const artistDisplay = order.artworks?.profiles?.display_name || order.artworks?.profiles?.full_name
@@ -78,7 +78,7 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }
           <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} />
           Notify buyer
         </label>
-        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
           {order.slip_url && (
             <button
               className="btn btn-sm"
@@ -91,6 +91,15 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }
           {order.status !== 'pending' && order.status !== 'rejected' && (
             <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 10px' }} onClick={onViewInvoice}>
               Invoice
+            </button>
+          )}
+          {order.status === 'approved' && (
+            <button
+              className="btn btn-sm"
+              style={{ fontSize: 11, padding: '3px 10px', background: '#1a1a1a', color: '#fff', border: 'none' }}
+              onClick={() => onPrintLabel(order)}
+            >
+              Label
             </button>
           )}
           {order.status === 'pending' && (order.payment_method === 'swipe' || !order.slip_url) && (
@@ -210,13 +219,10 @@ function AdminDashboard() {
   const [invoiceOrder, setInvoiceOrder]     = useState<any>(null)
   const [remittancePayout, setRemittancePayout] = useState<any>(null)
   const [notifyingId, setNotifyingId]       = useState<number | null>(null)
-
-  // ── Filters ──────────────────────────────────────────────────────────────
   const [orderSearch, setOrderSearch]       = useState('')
   const [orderStatus, setOrderStatus]       = useState('all')
   const [listingSearch, setListingSearch]   = useState('')
   const [listingStatus, setListingStatus]   = useState('all')
-
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -239,11 +245,7 @@ function AdminDashboard() {
   }
 
   async function fetchArtists() {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'artist')
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('profiles').select('*').eq('role', 'artist').order('created_at', { ascending: false })
     setArtists(data || [])
   }
 
@@ -264,10 +266,7 @@ function AdminDashboard() {
   }
 
   async function fetchWaitlistCounts() {
-    const { data } = await supabase
-      .from('waitlist')
-      .select('artwork_id')
-      .is('notified_at', null)
+    const { data } = await supabase.from('waitlist').select('artwork_id').is('notified_at', null)
     if (data) {
       const counts: Record<number, number> = {}
       data.forEach((w: any) => { counts[w.artwork_id] = (counts[w.artwork_id] || 0) + 1 })
@@ -328,9 +327,30 @@ function AdminDashboard() {
     }
   }
 
+  async function handlePrintLabel(order: any) {
+    try {
+      const { printLabel } = await import('@/lib/label')
+      printLabel({
+        invoiceNumber:  order.invoice_number,
+        orderSku:       order.order_sku,
+        buyerName:      order.buyer_name,
+        buyerPhone:     order.buyer_phone || '',
+        deliveryIsland: order.delivery_island || '',
+        deliveryAtoll:  order.delivery_atoll  || '',
+        deliveryMethod: order.delivery_method,
+        artworkTitle:   order.artworks?.title || '',
+        artistName:     order.artworks?.profiles?.display_name || order.artworks?.profiles?.full_name || '',
+        printSize:      order.print_size || '',
+        paperType:      order.paper_type || 'Photo Luster',
+        approvedAt:     order.approved_at || order.created_at,
+      })
+    } catch (err: any) {
+      toast.error('Could not generate label: ' + err.message)
+    }
+  }
+
   if (loading) return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
 
-  // ── Derived data ──────────────────────────────────────────────────────────
   const pendingOrders    = orders.filter(o => o.status === 'pending')
   const pendingPayouts   = payouts.filter(p => p.status === 'pending')
   const paidPayouts      = payouts.filter(p => p.status === 'paid')
@@ -340,7 +360,6 @@ function AdminDashboard() {
   const aprComm          = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
   const totalWaiting     = Object.values(waitlistCounts).reduce((s, c) => s + c, 0)
 
-  // ── Filtered lists for pagination ─────────────────────────────────────────
   const filteredOrders = orders.filter(o => {
     const matchSearch = !orderSearch ||
       o.invoice_number?.toLowerCase().includes(orderSearch.toLowerCase()) ||
@@ -423,7 +442,6 @@ function AdminDashboard() {
           ))}
         </div>
 
-        {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
           <OrdersTab
             orders={filteredOrders}
@@ -436,10 +454,10 @@ function AdminDashboard() {
             onStatusChange={fetchOrders}
             onViewInvoice={setInvoiceOrder}
             onViewSlip={setSelectedOrder}
+            onPrintLabel={handlePrintLabel}
           />
         )}
 
-        {/* ── ARTISTS TAB ── */}
         {tab === 'artists' && (
           <div>
             {pendingPayouts.length > 0 && (
@@ -549,7 +567,6 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* ── LISTINGS TAB ── */}
         {tab === 'listings' && (
           <ListingsTab
             artworks={filteredArtworks}
@@ -599,13 +616,11 @@ function AdminDashboard() {
   )
 }
 
-// ── Orders tab with pagination + search + filter ──────────────────────────
-function OrdersTab({ orders, allOrders, orderSearch, setOrderSearch, orderStatus, setOrderStatus, onAction, onStatusChange, onViewInvoice, onViewSlip }: any) {
+function OrdersTab({ orders, allOrders, orderSearch, setOrderSearch, orderStatus, setOrderStatus, onAction, onStatusChange, onViewInvoice, onViewSlip, onPrintLabel }: any) {
   const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(orders, PAGE_SIZES.orders)
 
   return (
     <div>
-      {/* Search + filter bar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
           className="form-input"
@@ -627,7 +642,6 @@ function OrdersTab({ orders, allOrders, orderSearch, setOrderSearch, orderStatus
           <button className="btn btn-sm" onClick={() => { setOrderSearch(''); setOrderStatus('all') }}>Clear ×</button>
         )}
       </div>
-
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {paginated.length === 0 ? (
           <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -641,22 +655,20 @@ function OrdersTab({ orders, allOrders, orderSearch, setOrderSearch, orderStatus
             onStatusChange={onStatusChange}
             onViewInvoice={() => onViewInvoice(o)}
             onViewSlip={() => onViewSlip(o)}
+            onPrintLabel={onPrintLabel}
           />
         ))}
       </div>
-
       <Pagination page={page} totalPages={totalPages} total={total} startIndex={startIndex} endIndex={endIndex} onPage={setPage} />
     </div>
   )
 }
 
-// ── Listings tab with pagination + search + filter ────────────────────────
 function ListingsTab({ artworks, allArtworks, listingSearch, setListingSearch, listingStatus, setListingStatus, waitlistCounts, notifyingId, onArtworkAction, onDownloadHires, onNotifyWaitlist }: any) {
   const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(artworks, PAGE_SIZES.listings)
 
   return (
     <div>
-      {/* Search + filter bar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
           className="form-input"
@@ -680,7 +692,6 @@ function ListingsTab({ artworks, allArtworks, listingSearch, setListingSearch, l
           <button className="btn btn-sm" onClick={() => { setListingSearch(''); setListingStatus('all') }}>Clear ×</button>
         )}
       </div>
-
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {paginated.length === 0 ? (
           <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
@@ -740,7 +751,6 @@ function ListingsTab({ artworks, allArtworks, listingSearch, setListingSearch, l
           )
         })}
       </div>
-
       <Pagination page={page} totalPages={totalPages} total={total} startIndex={startIndex} endIndex={endIndex} onPage={setPage} />
     </div>
   )
