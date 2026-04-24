@@ -34,6 +34,11 @@ export default async function OgImage({ params }: { params: { id: string } }) {
     }
   } catch {}
 
+  // Resize via Supabase image render endpoint
+  const resizedImageUrl = imageUrl
+    ? imageUrl.replace('/object/public/', '/render/image/public/') + '?width=630&height=630&resize=cover&quality=80'
+    : ''
+
   return new ImageResponse(
     (
       <div
@@ -46,8 +51,11 @@ export default async function OgImage({ params }: { params: { id: string } }) {
       >
         {/* Left — artwork image */}
         <div style={{ width: 630, height: 630, flexShrink: 0, overflow: 'hidden', display: 'flex', background: '#e8e6e0' }}>
-          {imageUrl ? (
-            <img src={imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          {resizedImageUrl || imageUrl ? (
+            <img
+              src={resizedImageUrl || imageUrl}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ fontSize: 64, color: '#ccc' }}>🖼</span>
