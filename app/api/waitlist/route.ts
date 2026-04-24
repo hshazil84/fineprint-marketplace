@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
+import { createClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Insert — unique constraint on (artwork_id, email) handles duplicates gracefully
-    const { error } = await supabase
+    const { error } = await 
       .from('waitlist')
       .upsert({ artwork_id: artworkId, email }, { onConflict: 'artwork_id,email', ignoreDuplicates: true })
 
