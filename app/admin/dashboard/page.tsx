@@ -239,7 +239,7 @@ function AdminDashboard() {
   async function fetchOrders() {
     const { data } = await supabase
       .from('orders')
-      .select('*, artworks(title, sku, artist_id, profiles:artist_id(full_name, display_name))')
+      .select('*, artworks(title, sku, artist_id, profiles:artist_id(full_name, display_name)), order_items(print_size, artwork_id)')
       .order('created_at', { ascending: false })
     setOrders(data || [])
   }
@@ -330,6 +330,26 @@ function AdminDashboard() {
   async function handlePrintLabel(order: any) {
     try {
       const { printLabel } = await import('@/lib/label')
+
+      // Build size counts from order_items — fall back to legacy single-item
+      const items = order.order_items && order.order_items.length > 0
+        ? order.order_items
+        : [{ print_size: order.print_size || 'A4' }]
+
+      const sizeCounts: Record<string, number> = {}
+      items.forEach((item: any) => {
+        const size = item.print_size || 'A4'
+        sizeCounts[size] = (sizeCounts[size] || 0) + 1
+      })
+
+      // Auto-resolve packaging
+      const sizes    = Object.keys(sizeCounts)
+      const hasLarge = sizes.some(s => s === 'A2' || s === '12x16')
+      const hasSmall = sizes.some(s => s === 'A4' || s === 'A3')
+      const packaging = hasLarge && hasSmall
+        ? 'Flat mailer + Tube'
+        : hasLarge ? 'Tube' : 'Flat mailer'
+
       printLabel({
         invoiceNumber:  order.invoice_number,
         orderSku:       order.order_sku,
@@ -338,10 +358,8 @@ function AdminDashboard() {
         deliveryIsland: order.delivery_island || '',
         deliveryAtoll:  order.delivery_atoll  || '',
         deliveryMethod: order.delivery_method,
-        artworkTitle:   order.artworks?.title || '',
-        artistName:     order.artworks?.profiles?.display_name || order.artworks?.profiles?.full_name || '',
-        printSize:      order.print_size || '',
-        paperType:      order.paper_type || 'Photo Luster',
+        sizeCounts,
+        packaging,
         approvedAt:     order.approved_at || order.created_at,
       })
     } catch (err: any) {
