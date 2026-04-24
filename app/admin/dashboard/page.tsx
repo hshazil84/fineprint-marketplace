@@ -114,17 +114,16 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip }
 }
 
 function AdminExportTab({ artists, onExport, orders }: any) {
-  const today = new Date().toISOString().split('T')[0]
+  const today     = new Date().toISOString().split('T')[0]
   const yearStart = new Date().getFullYear() + '-01-01'
-  const [from, setFrom] = useState(yearStart)
-  const [to, setTo] = useState(today)
+  const [from, setFrom]     = useState(yearStart)
+  const [to, setTo]         = useState(today)
   const [artist, setArtist] = useState('all')
 
   function applyMonth(val: string) {
     if (!val) return
     const parts = val.split('-')
-    const y = parts[0]
-    const m = parts[1]
+    const y = parts[0], m = parts[1]
     const last = new Date(parseInt(y), parseInt(m), 0).getDate()
     setFrom(val + '-01')
     setTo(val + '-' + String(last).padStart(2, '0'))
@@ -137,7 +136,7 @@ function AdminExportTab({ artists, onExport, orders }: any) {
   })
 
   const gross = filtered.reduce((s: number, o: any) => s + o.original_price, 0)
-  const comm = filtered.reduce((s: number, o: any) => s + o.fp_commission, 0)
+  const comm  = filtered.reduce((s: number, o: any) => s + o.fp_commission, 0)
 
   const months: { label: string; value: string }[] = []
   for (let i = 0; i < 6; i++) {
@@ -167,9 +166,7 @@ function AdminExportTab({ artists, onExport, orders }: any) {
           <select className="form-input" value={artist} onChange={e => setArtist(e.target.value)}>
             <option value="all">All artists</option>
             {artists.map((a: any) => (
-              <option key={a.id} value={a.artist_code}>
-                FP-{a.artist_code} — {a.display_name || a.full_name}
-              </option>
+              <option key={a.id} value={a.artist_code}>FP-{a.artist_code} — {a.display_name || a.full_name}</option>
             ))}
           </select>
         </div>
@@ -177,9 +174,7 @@ function AdminExportTab({ artists, onExport, orders }: any) {
           <label className="form-label">Quick select month</label>
           <select className="form-input" onChange={e => applyMonth(e.target.value)} defaultValue="">
             <option value="">— pick a month —</option>
-            {months.map(m => (
-              <option key={m.value} value={m.value}>{m.label}</option>
-            ))}
+            {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         </div>
       </div>
@@ -193,26 +188,26 @@ function AdminExportTab({ artists, onExport, orders }: any) {
           <input type="date" className="form-input" value={to} onChange={e => setTo(e.target.value)} />
         </div>
       </div>
-      <button className="btn btn-primary btn-full" onClick={() => onExport(from, to, artist)}>
-        Download CSV
-      </button>
+      <button className="btn btn-primary btn-full" onClick={() => onExport(from, to, artist)}>Download CSV</button>
     </div>
   )
 }
 
 function AdminDashboard() {
-  const router = useRouter()
+  const router       = useRouter()
   const searchParams = useSearchParams()
-  const [tab, setTab] = useState(searchParams.get('tab') || 'orders')
-  const [orders, setOrders] = useState<any[]>([])
-  const [artists, setArtists] = useState<any[]>([])
-  const [artworks, setArtworks] = useState<any[]>([])
-  const [payouts, setPayouts] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [tab, setTab]                       = useState(searchParams.get('tab') || 'orders')
+  const [orders, setOrders]                 = useState<any[]>([])
+  const [artists, setArtists]               = useState<any[]>([])
+  const [artworks, setArtworks]             = useState<any[]>([])
+  const [payouts, setPayouts]               = useState<any[]>([])
+  const [waitlistCounts, setWaitlistCounts] = useState<Record<number, number>>({})
+  const [loading, setLoading]               = useState(true)
+  const [selectedOrder, setSelectedOrder]   = useState<any>(null)
   const [selectedPayout, setSelectedPayout] = useState<any>(null)
-  const [invoiceOrder, setInvoiceOrder] = useState<any>(null)
+  const [invoiceOrder, setInvoiceOrder]     = useState<any>(null)
   const [remittancePayout, setRemittancePayout] = useState<any>(null)
+  const [notifyingId, setNotifyingId]       = useState<number | null>(null)
   const supabase = createClient()
 
   useEffect(() => { init() }, [])
@@ -222,7 +217,7 @@ function AdminDashboard() {
     if (!user) { router.push('/auth/login'); return }
     const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (!prof || prof.role !== 'admin') { router.push('/storefront'); return }
-    await Promise.all([fetchOrders(), fetchArtists(), fetchArtworks(), fetchPayouts()])
+    await Promise.all([fetchOrders(), fetchArtists(), fetchArtworks(), fetchPayouts(), fetchWaitlistCounts()])
     setLoading(false)
   }
 
@@ -259,6 +254,20 @@ function AdminDashboard() {
     setPayouts(data || [])
   }
 
+  async function fetchWaitlistCounts() {
+    const { data } = await supabase
+      .from('waitlist')
+      .select('artwork_id')
+      .is('notified_at', null)
+    if (data) {
+      const counts: Record<number, number> = {}
+      data.forEach((w: any) => {
+        counts[w.artwork_id] = (counts[w.artwork_id] || 0) + 1
+      })
+      setWaitlistCounts(counts)
+    }
+  }
+
   async function handleOrderAction(invoiceNumber: string, action: 'approve' | 'reject') {
     const res = await fetch('/api/orders/approve', {
       method: 'POST',
@@ -290,25 +299,43 @@ function AdminDashboard() {
   }
 
   async function handleExport(from: string, to: string, artist: string) {
-    const res = await fetch('/api/export?type=admin&from=' + from + '&to=' + to + '&artist=' + artist)
+    const res  = await fetch('/api/export?type=admin&from=' + from + '&to=' + to + '&artist=' + artist)
     const text = await res.text()
     downloadCSVFile(text, dateRangeFilename(from, to, 'fineprint_sales_' + artist))
     toast.success('CSV downloaded!')
   }
 
-  if (loading) {
-    return (
-      <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
-    )
+  async function handleNotifyWaitlist(artworkId: number, artworkTitle: string) {
+    setNotifyingId(artworkId)
+    try {
+      const res  = await fetch('/api/waitlist/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artworkId }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      toast.success('Notified ' + data.count + ' people on the waitlist for ' + artworkTitle)
+      fetchWaitlistCounts()
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setNotifyingId(null)
+    }
   }
 
-  const pendingOrders = orders.filter(o => o.status === 'pending')
+  if (loading) {
+    return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
+  }
+
+  const pendingOrders  = orders.filter(o => o.status === 'pending')
   const pendingPayouts = payouts.filter(p => p.status === 'pending')
-  const paidPayouts = payouts.filter(p => p.status === 'paid')
+  const paidPayouts    = payouts.filter(p => p.status === 'paid')
   const withdrawRequests = artists.filter(a => a.withdraw_requested)
-  const closedShops = artists.filter(a => a.shop_status === 'closed')
-  const aprRevenue = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.original_price, 0)
-  const aprComm = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
+  const closedShops    = artists.filter(a => a.shop_status === 'closed')
+  const aprRevenue     = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.original_price, 0)
+  const aprComm        = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
+  const totalWaiting   = Object.values(waitlistCounts).reduce((s, c) => s + c, 0)
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
@@ -316,15 +343,8 @@ function AdminDashboard() {
         minimal={true}
         rightContent={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>
-              Admin
-            </span>
-            <button
-              className="btn btn-sm"
-              onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}
-            >
-              Log out
-            </button>
+            <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>Admin</span>
+            <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>Log out</button>
           </div>
         }
       />
@@ -334,9 +354,9 @@ function AdminDashboard() {
 
         <div className="grid-4" style={{ marginBottom: 24 }}>
           {[
-            ['Pending orders', pendingOrders.length],
-            ['Total orders', orders.length],
-            ['Gross revenue', formatMVR(aprRevenue)],
+            ['Pending orders',   pendingOrders.length],
+            ['Total orders',     orders.length],
+            ['Gross revenue',    formatMVR(aprRevenue)],
             ['Total commission', formatMVR(aprComm)],
           ].map(([label, value]) => (
             <div key={label as string} className="stat-card">
@@ -358,6 +378,12 @@ function AdminDashboard() {
           </div>
         )}
 
+        {totalWaiting > 0 && (
+          <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56' }}>
+            {totalWaiting} buyer{totalWaiting !== 1 ? 's' : ''} waiting on sold-out artworks. Check the Listings tab to notify them.
+          </div>
+        )}
+
         <div className="tab-bar">
           {TABS.map(t => (
             <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>
@@ -370,6 +396,11 @@ function AdminDashboard() {
               {t === 'artists' && pendingPayouts.length > 0 && (
                 <span style={{ marginLeft: 6, background: 'var(--color-teal)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
                   {pendingPayouts.length}
+                </span>
+              )}
+              {t === 'listings' && totalWaiting > 0 && (
+                <span style={{ marginLeft: 6, background: '#1D9E75', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
+                  {totalWaiting}
                 </span>
               )}
             </button>
@@ -409,32 +440,18 @@ function AdminDashboard() {
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>
                           {p.profiles?.display_name || p.profiles?.full_name}
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>
-                            FP-{p.profiles?.artist_code}
-                          </span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>FP-{p.profiles?.artist_code}</span>
                         </p>
-                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          {p.bank_name} · {p.account_name}
-                        </p>
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_name}</p>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{p.account_number}</span>
-                          <button
-                            className="btn btn-sm"
-                            style={{ fontSize: 11, padding: '2px 8px' }}
-                            onClick={() => { navigator.clipboard.writeText(p.account_number); toast.success('Copied!') }}
-                          >
-                            Copy
-                          </button>
+                          <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => { navigator.clipboard.writeText(p.account_number); toast.success('Copied!') }}>Copy</button>
                         </div>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                          Requested {new Date(p.created_at).toLocaleDateString()}
-                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Requested {new Date(p.created_at).toLocaleDateString()}</p>
                       </div>
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>{formatMVR(p.amount)}</p>
-                        <button className="btn btn-sm btn-success" onClick={() => setSelectedPayout(p)}>
-                          Pay and confirm
-                        </button>
+                        <button className="btn btn-sm btn-success" onClick={() => setSelectedPayout(p)}>Pay and confirm</button>
                       </div>
                     </div>
                   ))}
@@ -450,13 +467,9 @@ function AdminDashboard() {
                     <div key={a.id} style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: '#FCEBEB' }}>
                       <p style={{ fontSize: 14, fontWeight: 500 }}>
                         {a.display_name || a.full_name}
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#A32D2D', marginLeft: 8 }}>
-                          FP-{a.artist_code}
-                        </span>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#A32D2D', marginLeft: 8 }}>FP-{a.artist_code}</span>
                       </p>
-                      <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>
-                        Reason: {a.withdraw_reason || 'No reason provided'}
-                      </p>
+                      <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>Reason: {a.withdraw_reason || 'No reason provided'}</p>
                       <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 2 }}>{a.email}</p>
                     </div>
                   ))}
@@ -473,25 +486,15 @@ function AdminDashboard() {
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>
                           {p.profiles?.display_name || p.profiles?.full_name}
-                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>
-                            FP-{p.profiles?.artist_code}
-                          </span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>FP-{p.profiles?.artist_code}</span>
                         </p>
-                        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          {p.bank_name} · {p.account_number}
-                        </p>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>
-                          {p.paid_at ? 'Paid ' + new Date(p.paid_at).toLocaleDateString() : ''}
-                        </p>
-                        <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11 }} onClick={() => setRemittancePayout(p)}>
-                          View remittance
-                        </button>
+                        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_number}</p>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.paid_at ? 'Paid ' + new Date(p.paid_at).toLocaleDateString() : ''}</p>
+                        <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11 }} onClick={() => setRemittancePayout(p)}>View remittance</button>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontSize: 15, fontWeight: 500 }}>{formatMVR(p.amount)}</p>
-                        <span className="badge" style={{ background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', marginTop: 4, display: 'inline-block' }}>
-                          paid
-                        </span>
+                        <span className="badge" style={{ background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', marginTop: 4, display: 'inline-block' }}>paid</span>
                       </div>
                     </div>
                   ))}
@@ -504,25 +507,21 @@ function AdminDashboard() {
               {artists.length === 0 ? (
                 <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No artists yet.</p>
               ) : artists.map(a => {
-                const artistOrders = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
+                const artistOrders    = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
                 const artistPayoutsArr = payouts.filter(p => p.artist_id === a.id && p.status === 'paid')
-                const totalEarned = artistOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
-                const totalPaid = artistPayoutsArr.reduce((s: number, p: any) => s + p.amount, 0)
-                const artworkCount = artworks.filter(w => w.artist_id === a.id).length
+                const totalEarned     = artistOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+                const totalPaid       = artistPayoutsArr.reduce((s: number, p: any) => s + p.amount, 0)
+                const artworkCount    = artworks.filter(w => w.artist_id === a.id).length
                 return (
                   <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{a.display_name || a.full_name}</p>
                         {a.shop_status === 'closed' && (
-                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>
-                            Shop closed
-                          </span>
+                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>
                         )}
                         {a.withdraw_requested && (
-                          <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>
-                            Withdrawal requested
-                          </span>
+                          <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
                         )}
                       </div>
                       <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
@@ -544,35 +543,65 @@ function AdminDashboard() {
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             {artworks.length === 0 ? (
               <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No listings yet.</p>
-            ) : artworks.map(a => (
-              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
-                {a.preview_url && (
-                  <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
-                )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-                    <span className="sku-tag">{a.sku}</span>
-                    <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
-                    <span className={'badge badge-' + a.status}>{a.status}</span>
+            ) : artworks.map(a => {
+              const waitCount = waitlistCounts[a.id] || 0
+              const remaining = a.edition_size ? a.edition_size - (a.editions_sold || 0) : null
+              const isSoldOut = remaining === 0
+              return (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                  {a.preview_url && (
+                    <img src={a.preview_url} alt={a.title} style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
+                  )}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                      <span className="sku-tag">{a.sku}</span>
+                      <p style={{ fontSize: 14, fontWeight: 500 }}>{a.title}</p>
+                      <span className={'badge badge-' + a.status}>{a.status}</span>
+                      {a.edition_size && (
+                        <span style={{ fontSize: 10, background: isSoldOut ? '#FCEBEB' : '#f0f0ec', color: isSoldOut ? '#A32D2D' : 'var(--color-text-muted)', padding: '1px 7px', borderRadius: 20 }}>
+                          {isSoldOut ? 'Sold out' : remaining + ' of ' + a.edition_size + ' left'}
+                        </span>
+                      )}
+                      {a.paper_type && a.paper_type !== 'Photo Luster' && (
+                        <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>
+                          {a.paper_type}
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+                      by {a.profiles?.display_name || a.profiles?.full_name} · {formatMVR(a.price)}
+                      {a.offer_label ? ' · ' + a.offer_label + ' ' + a.offer_pct + '% off' : ''}
+                    </p>
+                    {waitCount > 0 && (
+                      <p style={{ fontSize: 11, color: '#1D9E75', marginTop: 4 }}>
+                        {waitCount} buyer{waitCount !== 1 ? 's' : ''} on waitlist
+                      </p>
+                    )}
                   </div>
-                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-                    by {a.profiles?.display_name || a.profiles?.full_name} · {formatMVR(a.price)}
-                    {a.offer_label ? ' · ' + a.offer_label + ' ' + a.offer_pct + '% off' : ''}
-                  </p>
+                  <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center', flexDirection: 'column' }}>
+                    {a.hires_path && (
+                      <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>Hi-res</button>
+                    )}
+                    {a.status === 'pending' && (
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
+                      </div>
+                    )}
+                    {waitCount > 0 && (
+                      <button
+                        className="btn btn-sm"
+                        style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', border: 'none', whiteSpace: 'nowrap' }}
+                        onClick={() => handleNotifyWaitlist(a.id, a.title)}
+                        disabled={notifyingId === a.id}
+                      >
+                        {notifyingId === a.id ? 'Notifying...' : 'Notify ' + waitCount}
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
-                  {a.hires_path && (
-                    <button className="btn btn-sm" onClick={() => downloadHires(a.hires_path)}>Download hi-res</button>
-                  )}
-                  {a.status === 'pending' && (
-                    <>
-                      <button className="btn btn-sm btn-success" onClick={() => handleArtworkAction(a.id, 'approved')}>Approve</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => handleArtworkAction(a.id, 'rejected')}>Reject</button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -588,9 +617,7 @@ function AdminDashboard() {
             ) : artworks.filter(a => a.offer_pct).map(a => (
               <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
                 <div>
-                  <p style={{ fontSize: 14, fontWeight: 500 }}>
-                    {a.offer_label} — {a.profiles?.display_name || a.profiles?.full_name}
-                  </p>
+                  <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.profiles?.display_name || a.profiles?.full_name}</p>
                   <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
                     {a.sku} · {a.offer_pct}% off{a.offer_expires ? ' · Expires ' + a.offer_expires : ' · No expiry'}
                   </p>
@@ -602,32 +629,13 @@ function AdminDashboard() {
         )}
 
         {tab === 'customers' && <CustomersTab />}
-
-        {tab === 'export' && (
-          <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />
-        )}
+        {tab === 'export' && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
       </div>
 
-      {selectedOrder && (
-        <SlipModal
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }}
-        />
-      )}
-      {selectedPayout && (
-        <PayoutModal
-          payout={selectedPayout}
-          onClose={() => setSelectedPayout(null)}
-          onPaid={() => { fetchPayouts(); fetchOrders() }}
-        />
-      )}
-      {invoiceOrder && (
-        <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />
-      )}
-      {remittancePayout && (
-        <RemittanceModal payout={remittancePayout} onClose={() => setRemittancePayout(null)} />
-      )}
+      {selectedOrder    && <SlipModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }} />}
+      {selectedPayout   && <PayoutModal payout={selectedPayout} onClose={() => setSelectedPayout(null)} onPaid={() => { fetchPayouts(); fetchOrders() }} />}
+      {invoiceOrder     && <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
+      {remittancePayout && <RemittanceModal payout={remittancePayout} onClose={() => setRemittancePayout(null)} />}
     </div>
   )
 }
