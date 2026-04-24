@@ -9,10 +9,8 @@ export interface LabelData {
   deliveryIsland: string
   deliveryAtoll:  string
   deliveryMethod: 'delivery' | 'pickup'
-  artworkTitle:   string
-  artistName:     string
-  printSize:      string
-  paperType:      string
+  sizeCounts:     Record<string, number>  // e.g. { A4: 3, A3: 1 }
+  packaging:      string                  // e.g. 'Flat mailer' | 'Tube' | 'Flat mailer + Tube'
   approvedAt:     string
 }
 
@@ -35,13 +33,6 @@ export function printLabel(data: LabelData) {
   const pad = 18
   let   y   = pad
 
-  function text(str: string, x: number, yPos: number, size: number, weight: 'normal' | 'bold' = 'normal', color = '#1a1a1a') {
-    doc.setFontSize(size)
-    doc.setFont('helvetica', weight)
-    doc.setTextColor(color)
-    doc.text(str, x, yPos)
-  }
-
   function line(yPos: number) {
     doc.setDrawColor('#e0e0e0')
     doc.setLineWidth(0.5)
@@ -49,15 +40,24 @@ export function printLabel(data: LabelData) {
   }
 
   function label(str: string, x: number, yPos: number) {
-    text(str, x, yPos, 6.5, 'normal', '#888888')
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor('#888888')
+    doc.text(str, x, yPos)
   }
 
   function value(str: string, x: number, yPos: number, size = 9) {
-    text(str, x, yPos, size, 'normal', '#1a1a1a')
+    doc.setFontSize(size)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor('#1a1a1a')
+    doc.text(str, x, yPos)
   }
 
   function bold(str: string, x: number, yPos: number, size = 9) {
-    text(str, x, yPos, size, 'bold', '#1a1a1a')
+    doc.setFontSize(size)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor('#1a1a1a')
+    doc.text(str, x, yPos)
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -65,6 +65,7 @@ export function printLabel(data: LabelData) {
   const fw = doc.getTextWidth('fineprint')
   bold('studio', pad + fw, y + 10, 13)
 
+  // Rainbow bar
   const colors = ['#00adee', '#4fc3f7', '#fff100', '#f05a28', '#be1e2d']
   const barW   = 60
   colors.forEach((c, i) => {
@@ -72,6 +73,7 @@ export function printLabel(data: LabelData) {
     doc.rect(pad + (i * barW / colors.length), y + 14, barW / colors.length, 2, 'F')
   })
 
+  // Invoice + date top right
   const date = data.approvedAt
     ? new Date(data.approvedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -116,22 +118,32 @@ export function printLabel(data: LabelData) {
 
   line(y); y += 10
 
-  // ── Artwork details ───────────────────────────────────────────────────────
-  label('ARTWORK', pad, y)
-  label('PRINT DETAILS', col2, y)
+  // ── Items ─────────────────────────────────────────────────────────────────
+  const totalItems = Object.values(data.sizeCounts).reduce((s, c) => s + c, 0)
+  label('ITEMS (' + totalItems + ')', pad, y)
   y += 9
 
-  const titleTrunc = data.artworkTitle.length > 28 ? data.artworkTitle.slice(0, 28) + '...' : data.artworkTitle
-  bold(titleTrunc, pad, y, 9)
-  bold(data.printSize, col2, y, 9)
-  y += 11
+  // Size order: A4, A3, A2, 12x16
+  const sizeOrder = ['A4', 'A3', 'A2', '12x16']
+  const sortedSizes = Object.entries(data.sizeCounts).sort((a, b) => {
+    const ai = sizeOrder.indexOf(a[0])
+    const bi = sizeOrder.indexOf(b[0])
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi)
+  })
 
-  value('by ' + data.artistName, pad, y)
-  value(data.paperType || 'Photo Luster', col2, y)
+  sortedSizes.forEach(([size, count]) => {
+    bold(count + 'x ' + size, pad, y, 9)
+    value('  Giclee archival print', pad + 32, y, 9)
+    y += 11
+  })
+
+  y += 3
+  line(y); y += 10
+
+  // ── Packaging ─────────────────────────────────────────────────────────────
+  label('PACKAGING', pad, y)
   y += 9
-
-  value('Giclee archival print', pad, y)
-  value('Rolled · Tube packaging', col2, y)
+  bold(data.packaging, pad, y, 9)
   y += 14
 
   line(y); y += 10
