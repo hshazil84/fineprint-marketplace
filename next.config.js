@@ -9,6 +9,8 @@ const nextConfig = {
     ],
   },
   poweredByHeader: false,
+  env: {
+    NEXT_PUBLIC_SITE_URL: 'https://shop.fineprintmv.com',
+  },
 }
-
 module.exports = nextConfig
