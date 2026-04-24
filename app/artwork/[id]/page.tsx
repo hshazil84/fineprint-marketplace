@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES } from '@/lib/pricing'
+import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES, getPaperAddOn, getPaperOption, DEFAULT_PAPER } from '@/lib/pricing'
 import { useCart } from '@/lib/cart'
 import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 import toast from 'react-hot-toast'
@@ -10,15 +10,18 @@ import Link from 'next/link'
 import Header from '@/app/components/Header'
 
 export default function ArtworkPage() {
-  const { id } = useParams()
-  const router = useRouter()
-  const [artwork, setArtwork] = useState<any>(null)
-  const [artist, setArtist] = useState<any>(null)
-  const [related, setRelated] = useState<any[]>([])
+  const { id }   = useParams()
+  const router   = useRouter()
+  const [artwork, setArtwork]           = useState<any>(null)
+  const [artist, setArtist]             = useState<any>(null)
+  const [related, setRelated]           = useState<any[]>([])
   const [galleryImages, setGalleryImages] = useState<any[]>([])
-  const [activeImage, setActiveImage] = useState<string | null>(null)
+  const [activeImage, setActiveImage]   = useState<string | null>(null)
   const [selectedSize, setSelectedSize] = useState('A4')
   const [showArtistModal, setShowArtistModal] = useState(false)
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistDone, setWaitlistDone]   = useState(false)
+  const [waitlistLoading, setWaitlistLoading] = useState(false)
   const { add, has } = useCart()
   const supabase = createClient()
 
@@ -53,6 +56,28 @@ export default function ArtworkPage() {
     setRelated(rel || [])
   }
 
+  async function joinWaitlist() {
+    if (!waitlistEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(waitlistEmail)) {
+      toast.error('Please enter a valid email'); return
+    }
+    setWaitlistLoading(true)
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artworkId: artwork.id, email: waitlistEmail }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      setWaitlistDone(true)
+      toast.success('We\'ll notify you when this is back in stock!')
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong')
+    } finally {
+      setWaitlistLoading(false)
+    }
+  }
+
   if (!artwork) return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
       <Header />
@@ -60,16 +85,29 @@ export default function ArtworkPage() {
     </div>
   )
 
+  const paperType    = artwork.paper_type || DEFAULT_PAPER
+  const paperOption  = getPaperOption(paperType)
+  const paperAddOn   = getPaperAddOn(paperType, selectedSize)
   const availableSizes = artwork.sizes || SIZES
-  const prices = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize)
-  const orderSKU = buildOrderSKU(artwork.sku, selectedSize)
+  const prices       = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType)
+  const orderSKU     = buildOrderSKU(artwork.sku, selectedSize)
   const alreadyInCart = has(artwork.id, selectedSize)
+
+  // Edition logic
+  const editionSize  = artwork.edition_size
+  const editionsSold = artwork.editions_sold || 0
+  const remaining    = editionSize ? editionSize - editionsSold : null
+  const isLimited    = !!editionSize
+  const isSoldOut    = isLimited && remaining === 0
+  const isLowStock   = isLimited && remaining !== null && remaining > 0 && remaining <= 10
+
   const allThumbnails = [
     { url: artwork.preview_url, isMain: true },
     ...galleryImages.map(g => ({ url: g.url, isMain: false })),
   ]
 
   function addToCart() {
+    if (isSoldOut) return
     add({
       artworkId:    artwork.id,
       artworkSku:   artwork.sku,
@@ -78,7 +116,7 @@ export default function ArtworkPage() {
       artistId:     artwork.artist_id,
       printSize:    selectedSize,
       artistPrice:  artwork.price,
-      printingFee:  PRINTING_FEES[selectedSize] || PRINTING_FEES['A4'],
+      printingFee:  prices.totalPrintFee,
       offerLabel:   artwork.offer_label,
       offerPct:     artwork.offer_pct,
       previewUrl:   artwork.preview_url,
@@ -87,6 +125,7 @@ export default function ArtworkPage() {
   }
 
   function buyNow() {
+    if (isSoldOut) return
     add({
       artworkId:    artwork.id,
       artworkSku:   artwork.sku,
@@ -95,7 +134,7 @@ export default function ArtworkPage() {
       artistId:     artwork.artist_id,
       printSize:    selectedSize,
       artistPrice:  artwork.price,
-      printingFee:  PRINTING_FEES[selectedSize] || PRINTING_FEES['A4'],
+      printingFee:  prices.totalPrintFee,
       offerLabel:   artwork.offer_label,
       offerPct:     artwork.offer_pct,
       previewUrl:   artwork.preview_url,
@@ -112,26 +151,39 @@ export default function ArtworkPage() {
         </Link>
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
 
-          {/* LEFT — image + gallery strip */}
+          {/* LEFT — image + gallery */}
           <div>
             <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative', marginBottom: galleryImages.length > 0 ? 10 : 0 }}>
               {activeImage ? (
-                <img
-                  src={activeImage}
-                  alt={artwork.title}
-                  style={{ width: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none', objectFit: 'contain', maxHeight: 520 }}
-                />
+                <img src={activeImage} alt={artwork.title} style={{ width: '100%', display: 'block', pointerEvents: 'none', userSelect: 'none', objectFit: 'contain', maxHeight: 520 }} />
               ) : (
-                <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>
-                  No preview available
-                </div>
+                <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>No preview available</div>
               )}
               <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
-              {artwork.offer_pct ? (
-                <div style={{ position: 'absolute', top: 14, left: 14, background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20, zIndex: 20, pointerEvents: 'none' }}>
-                  {artwork.offer_pct}% off
-                </div>
-              ) : null}
+
+              {/* Badges */}
+              <div style={{ position: 'absolute', top: 14, left: 14, display: 'flex', gap: 6, zIndex: 20, pointerEvents: 'none', flexWrap: 'wrap' }}>
+                {artwork.offer_pct ? (
+                  <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
+                    {artwork.offer_pct}% off
+                  </span>
+                ) : null}
+                {isSoldOut && (
+                  <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
+                    Sold out
+                  </span>
+                )}
+                {isLowStock && !isSoldOut && (
+                  <span style={{ background: '#FAEEDA', color: '#633806', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
+                    Only {remaining} left
+                  </span>
+                )}
+                {isLimited && !isSoldOut && !isLowStock && (
+                  <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 11, fontWeight: 400, padding: '4px 10px', borderRadius: 20 }}>
+                    Limited edition
+                  </span>
+                )}
+              </div>
             </div>
 
             {allThumbnails.length > 1 && (
@@ -140,16 +192,7 @@ export default function ArtworkPage() {
                   <div
                     key={i}
                     onClick={() => setActiveImage(thumb.url)}
-                    style={{
-                      aspectRatio: '4/3',
-                      borderRadius: 'var(--radius-md)',
-                      overflow: 'hidden',
-                      cursor: 'pointer',
-                      border: activeImage === thumb.url ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                      transition: 'border-color 0.15s',
-                      background: 'var(--color-surface)',
-                      position: 'relative',
-                    }}
+                    style={{ aspectRatio: '4/3', borderRadius: 'var(--radius-md)', overflow: 'hidden', cursor: 'pointer', border: activeImage === thumb.url ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)', transition: 'border-color 0.15s', background: 'var(--color-surface)', position: 'relative' }}
                   >
                     <img src={thumb.url} alt={'View ' + (i + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
                     <div style={{ position: 'absolute', inset: 0 }} onContextMenu={e => e.preventDefault()} />
@@ -170,6 +213,29 @@ export default function ArtworkPage() {
             >
               by {artist?.display_name || artist?.full_name}
             </button>
+
+            {/* Edition status */}
+            {isLimited && (
+              <div style={{ marginBottom: 12 }}>
+                {isSoldOut ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 20, padding: '4px 12px' }}>
+                    <span style={{ fontSize: 12, color: '#A32D2D', fontWeight: 500 }}>Sold out</span>
+                    <span style={{ fontSize: 11, color: '#A32D2D' }}>· {editionSize} of {editionSize} sold</span>
+                  </div>
+                ) : isLowStock ? (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 20, padding: '4px 12px' }}>
+                    <span style={{ fontSize: 12, color: '#633806', fontWeight: 500 }}>Only {remaining} left</span>
+                    <span style={{ fontSize: 11, color: '#633806' }}>· {editionsSold} of {editionSize} sold</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 20, padding: '4px 12px' }}>
+                    <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Limited edition</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>· {editionsSold} of {editionSize} sold</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ marginBottom: 16 }}>
               <span className="sku-tag">Artwork SKU: {artwork.sku}</span>
             </div>
@@ -177,6 +243,7 @@ export default function ArtworkPage() {
               {artwork.description}
             </p>
             <div className="divider" />
+
             <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Select print size</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
               {availableSizes.map((size: string) => (
@@ -191,6 +258,7 @@ export default function ArtworkPage() {
               ))}
             </div>
 
+            {/* Price breakdown */}
             <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
               {artwork.offer_pct ? (
                 <>
@@ -209,14 +277,30 @@ export default function ArtworkPage() {
                   <span>{formatMVR(artwork.price)}</span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
-                <span>{selectedSize} giclee printing</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: paperAddOn > 0 ? 4 : 8 }}>
+                <span>{selectedSize} giclée printing</span>
                 <span>{formatMVR(prices.printingFee)}</span>
               </div>
+              {paperAddOn > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#633806', marginBottom: 8 }}>
+                  <span>Paper upgrade · {paperType}</span>
+                  <span>+{formatMVR(paperAddOn)}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
                 <span>Print price</span>
                 <span>{formatMVR(prices.artworkLineItem)}</span>
               </div>
+
+              {/* Paper type line */}
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 11 }}>🖨</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
+                  Printed on <strong>Hahnemühle {paperType}</strong>
+                  {paperOption && <span style={{ color: 'var(--color-text-hint)' }}> · {paperOption.description}</span>}
+                </span>
+              </div>
+
               <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
                 + MVR 100 delivery fee at checkout · or free pickup from Malé studio
               </p>
@@ -226,20 +310,65 @@ export default function ArtworkPage() {
               {orderSKU}
             </span>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-              <button
-                className="btn btn-primary btn-full"
-                onClick={alreadyInCart ? undefined : addToCart}
-                style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}}
-                disabled={alreadyInCart}
-              >
-                {alreadyInCart ? 'Added to cart ✓' : 'Add to cart'}
-              </button>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>Checkout</button>
-                <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>Continue shopping</button>
+            {/* CTA — sold out vs normal */}
+            {isSoldOut ? (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 12, padding: '16px 18px', marginBottom: 12 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D', marginBottom: 4 }}>This edition is sold out</p>
+                  <p style={{ fontSize: 13, color: '#A32D2D', opacity: 0.8, lineHeight: 1.6 }}>
+                    All {editionSize} prints have been sold. Leave your email and we'll notify you if more become available.
+                  </p>
+                </div>
+
+                {waitlistDone ? (
+                  <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>✓</span>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#0F6E56' }}>You're on the waitlist</p>
+                      <p style={{ fontSize: 12, color: '#1D9E75', marginTop: 2 }}>We'll email {waitlistEmail} when this is restocked.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      type="email"
+                      value={waitlistEmail}
+                      onChange={e => setWaitlistEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      onKeyDown={e => e.key === 'Enter' && joinWaitlist()}
+                      style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '0.5px solid var(--color-border)', fontSize: 13, background: 'var(--color-surface)', color: 'var(--color-text)', outline: 'none' }}
+                    />
+                    <button
+                      onClick={joinWaitlist}
+                      disabled={waitlistLoading}
+                      style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', flexShrink: 0, opacity: waitlistLoading ? 0.6 : 1 }}
+                    >
+                      {waitlistLoading ? '...' : 'Notify me'}
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+                <button
+                  className="btn btn-primary btn-full"
+                  onClick={alreadyInCart ? undefined : addToCart}
+                  style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}}
+                  disabled={alreadyInCart}
+                >
+                  {alreadyInCart ? 'Added to cart ✓' : 'Add to cart'}
+                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>Checkout</button>
+                  <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>Continue shopping</button>
+                </div>
+                {isLowStock && (
+                  <p style={{ fontSize: 12, color: '#633806', textAlign: 'center', marginTop: 4 }}>
+                    🔥 Only {remaining} prints left — order before they're gone!
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -292,10 +421,7 @@ function ArtistModal({ artist, onClose, artworks }: any) {
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 14, background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--color-text-muted)' }}>×</button>
         <div style={{ padding: '24px 24px 0' }}>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center', marginBottom: 20 }}>
-
-            {/* ── Artist avatar ── */}
             <AvatarDisplay profile={artist} size={64} />
-
             <div>
               <p style={{ fontSize: 18, fontWeight: 500 }}>{displayName}</p>
               {artist.location && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{artist.location}</p>}
