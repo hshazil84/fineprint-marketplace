@@ -62,8 +62,8 @@ function Typewriter({ text, delay = 0, speed = 45 }: { text: string; delay?: num
   )
 }
 
-// ── Zigzag SVG (bottom only) ──────────────────────────────────────────────
-function ZigzagBottom({ color = '#f5f0e8' }: { color?: string }) {
+// ── Zigzag bottom ─────────────────────────────────────────────────────────
+function ZigzagBottom({ color = '#f0ebe0' }: { color?: string }) {
   const w = 400, h = 14, size = 12
   const pts: string[] = []
   let x = 0, top = true
@@ -81,98 +81,154 @@ function ZigzagBottom({ color = '#f5f0e8' }: { color?: string }) {
   )
 }
 
-// ── HP-style white printer ────────────────────────────────────────────────
+// ── Compact thermal printer ───────────────────────────────────────────────
 function PrinterBody() {
   return (
-    <div style={{
-      width: 300,
-      margin: '0 auto',
-      position: 'relative',
-      zIndex: 10,
-    }}>
-      {/* Main body */}
+    <div style={{ width: 280, margin: '0 auto', position: 'relative', zIndex: 10 }}>
+      {/* Chrome body */}
       <div style={{
-        background:   'linear-gradient(to bottom, #f8f8f6 0%, #efefed 60%, #e4e4e1 100%)',
-        borderRadius: '14px 14px 0 0',
-        padding:      '14px 16px 0',
+        background:   'linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 30%, #c0c0c0 60%, #b8b8b8 100%)',
+        borderRadius: '18px 18px 6px 6px',
+        padding:      '10px 16px 0',
         boxShadow:
-          '0 -2px 0 rgba(255,255,255,0.9) inset, ' +
-          '0 2px 0 rgba(0,0,0,0.06) inset, ' +
-          '0 6px 24px rgba(0,0,0,0.12)',
-        border: '0.5px solid #d8d8d4',
+          'inset 0 1px 0 rgba(255,255,255,0.9), ' +
+          'inset 0 -1px 0 rgba(0,0,0,0.15), ' +
+          '0 4px 20px rgba(0,0,0,0.2), ' +
+          '0 1px 3px rgba(0,0,0,0.15)',
+        border:       '0.5px solid #aaa',
+        position:     'relative',
       }}>
-        {/* Top panel — logo + controls */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          {/* HP logo area */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <div style={{
-              width: 28, height: 18,
-              background: 'linear-gradient(135deg, #0096d6, #005f8e)',
-              borderRadius: 4,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ color: '#fff', fontSize: 10, fontWeight: 700, fontFamily: 'sans-serif', letterSpacing: '-0.5px' }}>hp</span>
-            </div>
-            <span style={{ fontSize: 9, color: '#aaa', letterSpacing: '0.06em', fontFamily: 'sans-serif' }}>DESKJET</span>
-          </div>
 
-          {/* Control buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {/* Power LED */}
+        {/* Subtle brushed metal lines */}
+        <div style={{
+          position:   'absolute',
+          inset:      0,
+          borderRadius: '18px 18px 6px 6px',
+          background: 'repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(255,255,255,0.04) 3px, rgba(255,255,255,0.04) 4px)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Top row — LED only, right aligned */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 10, paddingRight: 4 }}>
+          {/* Green LED */}
+          <div style={{ position: 'relative' }}>
             <div style={{
-              width: 8, height: 8, borderRadius: '50%',
-              background: '#22c55e',
-              boxShadow: '0 0 6px rgba(34,197,94,0.8)',
+              width: 9, height: 9, borderRadius: '50%',
+              background: 'radial-gradient(circle at 35% 35%, #6aff9e, #22c55e 60%, #15803d)',
+              boxShadow: '0 0 8px rgba(34,197,94,0.9), 0 0 16px rgba(34,197,94,0.4)',
+              border: '0.5px solid rgba(0,0,0,0.2)',
             }} />
-            {/* Cancel button */}
-            <div style={{
-              width: 20, height: 20, borderRadius: '50%',
-              background: 'linear-gradient(to bottom, #f0f0ee, #e0e0dc)',
-              border: '0.5px solid #ccc',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ fontSize: 8, color: '#888' }}>✕</span>
-            </div>
-            {/* Resume button */}
-            <div style={{
-              width: 20, height: 20, borderRadius: '50%',
-              background: 'linear-gradient(to bottom, #f0f0ee, #e0e0dc)',
-              border: '0.5px solid #ccc',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span style={{ fontSize: 8, color: '#888' }}>▶</span>
-            </div>
           </div>
         </div>
 
-        {/* Paper slot area */}
+        {/* Paper slot */}
         <div style={{
-          background:   'linear-gradient(to bottom, #1a1a1a, #2a2a2a)',
-          borderRadius: '3px 3px 0 0',
-          height:       20,
+          background:   'linear-gradient(180deg, #1a1a1a, #2a2a2a)',
+          borderRadius: '2px 2px 0 0',
+          height:       18,
           position:     'relative',
-          boxShadow:    'inset 0 2px 6px rgba(0,0,0,0.5)',
-          display:      'flex',
-          alignItems:   'center',
-          justifyContent: 'center',
+          boxShadow:    'inset 0 3px 8px rgba(0,0,0,0.6)',
+          overflow:     'hidden',
         }}>
           {/* Slot opening */}
           <div style={{
-            position:   'absolute',
-            bottom:     0,
-            left:       '50%',
-            transform:  'translateX(-50%)',
-            width:      220,
-            height:     5,
-            background: '#0a0a0a',
+            position:     'absolute',
+            bottom:       0,
+            left:         '50%',
+            transform:    'translateX(-50%)',
+            width:        200,
+            height:       6,
+            background:   '#0a0a0a',
             borderRadius: '1px 1px 0 0',
           }} />
-          {/* Slot guide lines */}
-          <div style={{ position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)', width: 1, height: 8, background: '#444', borderRadius: 1 }} />
-          <div style={{ position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)', width: 1, height: 8, background: '#444', borderRadius: 1 }} />
+          {/* Inner slot glow */}
+          <div style={{
+            position:   'absolute',
+            bottom:     6,
+            left:       '50%',
+            transform:  'translateX(-50%)',
+            width:      180,
+            height:     1,
+            background: 'rgba(255,140,0,0.3)',
+            boxShadow:  '0 0 4px rgba(255,140,0,0.3)',
+          }} />
+          {/* Guide marks */}
+          {[-70, 70].map((x, i) => (
+            <div key={i} style={{
+              position:   'absolute',
+              bottom:     8,
+              left:       `calc(50% + ${x}px)`,
+              width:      1,
+              height:     6,
+              background: '#555',
+            }} />
+          ))}
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Receipt curl top ──────────────────────────────────────────────────────
+function ReceiptCurlTop() {
+  return (
+    <div style={{
+      background:   '#f0ebe0',
+      height:       32,
+      position:     'relative',
+      overflow:     'hidden',
+      // Perspective taper — wider at top, narrowing slightly
+      clipPath:     'polygon(0% 0%, 100% 0%, 97% 100%, 3% 100%)',
+    }}>
+      {/* Left curl shadow */}
+      <div style={{
+        position:   'absolute',
+        left:       0,
+        top:        0,
+        bottom:     0,
+        width:      '30%',
+        background: 'linear-gradient(to right, rgba(0,0,0,0.12), transparent)',
+        pointerEvents: 'none',
+      }} />
+      {/* Right curl shadow */}
+      <div style={{
+        position:   'absolute',
+        right:      0,
+        top:        0,
+        bottom:     0,
+        width:      '30%',
+        background: 'linear-gradient(to left, rgba(0,0,0,0.12), transparent)',
+        pointerEvents: 'none',
+      }} />
+      {/* Top curl highlight */}
+      <div style={{
+        position:   'absolute',
+        top:        0,
+        left:       '10%',
+        right:      '10%',
+        height:     8,
+        background: 'linear-gradient(to bottom, rgba(255,255,255,0.5), transparent)',
+        pointerEvents: 'none',
+      }} />
+      {/* Tear dashes */}
+      <div style={{
+        position:   'absolute',
+        bottom:     6,
+        left:       '5%',
+        right:      '5%',
+        display:    'flex',
+        alignItems: 'center',
+        gap:        8,
+      }}>
+        <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
+        <span style={{
+          fontSize:      7,
+          color:         '#b0a99e',
+          letterSpacing: '0.08em',
+          fontFamily:    '"Courier New", Courier, monospace',
+          flexShrink:    0,
+        }}>✂ TEAR</span>
+        <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
       </div>
     </div>
   )
@@ -207,17 +263,17 @@ function Receipt({ data }: { data: any }) {
         @keyframes blink { 50% { opacity: 0; } }
 
         @keyframes feed-out {
-          0%    { transform: translateY(-100%); }
-          70%   { transform: translateY(-8%);   animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
-          84%   { transform: translateY(-2%);   animation-timing-function: cubic-bezier(0.0, 0, 0.2, 1); }
-          92%   { transform: translateY(0.8%);  animation-timing-function: cubic-bezier(0.0, 0, 0.2, 1); }
-          96%   { transform: translateY(0.2%);  }
-          100%  { transform: translateY(0); }
+          0%   { transform: translateY(-100%); }
+          70%  { transform: translateY(-8%);  animation-timing-function: cubic-bezier(0.4,0,0.6,1); }
+          84%  { transform: translateY(-2%);  animation-timing-function: cubic-bezier(0.0,0,0.2,1); }
+          92%  { transform: translateY(0.8%); animation-timing-function: cubic-bezier(0.0,0,0.2,1); }
+          96%  { transform: translateY(0.2%); }
+          100% { transform: translateY(0); }
         }
 
         @keyframes shadow-grow {
           0%   { filter: drop-shadow(0 0px 0px rgba(0,0,0,0)); }
-          100% { filter: drop-shadow(0 8px 20px rgba(0,0,0,0.12)); }
+          100% { filter: drop-shadow(0 10px 24px rgba(0,0,0,0.14)); }
         }
 
         @keyframes scan-line {
@@ -230,168 +286,175 @@ function Receipt({ data }: { data: any }) {
             feed-out ${duration}ms linear 0.9s both,
             shadow-grow ${duration}ms ease-out 0.9s both;
         }
-
         .receipt-done {
           transform: translateY(0);
-          filter: drop-shadow(0 8px 20px rgba(0,0,0,0.12));
+          filter: drop-shadow(0 10px 24px rgba(0,0,0,0.14));
         }
-
         .scan-line {
           position: absolute;
-          left: 0; right: 0;
-          height: 2px;
+          left: 0; right: 0; height: 2px;
           background: rgba(0,0,0,0.08);
           pointer-events: none;
           z-index: 5;
           animation: scan-line ${duration}ms linear 0.9s both;
         }
+
+        /* Side curl shadows on the receipt body */
+        .receipt-body-wrap {
+          position: relative;
+        }
+        .receipt-body-wrap::before {
+          content: '';
+          position: absolute;
+          left: 0; top: 0; bottom: 0;
+          width: 18px;
+          background: linear-gradient(to right, rgba(0,0,0,0.07), transparent);
+          pointer-events: none;
+          z-index: 2;
+        }
+        .receipt-body-wrap::after {
+          content: '';
+          position: absolute;
+          right: 0; top: 0; bottom: 0;
+          width: 18px;
+          background: linear-gradient(to left, rgba(0,0,0,0.07), transparent);
+          pointer-events: none;
+          z-index: 2;
+        }
       `}</style>
 
-      <div style={{ maxWidth: 300, margin: '0 auto 40px', position: 'relative' }}>
+      <div style={{ maxWidth: 280, margin: '0 auto 40px', position: 'relative' }}>
 
         <PrinterBody />
 
-        {/* Clip container — hides receipt above slot */}
+        {/* Clip container */}
         <div style={{ overflow: 'hidden', position: 'relative' }}>
           <div
             ref={receiptRef}
             className={printing ? (done ? 'receipt-done' : 'receipt-feed') : ''}
             style={{
-              transform: printing ? undefined : 'translateY(-100%)',
-              position:  'relative',
-              overflow:  'hidden',
-              // Curved bottom corners on the receipt
-              borderRadius: '0 0 8px 8px',
+              transform:    printing ? undefined : 'translateY(-100%)',
+              position:     'relative',
+              borderRadius: '0 0 6px 6px',
+              overflow:     'hidden',
             }}
           >
             {printing && !done && <div className="scan-line" />}
 
-            {/* ── Top tear line ── */}
-            <div style={{
-              background: '#f5f0e8',
-              padding:    '10px 24px 0',
-              display:    'flex',
-              alignItems: 'center',
-              gap:        8,
-            }}>
-              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
-              <span style={{
-                fontSize:   8,
-                color:      '#b0a99e',
-                letterSpacing: '0.08em',
-                fontFamily: '"Courier New", Courier, monospace',
-                flexShrink: 0,
-              }}>✂ TEAR HERE</span>
-              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
-            </div>
+            {/* Curl top */}
+            <ReceiptCurlTop />
 
-            {/* ── Body ── */}
-            <div style={{
-              background:  '#f5f0e8',
-              padding:     '8px 24px 16px',
-              fontFamily:  '"Courier New", Courier, monospace',
-              fontSize:    11,
-              color:       '#2a2520',
-              lineHeight:  1.9,
-            }}>
-              {/* Header */}
-              <div style={{ textAlign: 'center', marginBottom: 10 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.14em', marginBottom: 2 }}>FINEPRINT STUDIO</p>
-                <p style={{ fontSize: 9, color: '#7a7068', letterSpacing: '0.06em', lineHeight: 1.6 }}>
-                  H. DHUNBURIMAAGE, JANAVAREE MAGU<br />
-                  MALÉ, MALDIVES<br />
-                  hello@fineprintmv.com
-                </p>
-              </div>
+            {/* Body with side curl shadows */}
+            <div className="receipt-body-wrap">
+              <div style={{
+                background:  '#f0ebe0',
+                padding:     '4px 24px 16px',
+                fontFamily:  '"Courier New", Courier, monospace',
+                fontSize:    11,
+                color:       '#2a2520',
+                lineHeight:  1.9,
+              }}>
 
-              <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
-
-              {/* Date + time */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7a7068', marginBottom: 8 }}>
-                <span>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                <span>{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-
-              {/* Invoice */}
-              <div style={{ marginBottom: 6 }}>
-                <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>INVOICE NO.</p>
-                <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em' }}>
-                  <Typewriter text={data.invoiceNumber || ''} delay={1400} speed={55} />
-                </p>
-              </div>
-
-              {/* Order SKU */}
-              {data.orderSku && (
-                <div style={{ marginBottom: 8 }}>
-                  <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>ORDER REF.</p>
-                  <p style={{ fontSize: 10, letterSpacing: '0.04em' }}>
-                    <Typewriter text={data.orderSku} delay={2000} speed={40} />
+                {/* Header */}
+                <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                  <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.14em', marginBottom: 2 }}>FINEPRINT STUDIO</p>
+                  <p style={{ fontSize: 9, color: '#7a7068', letterSpacing: '0.06em', lineHeight: 1.6 }}>
+                    H. DHUNBURIMAAGE, JANAVAREE MAGU<br />
+                    MALÉ, MALDIVES<br />
+                    hello@fineprintmv.com
                   </p>
                 </div>
-              )}
 
-              <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
+                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
 
-              {/* Items */}
-              <div style={{ marginBottom: 6 }}>
-                {data.items?.map((item: any, i: number) => (
-                  <div key={i} style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, flex: 1, lineHeight: 1.4 }}>{item.title}</span>
-                      <span style={{ fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{formatMVR(item.price)}</span>
-                    </div>
-                    <p style={{ fontSize: 9, color: '#7a7068' }}>
-                      {item.artistName} · {item.printSize}{item.quantity > 1 ? ' · ×' + item.quantity : ''}
+                {/* Date + time */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7a7068', marginBottom: 8 }}>
+                  <span>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  <span>{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+
+                {/* Invoice */}
+                <div style={{ marginBottom: 6 }}>
+                  <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>INVOICE NO.</p>
+                  <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em' }}>
+                    <Typewriter text={data.invoiceNumber || ''} delay={1400} speed={55} />
+                  </p>
+                </div>
+
+                {/* Order SKU */}
+                {data.orderSku && (
+                  <div style={{ marginBottom: 8 }}>
+                    <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>ORDER REF.</p>
+                    <p style={{ fontSize: 10, letterSpacing: '0.04em' }}>
+                      <Typewriter text={data.orderSku} delay={2000} speed={40} />
                     </p>
                   </div>
-                ))}
-              </div>
+                )}
 
-              <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
+                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
 
-              {/* Delivery */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
-                <span>{data.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                <span>{data.deliveryMethod === 'pickup' ? 'FREE' : 'MVR 100'}</span>
-              </div>
+                {/* Items */}
+                <div style={{ marginBottom: 6 }}>
+                  {data.items?.map((item: any, i: number) => (
+                    <div key={i} style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, flex: 1, lineHeight: 1.4 }}>{item.title}</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{formatMVR(item.price)}</span>
+                      </div>
+                      <p style={{ fontSize: 9, color: '#7a7068' }}>
+                        {item.artistName} · {item.printSize}{item.quantity > 1 ? ' · ×' + item.quantity : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
 
-              {/* Total */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, paddingTop: 8, borderTop: '1px solid #c4bfb6', marginTop: 4 }}>
-                <span>TOTAL</span>
-                <span>{formatMVR(data.totalPaid || total)}</span>
-              </div>
+                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
 
-              <div style={{ textAlign: 'center', margin: '10px 0 6px' }}>
-                {[0, 1, 2].map(i => (
-                  <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
-                ))}
-              </div>
+                {/* Delivery */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
+                  <span>{data.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+                  <span>{data.deliveryMethod === 'pickup' ? 'FREE' : 'MVR 100'}</span>
+                </div>
 
-              {/* Payment */}
-              <div style={{ textAlign: 'center', fontSize: 9, color: '#7a7068', lineHeight: 1.8 }}>
-                <p>{data.paymentMethod === 'swipe' ? 'PAID VIA SWIPE' : 'BANK TRANSFER — BML'}</p>
-                <p>PENDING VERIFICATION</p>
-              </div>
+                {/* Total */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, paddingTop: 8, borderTop: '1px solid #c4bfb6', marginTop: 4 }}>
+                  <span>TOTAL</span>
+                  <span>{formatMVR(data.totalPaid || total)}</span>
+                </div>
 
-              <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
+                <div style={{ textAlign: 'center', margin: '10px 0 6px' }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
+                  ))}
+                </div>
 
-              {/* Footer */}
-              <div style={{ textAlign: 'center', fontSize: 9, color: '#7a7068', lineHeight: 1.9 }}>
-                <p>GICLÉE ARCHIVAL PRINTS</p>
-                <p>HAHNEMÜHLE PAPERS</p>
-                <p style={{ marginTop: 4, fontWeight: 600 }}>THANK YOU FOR YOUR ORDER!</p>
-                <p>fineprintmv.com</p>
-              </div>
+                {/* Payment */}
+                <div style={{ textAlign: 'center', fontSize: 9, color: '#7a7068', lineHeight: 1.8 }}>
+                  <p>{data.paymentMethod === 'swipe' ? 'PAID VIA SWIPE' : 'BANK TRANSFER — BML'}</p>
+                  <p>PENDING VERIFICATION</p>
+                </div>
 
-              <div style={{ textAlign: 'center', margin: '10px 0 4px' }}>
-                {[0, 1, 2].map(i => (
-                  <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
-                ))}
+                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
+
+                {/* Footer */}
+                <div style={{ textAlign: 'center', fontSize: 9, color: '#7a7068', lineHeight: 1.9 }}>
+                  <p>GICLÉE ARCHIVAL PRINTS</p>
+                  <p>HAHNEMÜHLE PAPERS</p>
+                  <p style={{ marginTop: 4, fontWeight: 600 }}>THANK YOU FOR YOUR ORDER!</p>
+                  <p>fineprintmv.com</p>
+                </div>
+
+                <div style={{ textAlign: 'center', margin: '10px 0 4px' }}>
+                  {[0, 1, 2].map(i => (
+                    <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
+                  ))}
+                </div>
+
               </div>
             </div>
 
-            {/* ── Bottom zigzag ── */}
-            <ZigzagBottom color="#f5f0e8" />
+            {/* Bottom zigzag */}
+            <ZigzagBottom color="#f0ebe0" />
 
           </div>
         </div>
@@ -428,7 +491,7 @@ export default function OrderConfirmedPage() {
 
         {data && <Receipt data={data} />}
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 8 }}>
           <Link href="/storefront" className="btn btn-primary">Continue browsing</Link>
           <Link href="/orders/track" className="btn btn-sm">Track your order</Link>
         </div>
