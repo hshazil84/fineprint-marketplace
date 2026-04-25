@@ -131,4 +131,62 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
       {/* Withdraw from platform */}
       <div className="card">
         <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Withdraw from platform</p>
-        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16, lineHeig
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
+          Request to permanently remove your account and artworks from FinePrint Studio. We will process any outstanding payouts before closing your account.
+        </p>
+        {accountStatus === 'pending_withdrawal' ? (
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px' }}>
+            <p style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, marginBottom: 4 }}>Withdrawal requested</p>
+            <p style={{ fontSize: 12, color: '#A32D2D' }}>
+              Your request has been submitted. Our team will be in touch shortly to process your account closure. Will miss you 💔
+            </p>
+          </div>
+        ) : accountStatus === 'withdrawn' ? (
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px' }}>
+            <p style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, marginBottom: 4 }}>Account withdrawn</p>
+            <p style={{ fontSize: 12, color: '#A32D2D' }}>
+              Your account has been deactivated. Reach out to hello@fineprintmv.com if you'd like to return.
+            </p>
+          </div>
+        ) : showWithdrawForm ? (
+          <div>
+            <div className="form-group">
+              <label className="form-label">Reason for leaving</label>
+              <textarea
+                className="form-input"
+                value={withdrawReason}
+                onChange={e => setWithdrawReason(e.target.value)}
+                placeholder="Please tell us why you want to leave..."
+                style={{ minHeight: 80 }}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={submitWithdraw}
+                disabled={withdrawing}
+              >
+                {withdrawing ? 'Submitting...' : 'Submit withdrawal request'}
+              </button>
+              <button
+                className="btn btn-sm"
+                onClick={() => { setShowWithdrawForm(false); setWithdrawReason('') }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="btn btn-sm"
+            style={{ fontSize: 12, color: '#A32D2D', border: '0.5px solid #F09595', background: 'none' }}
+            onClick={() => setShowWithdrawForm(true)}
+          >
+            Request withdrawal
+          </button>
+        )}
+      </div>
+
+    </div>
+  )
+}
