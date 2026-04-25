@@ -1,14 +1,14 @@
 'use client'
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase'
 import toast from 'react-hot-toast'
+import AccountStatusBanner from './AccountStatusBanner'
 
 export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProfileUpdate: (updates: any) => void }) {
   const [shopClosing, setShopClosing] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawReason, setWithdrawReason] = useState('')
   const [showWithdrawForm, setShowWithdrawForm] = useState(false)
-  const supabase = createClient()
+  const [accountStatus, setAccountStatus] = useState(profile?.account_status ?? 'active')
 
   const isShopClosed = profile?.shop_status === 'closed'
 
@@ -16,14 +16,7 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
     setShopClosing(true)
     try {
       const newStatus = isShopClosed ? 'open' : 'closed'
-      const { error } = await supabase
-        .from('profiles')
-        .update({ shop_status: newStatus })
-        .eq('id', profile.id)
-      if (error) throw error
-      onProfileUpdate({ shop_status: newStatus })
-      toast.success(newStatus === 'closed' ? 'Shop closed — your artworks are hidden from the storefront' : 'Shop is open — your artworks are visible again')
-      await fetch('/api/notify/shop-status', {
+      const res = await fetch('/api/notify/shop-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -32,6 +25,11 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
           status: newStatus,
         }),
       })
+      if (!res.ok) throw new Error('Failed to update shop status')
+      onProfileUpdate({ shop_status: newStatus })
+      toast.success(newStatus === 'closed'
+        ? 'Shop closed — your artworks are hidden from the storefront'
+        : 'Shop is open — your artworks are visible again')
     } catch (err: any) {
       toast.error(err.message)
     } finally {
@@ -43,21 +41,16 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
     if (!withdrawReason.trim()) { toast.error('Please provide a reason'); return }
     setWithdrawing(true)
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ withdraw_requested: true, withdraw_reason: withdrawReason })
-        .eq('id', profile.id)
-      if (error) throw error
-      await fetch('/api/notify/withdraw', {
+      const res = await fetch('/api/artist/withdrawal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          artistName: profile.display_name || profile.full_name,
-          artistCode: profile.artist_code,
-          reason: withdrawReason,
-        }),
+        body: JSON.stringify({ action: 'request_withdrawal', reason: withdrawReason }),
       })
-      onProfileUpdate({ withdraw_requested: true, withdraw_reason: withdrawReason })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to submit request')
+
+      onProfileUpdate({ account_status: 'pending_withdrawal' })
+      setAccountStatus('pending_withdrawal')
       toast.success('Withdrawal request submitted — we will be in touch.')
       setShowWithdrawForm(false)
     } catch (err: any) {
@@ -67,8 +60,31 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
     }
   }
 
+  async function handleUnpause() {
+    try {
+      const res = await fetch('/api/artist/withdrawal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unpause' }),
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error || 'Failed to unpause')
+      onProfileUpdate({ account_status: 'active' })
+      setAccountStatus('active')
+      toast.success('Your account is active again!')
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
   return (
     <div style={{ maxWidth: 520, margin: '0 auto' }}>
+
+      {/* Account status banner */}
+      <AccountStatusBanner
+        status={accountStatus}
+        onManage={handleUnpause}
+      />
 
       {/* Close shop */}
       <div className="card" style={{ marginBottom: 16 }}>
@@ -111,19 +127,21 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
       <div className="card">
         <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Withdraw from platform</p>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
-          Request to permanently remove your account and artworks from FinePrint Studio. We will process any outstanding payouts before closing your account. 
+          Request to permanently remove your account and artworks from FinePrint Studio. We will process any outstanding payouts before closing your account.
         </p>
-        {profile?.withdraw_requested ? (
+        {accountStatus === 'pending_withdrawal' ? (
           <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px' }}>
             <p style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, marginBottom: 4 }}>Withdrawal requested</p>
             <p style={{ fontSize: 12, color: '#A32D2D' }}>
               Your request has been submitted. Our team will be in touch shortly to process your account closure. Will miss you 💔
             </p>
-            {profile?.withdraw_reason && (
-              <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 6, fontStyle: 'italic' }}>
-                Reason: {profile.withdraw_reason}
-              </p>
-            )}
+          </div>
+        ) : accountStatus === 'withdrawn' ? (
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '12px 14px' }}>
+            <p style={{ fontSize: 13, color: '#A32D2D', fontWeight: 500, marginBottom: 4 }}>Account withdrawn</p>
+            <p style={{ fontSize: 12, color: '#A32D2D' }}>
+              Your account has been deactivated. Reach out to hello@fineprintmv.com if you'd like to return.
+            </p>
           </div>
         ) : showWithdrawForm ? (
           <div>
@@ -163,6 +181,7 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
           </button>
         )}
       </div>
+
     </div>
   )
 }
