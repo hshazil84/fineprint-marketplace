@@ -10,13 +10,8 @@ import Header from '@/app/components/Header'
 // ── Animated MVR number ───────────────────────────────────────────────────
 function AnimatedMVR({ amount, size = 15 }: { amount: number; size?: number }) {
   const [animKey, setAnimKey] = useState(0)
-
-  useEffect(() => {
-    setAnimKey(k => k + 1)
-  }, [amount])
-
-  const digits = String(amount.toLocaleString())
-
+  useEffect(() => { setAnimKey(k => k + 1) }, [amount])
+  const digits = amount.toLocaleString()
   return (
     <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, fontSize: size, fontWeight: 500 }}>
       <span>MVR </span>
@@ -190,8 +185,8 @@ export default function CheckoutPage() {
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
 
-      {/* ── Animation CSS ── */}
       <style>{`
+        /* ── Digit pop-in animation ── */
         :root {
           --digit-dur: 500ms;
           --digit-distance: 8px;
@@ -225,6 +220,33 @@ export default function CheckoutPage() {
         }
         @media (prefers-reduced-motion: reduce) {
           .t-digit-group .t-digit { animation: none !important; }
+        }
+
+        /* ── Shine sweep button ── */
+        .fp-shine-btn::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          background: linear-gradient(
+            45deg,
+            transparent 25%,
+            rgba(255,255,255,0.18) 50%,
+            transparent 75%,
+            transparent 100%
+          );
+          background-size: 250% 250%, 100% 100%;
+          background-position: 200% 0, 0 0;
+          background-repeat: no-repeat;
+          transition: none;
+          pointer-events: none;
+        }
+        .fp-shine-btn:hover:not(:disabled)::before {
+          background-position: -100% 0, 0 0;
+          transition: background-position 1500ms ease;
+        }
+        .fp-shine-btn:active:not(:disabled) {
+          transform: scale(0.99);
         }
       `}</style>
 
@@ -467,9 +489,32 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              <button className="btn btn-primary btn-full" onClick={handleSubmit} disabled={submitting}>
+              {/* ── Shine submit button ── */}
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="fp-shine-btn"
+                style={{
+                  width:        '100%',
+                  padding:      '13px 20px',
+                  borderRadius: 12,
+                  border:       'none',
+                  background:   'linear-gradient(to right, #1a1a1a, #2d2d2d)',
+                  color:        '#fff',
+                  fontSize:     14,
+                  fontWeight:   500,
+                  cursor:       submitting ? 'default' : 'pointer',
+                  opacity:      submitting ? 0.6 : 1,
+                  position:     'relative',
+                  overflow:     'hidden',
+                  fontFamily:   'inherit',
+                  letterSpacing: '0.01em',
+                  marginTop:    4,
+                }}
+              >
                 {submitting ? 'Submitting...' : paymentMethod === 'swipe' ? 'I have paid via Swipe — Submit order' : 'Submit order'}
               </button>
+
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12, textAlign: 'center', lineHeight: 1.6 }}>
                 By submitting you agree to our <a href="/terms" style={{ color: '#1D9E75' }}>Terms and Conditions</a>
               </p>
