@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { SparkButton } from '@/app/components/SparkButton'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
@@ -9,12 +10,12 @@ import Header from '@/app/components/Header'
 export default function SignupPage() {
   const router = useRouter()
   const [form, setForm] = useState({
-    name: '',
+    name:        '',
     displayName: '',
-    email: '',
-    password: '',
-    role: 'artist',
-    location: '',
+    email:       '',
+    password:    '',
+    role:        'artist',
+    location:    '',
   })
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
@@ -27,7 +28,7 @@ export default function SignupPage() {
   }
 
   async function ensureUniqueCode(baseCode: string): Promise<string> {
-    let code = baseCode
+    let code    = baseCode
     let attempt = 0
     while (true) {
       const { data } = await supabase
@@ -57,13 +58,13 @@ export default function SignupPage() {
     }
 
     const { error: profileError } = await supabase.from('profiles').insert({
-      id: data.user.id,
-      full_name: form.name,
+      id:           data.user.id,
+      full_name:    form.name,
       display_name: form.displayName || null,
-      email: form.email,
-      role: form.role,
-      location: form.location || null,
-      artist_code: artistCode,
+      email:        form.email,
+      role:         form.role,
+      location:     form.location || null,
+      artist_code:  artistCode,
     })
 
     if (profileError) { toast.error(profileError.message); setLoading(false); return }
@@ -71,9 +72,9 @@ export default function SignupPage() {
     if (form.role === 'artist') {
       try {
         await fetch('/api/notify/artist', {
-          method: 'POST',
+          method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: form.name, email: form.email, location: form.location }),
+          body:    JSON.stringify({ name: form.name, email: form.email, location: form.location }),
         })
       } catch {}
     }
@@ -88,6 +89,7 @@ export default function SignupPage() {
       <Header />
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <div style={{ width: '100%', maxWidth: 440 }}>
+
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Join FinePrint Studio</h1>
           <p style={{ color: 'var(--color-text-muted)', marginBottom: 24 }}>Artist account — sell your prints</p>
 
@@ -95,8 +97,13 @@ export default function SignupPage() {
 
             <div className="form-group">
               <label className="form-label">Full name</label>
-              <input className="form-input" placeholder="Ahmed Ali"
-                value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
+              <input
+                className="form-input"
+                placeholder="Ahmed Ali"
+                value={form.name}
+                onChange={e => setForm({ ...form, name: e.target.value })}
+                required
+              />
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
                 Your legal name — not shown publicly
               </p>
@@ -104,8 +111,12 @@ export default function SignupPage() {
 
             <div className="form-group">
               <label className="form-label">Display name</label>
-              <input className="form-input" placeholder="e.g. Raajjethere, Azleena"
-                value={form.displayName} onChange={e => setForm({ ...form, displayName: e.target.value })} />
+              <input
+                className="form-input"
+                placeholder="e.g. Raajjethere, Azleena"
+                value={form.displayName}
+                onChange={e => setForm({ ...form, displayName: e.target.value })}
+              />
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
                 Shown on your artworks and public profile. Leave blank to use your full name.
               </p>
@@ -113,20 +124,36 @@ export default function SignupPage() {
 
             <div className="form-group">
               <label className="form-label">Email</label>
-              <input className="form-input" type="email" placeholder="you@example.com"
-                value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+              <input
+                className="form-input"
+                type="email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={e => setForm({ ...form, email: e.target.value })}
+                required
+              />
             </div>
 
             <div className="form-group">
               <label className="form-label">Password</label>
-              <input className="form-input" type="password" placeholder="min. 8 characters"
-                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
+              <input
+                className="form-input"
+                type="password"
+                placeholder="min. 8 characters"
+                value={form.password}
+                onChange={e => setForm({ ...form, password: e.target.value })}
+                required
+              />
             </div>
 
             <div className="form-group">
               <label className="form-label">Island / Location</label>
-              <input className="form-input" placeholder="e.g. Malé, Kaafu Atoll"
-                value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
+              <input
+                className="form-input"
+                placeholder="e.g. Malé, Kaafu Atoll"
+                value={form.location}
+                onChange={e => setForm({ ...form, location: e.target.value })}
+              />
             </div>
 
             {form.name && (
@@ -149,9 +176,11 @@ export default function SignupPage() {
               </label>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-full" style={{ marginTop: 8 }} disabled={loading}>
-              {loading ? 'Creating account...' : 'Create account'}
-            </button>
+            <div style={{ marginTop: 8 }}>
+              <SparkButton type="submit" fullWidth disabled={loading}>
+                {loading ? 'Creating account...' : 'Create account'}
+              </SparkButton>
+            </div>
 
             <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 14, textAlign: 'center' }}>
               Already have an account?{' '}
