@@ -1,30 +1,22 @@
-import { createAdminClient, createAnonClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  console.log('withdrawal route hit, auth:', req.headers.get('authorization')?.slice(0, 20))
   try {
-    const authHeader = req.headers.get('authorization')
-    const token = authHeader?.replace('Bearer ', '')
-    if (!token) return NextResponse.json({ error: 'Unauthorized - no token' }, { status: 401 })
-
-    const anon = createAnonClient()
-    const { data: { user }, error } = await anon.auth.getUser(token)
-    console.log('user:', user?.id, 'error:', error?.message)
-    if (!user) return NextResponse.json({ error: 'Unauthorized', detail: error?.message }, { status: 401 })
+    const { action, artistId } = await req.json()
+    if (!artistId) return NextResponse.json({ error: 'Missing artistId' }, { status: 400 })
 
     const admin = createAdminClient()
-    const { action } = await req.json()
 
     if (action === 'pause') {
-      await admin.from('profiles').update({ account_status: 'paused' }).eq('id', user.id)
-      await admin.from('artworks').update({ is_active: false }).eq('artist_id', user.id)
+      await admin.from('profiles').update({ account_status: 'paused' }).eq('id', artistId)
+      await admin.from('artworks').update({ is_active: false }).eq('artist_id', artistId)
       return NextResponse.json({ ok: true, status: 'paused' })
     }
 
     if (action === 'unpause') {
-      await admin.from('profiles').update({ account_status: 'active' }).eq('id', user.id)
-      await admin.from('artworks').update({ is_active: true }).eq('artist_id', user.id)
+      await admin.from('profiles').update({ account_status: 'active' }).eq('id', artistId)
+      await admin.from('artworks').update({ is_active: true }).eq('artist_id', artistId)
       return NextResponse.json({ ok: true, status: 'active' })
     }
 
@@ -32,12 +24,12 @@ export async function POST(req: Request) {
       await admin
         .from('profiles')
         .update({ account_status: 'pending_withdrawal' })
-        .eq('id', user.id)
+        .eq('id', artistId)
 
       const { data: profile } = await admin
         .from('profiles')
         .select('full_name, email, artist_code')
-        .eq('id', user.id)
+        .eq('id', artistId)
         .single()
 
       await fetch('https://api.resend.com/emails', {
