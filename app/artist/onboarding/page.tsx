@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 const STEPS = 5
 
 const TITLES = [
-  'You are exactly who\nwe built this for, [name] ♡',
+  'You are exactly who\nwe built this for, [name]',
   'Museum-quality\nprints, handled.',
   'You keep 95%\nof every sale.',
   'Everything\nin one place.',
@@ -25,11 +25,9 @@ function buildWords(step: number, name: string) {
   return raw.split('\n').map(line => line.split(' '))
 }
 
-function WordTitle({
-  step, name, animKey,
-}: { step: number; name: string; animKey: number }) {
+function WordTitle({ step, name, animKey }: { step: number; name: string; animKey: number }) {
   const [visible, setVisible] = useState<boolean[]>([])
-  const em = EM_WORDS[step] || []
+  const em    = EM_WORDS[step] || []
   const lines = buildWords(step, name)
   const flat  = lines.flat()
 
@@ -44,13 +42,15 @@ function WordTitle({
   return (
     <h1 style={{
       fontFamily: '"DM Serif Display", Georgia, serif',
-      fontSize: step === 0 || step === 4 ? 36 : 30,
-      lineHeight: 1.1, margin: '0 0 16px', color: '#1a1a18',
+      fontSize:   step === 0 || step === 4 ? 36 : 30,
+      lineHeight: 1.1,
+      margin:     '0 0 16px',
+      color:      '#1a1a18',
     }}>
       {lines.map((words, li) => (
         <span key={li} style={{ display: 'block' }}>
           {words.map((w, wi) => {
-            const i = idx++
+            const i    = idx++
             const isEm = em.includes(w)
             return (
               <span key={wi}>
@@ -77,16 +77,17 @@ function WordTitle({
 
 function AuroraCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')!
     const bands = [
-      { y:.18, amp:.14, freq:.55, speed:.28, h:165, s:55, l:72, a:.45, th:.20 },
-      { y:.35, amp:.10, freq:.80, speed:.40, h:195, s:60, l:75, a:.35, th:.15 },
-      { y:.50, amp:.12, freq:.65, speed:.22, h:145, s:50, l:70, a:.30, th:.13 },
-      { y:.65, amp:.08, freq:1.0, speed:.35, h:175, s:55, l:74, a:.22, th:.10 },
-      { y:.25, amp:.09, freq:.90, speed:.18, h:210, s:50, l:78, a:.28, th:.11 },
+      { y:.18, amp:.14, freq:.55, speed:.28, h:165, s:55, l:72, a:.55, th:.22 },
+      { y:.35, amp:.10, freq:.80, speed:.40, h:195, s:60, l:75, a:.45, th:.18 },
+      { y:.50, amp:.12, freq:.65, speed:.22, h:145, s:50, l:70, a:.40, th:.16 },
+      { y:.65, amp:.08, freq:1.0, speed:.35, h:175, s:55, l:74, a:.30, th:.13 },
+      { y:.25, amp:.09, freq:.90, speed:.18, h:210, s:50, l:78, a:.35, th:.14 },
     ]
     let t = 0, raf = 0
 
@@ -117,11 +118,11 @@ function AuroraCanvas() {
         for (let i = pts.length-1; i >= 0; i--) ctx.lineTo(pts[i].x, pts[i].y + th)
         ctx.closePath()
         const g = ctx.createLinearGradient(0, cy-th, 0, cy+th)
-        g.addColorStop(0,    `hsla(${b.h},${b.s}%,${b.l}%,0)`)
-        g.addColorStop(.35,  `hsla(${b.h},${b.s}%,${b.l}%,${b.a})`)
-        g.addColorStop(.5,   `hsla(${b.h+15},${b.s}%,${b.l+5}%,${b.a*1.2})`)
-        g.addColorStop(.65,  `hsla(${b.h},${b.s}%,${b.l}%,${b.a})`)
-        g.addColorStop(1,    `hsla(${b.h},${b.s}%,${b.l}%,0)`)
+        g.addColorStop(0,   `hsla(${b.h},${b.s}%,${b.l}%,0)`)
+        g.addColorStop(.35, `hsla(${b.h},${b.s}%,${b.l}%,${b.a})`)
+        g.addColorStop(.5,  `hsla(${b.h+15},${b.s}%,${b.l+5}%,${b.a*1.2})`)
+        g.addColorStop(.65, `hsla(${b.h},${b.s}%,${b.l}%,${b.a})`)
+        g.addColorStop(1,   `hsla(${b.h},${b.s}%,${b.l}%,0)`)
         ctx.fillStyle = g
         ctx.fill()
       })
@@ -134,31 +135,113 @@ function AuroraCanvas() {
 
   return (
     <div style={{
-      position: 'absolute', top: 0, left: 0, right: 0,
-      height: '50%', pointerEvents: 'none', zIndex: 0, overflow: 'hidden',
+      position:      'absolute',
+      top:           0, left: 0, right: 0,
+      height:        '50%',
+      pointerEvents: 'none',
+      zIndex:        0,
+      overflow:      'hidden',
+      filter:        'blur(18px)',     // ← soft gradient blur
     }}>
       <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, height: '75%',
+        position:   'absolute',
+        bottom:     0, left: 0, right: 0,
+        height:     '75%',
         background: 'linear-gradient(to bottom, transparent, var(--color-background-primary, #f9f8f5))',
       }} />
     </div>
   )
 }
 
-function HeartIcon() {
+// ── Full-screen transition overlay ────────────────────────────────────────
+function DashboardTransition({ active, onDone }: { active: boolean; onDone: () => void }) {
+  const [phase, setPhase] = useState<'idle'|'expand'|'text'|'done'>('idle')
+
+  useEffect(() => {
+    if (!active) return
+    // Phase 1 — teal circle expands from button
+    setPhase('expand')
+    // Phase 2 — show text
+    setTimeout(() => setPhase('text'), 600)
+    // Phase 3 — navigate
+    setTimeout(() => { setPhase('done'); onDone() }, 1800)
+  }, [active])
+
+  if (phase === 'idle') return null
+
   return (
-    <svg width="64" height="64" viewBox="0 0 64 64" style={{ display: 'block' }}>
-      <circle cx="32" cy="32" r="30" fill="#fff0f3" stroke="#ffc0cc" strokeWidth="1" />
-      <path
-        d="M32 45 C32 45 14 34 14 23 C14 17 18.5 13 23.5 13 C27 13 30 15 32 18 C34 15 37 13 40.5 13 C45.5 13 50 17 50 23 C50 34 32 45 32 45Z"
-        fill="#ff6b8a"
-        style={{
-          transformOrigin: '50% 55%',
-          animation: 'fp-heartbeat 1.6s ease-in-out infinite',
-        }}
-      />
-    </svg>
+    <div style={{
+      position:   'fixed',
+      inset:      0,
+      zIndex:     1000,
+      display:    'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow:   'hidden',
+    }}>
+      {/* Expanding circle */}
+      <div style={{
+        position:     'absolute',
+        width:        phase === 'expand' || phase === 'text' || phase === 'done' ? '300vmax' : 0,
+        height:       phase === 'expand' || phase === 'text' || phase === 'done' ? '300vmax' : 0,
+        borderRadius: '50%',
+        background:   'linear-gradient(135deg, #1D9E75, #0F6E56)',
+        transition:   'width 0.7s cubic-bezier(0.4,0,0.2,1), height 0.7s cubic-bezier(0.4,0,0.2,1)',
+        transform:    'translate(-50%, -50%)',
+        left:         '50%',
+        top:          '50%',
+      }} />
+
+      {/* Aurora overlay on top of teal */}
+      <div style={{
+        position:   'absolute',
+        inset:      0,
+        opacity:    phase === 'text' ? 0.15 : 0,
+        transition: 'opacity 0.6s ease',
+        background: 'linear-gradient(135deg, rgba(93,202,165,0.4), rgba(0,173,238,0.3), rgba(255,193,75,0.2))',
+      }} />
+
+      {/* Text */}
+      <div style={{
+        position:   'relative',
+        zIndex:     1,
+        textAlign:  'center',
+        opacity:    phase === 'text' ? 1 : 0,
+        transform:  phase === 'text' ? 'translateY(0)' : 'translateY(20px)',
+        transition: 'opacity 0.5s ease, transform 0.5s ease',
+      }}>
+        <p style={{
+          fontFamily: '"DM Serif Display", Georgia, serif',
+          fontSize:   40,
+          color:      '#fff',
+          lineHeight: 1.1,
+          marginBottom: 12,
+        }}>
+          Welcome to<br /><em style={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.8)' }}>your dashboard.</em>
+        </p>
+        <p style={{
+          fontSize:   14,
+          color:      'rgba(255,255,255,0.6)',
+          fontFamily: '"DM Sans", sans-serif',
+          letterSpacing: '0.02em',
+        }}>
+          Setting everything up for you...
+        </p>
+        {/* Loading dots */}
+        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 20 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width:            6,
+              height:           6,
+              borderRadius:     '50%',
+              background:       'rgba(255,255,255,0.6)',
+              animation:        `fp-dot-pulse 1s ease-in-out ${i * 0.15}s infinite`,
+            }} />
+          ))}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -168,13 +251,13 @@ function Confetti({ active }: { active: boolean }) {
   useEffect(() => {
     if (!active) return
     setPieces(Array.from({ length: 55 }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      bg: cols[Math.floor(Math.random() * cols.length)],
-      dur: 1.5 + Math.random() * 2,
+      id:    i,
+      left:  Math.random() * 100,
+      bg:    cols[Math.floor(Math.random() * cols.length)],
+      dur:   1.5 + Math.random() * 2,
       delay: Math.random() * 0.8,
-      w: 4 + Math.random() * 6,
-      h: 4 + Math.random() * 6,
+      w:     4 + Math.random() * 6,
+      h:     4 + Math.random() * 6,
     })))
   }, [active])
 
@@ -183,12 +266,14 @@ function Confetti({ active }: { active: boolean }) {
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 2 }}>
       {pieces.map(p => (
         <div key={p.id} style={{
-          position: 'absolute',
-          left: p.left + '%', top: -8,
-          width: p.w, height: p.h,
-          background: p.bg,
-          borderRadius: 1,
-          animation: `fp-conf-fall ${p.dur}s linear ${p.delay}s both`,
+          position:         'absolute',
+          left:             p.left + '%',
+          top:              -8,
+          width:            p.w,
+          height:           p.h,
+          background:       p.bg,
+          borderRadius:     1,
+          animation:        `fp-conf-fall ${p.dur}s linear ${p.delay}s both`,
         }} />
       ))}
     </div>
@@ -196,15 +281,15 @@ function Confetti({ active }: { active: boolean }) {
 }
 
 export default function OnboardingPage() {
-  const router    = useRouter()
-  const supabase  = createClient()
-  const [profile, setProfile]   = useState<any>(null)
-  const [step, setStep]         = useState(0)
-  const [animKey, setAnimKey]   = useState(0)
-  const [sliding, setSliding]   = useState(false)
-  const [direction, setDirection] = useState<1|-1>(1)
-  const [loading, setLoading]   = useState(true)
-  const [finishing, setFinishing] = useState(false)
+  const router   = useRouter()
+  const supabase = createClient()
+  const [profile, setProfile]         = useState<any>(null)
+  const [step, setStep]               = useState(0)
+  const [animKey, setAnimKey]         = useState(0)
+  const [sliding, setSliding]         = useState(false)
+  const [direction, setDirection]     = useState<1|-1>(1)
+  const [loading, setLoading]         = useState(true)
+  const [transitioning, setTransitioning] = useState(false)
 
   useEffect(() => {
     async function init() {
@@ -220,15 +305,16 @@ export default function OnboardingPage() {
   }, [])
 
   async function complete() {
-    setFinishing(true)
+    // Mark complete in DB
     if (profile) {
       await supabase.from('profiles').update({ onboarding_complete: true }).eq('id', profile.id)
     }
-    router.push('/artist/dashboard')
+    // Trigger transition overlay
+    setTransitioning(true)
   }
 
   function goTo(next: number) {
-    if (sliding) return
+    if (sliding || transitioning) return
     if (next >= STEPS) { complete(); return }
     setDirection(next > step ? 1 : -1)
     setSliding(true)
@@ -253,60 +339,79 @@ export default function OnboardingPage() {
   )
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--color-background-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div style={{ minHeight: '100vh', background: 'var(--color-background-primary, #f9f8f5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
 
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
-        @keyframes fp-heartbeat { 0%,100%{transform:scale(1)} 15%{transform:scale(1.18)} 30%{transform:scale(1)} 45%{transform:scale(1.1)} 60%{transform:scale(1)} }
-        @keyframes fp-conf-fall  { 0%{opacity:1;transform:translateY(-10px) rotate(0deg)} 100%{opacity:0;transform:translateY(110vh) rotate(720deg)} }
-        @keyframes fp-spin       { to{transform:rotate(360deg)} }
-        @keyframes fp-slide-in-right  { from{transform:translateX(60px);opacity:0} to{transform:translateX(0);opacity:1} }
-        @keyframes fp-slide-in-left   { from{transform:translateX(-60px);opacity:0} to{transform:translateX(0);opacity:1} }
-        @keyframes fp-slide-out-left  { from{transform:translateX(0);opacity:1} to{transform:translateX(-60px);opacity:0} }
-        @keyframes fp-slide-out-right { from{transform:translateX(0);opacity:1} to{transform:translateX(60px);opacity:0} }
-        @keyframes fp-heart-pop  { 0%{transform:scale(0.4);opacity:0} 100%{transform:scale(1);opacity:1} }
-        @keyframes fp-pulse-dot  { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.4);opacity:0.7} }
+        @keyframes fp-conf-fall   { 0%{opacity:1;transform:translateY(-10px) rotate(0deg)} 100%{opacity:0;transform:translateY(110vh) rotate(720deg)} }
+        @keyframes fp-spin        { to{transform:rotate(360deg)} }
+        @keyframes fp-slide-in-r  { from{transform:translateX(60px);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes fp-slide-in-l  { from{transform:translateX(-60px);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes fp-slide-out-l { from{transform:translateX(0);opacity:1} to{transform:translateX(-60px);opacity:0} }
+        @keyframes fp-slide-out-r { from{transform:translateX(0);opacity:1} to{transform:translateX(60px);opacity:0} }
+        @keyframes fp-heart-pop   { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+        @keyframes fp-heart-beat  { 0%,100%{transform:scale(1)} 15%{transform:scale(1.2)} 30%{transform:scale(1)} 45%{transform:scale(1.08)} 60%{transform:scale(1)} }
+        @keyframes fp-dot-pulse   { 0%,100%{opacity:0.3;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.2)} }
+        @keyframes fp-heart-float {
+          0%   { opacity:0; transform:scale(0.4) translateY(0); }
+          20%  { opacity:1; transform:scale(1.1) translateY(-4px); }
+          80%  { opacity:1; transform:scale(1) translateY(-2px); }
+          100% { opacity:1; transform:scale(1) translateY(0); }
+        }
       `}</style>
 
+      {/* Dashboard transition overlay */}
+      <DashboardTransition
+        active={transitioning}
+        onDone={() => router.push('/artist/dashboard')}
+      />
+
       <div style={{
-        width: '100%', maxWidth: 520,
-        background: 'var(--color-background-primary, #f9f8f5)',
+        width:        '100%',
+        maxWidth:     520,
+        background:   'var(--color-background-primary, #f9f8f5)',
         borderRadius: 20,
-        border: '0.5px solid var(--color-border, #e8e5dc)',
-        overflow: 'hidden',
-        position: 'relative',
-        minHeight: 600,
-        display: 'flex', flexDirection: 'column',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
+        border:       '0.5px solid var(--color-border, #e8e5dc)',
+        overflow:     'hidden',
+        position:     'relative',
+        minHeight:    600,
+        display:      'flex',
+        flexDirection: 'column',
+        boxShadow:    '0 8px 40px rgba(0,0,0,0.08)',
       }}>
 
         <AuroraCanvas />
         <Confetti active={step === 4} />
 
-        {/* Dot nav */}
+        {/* Dots */}
         <div style={{ display: 'flex', gap: 6, padding: '28px 36px 0', position: 'relative', zIndex: 1 }}>
           {Array.from({ length: STEPS }).map((_, i) => (
             <div
               key={i}
               onClick={() => goTo(i)}
               style={{
-                height: 6, borderRadius: 3, cursor: 'pointer',
+                height:     6,
+                borderRadius: 3,
+                cursor:     'pointer',
                 background: i === step ? '#1a1a18' : 'rgba(26,26,24,0.12)',
-                width: i === step ? 20 : 6,
+                width:      i === step ? 20 : 6,
                 transition: 'all 0.3s ease',
               }}
             />
           ))}
         </div>
 
-        {/* Slide content */}
+        {/* Slide */}
         <div style={{
-          flex: 1, padding: '20px 36px 28px',
-          position: 'relative', zIndex: 1,
-          display: 'flex', flexDirection: 'column',
-          animation: sliding
-            ? `${direction === 1 ? 'fp-slide-out-left' : 'fp-slide-out-right'} 0.4s ease both`
-            : `${direction === 1 ? 'fp-slide-in-right' : 'fp-slide-in-left'} 0.4s ease both`,
+          flex:           1,
+          padding:        '20px 36px 28px',
+          position:       'relative',
+          zIndex:         1,
+          display:        'flex',
+          flexDirection:  'column',
+          animation:      sliding
+            ? `${direction === 1 ? 'fp-slide-out-l' : 'fp-slide-out-r'} 0.4s ease both`
+            : `${direction === 1 ? 'fp-slide-in-r' : 'fp-slide-in-l'} 0.4s ease both`,
         }}>
 
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -317,7 +422,18 @@ export default function OnboardingPage() {
                 <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9a9890', marginBottom: 14, fontFamily: '"DM Sans", sans-serif' }}>
                   FinePrint Studio — Artist welcome
                 </p>
-                <WordTitle step={0} name={firstName} animKey={animKey} />
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginBottom: 0 }}>
+                  <WordTitle step={0} name={firstName} animKey={animKey} />
+                  <span style={{
+                    fontSize:   32,
+                    color:      '#ffb3c6',
+                    lineHeight: 1,
+                    marginBottom: 18,
+                    display:    'inline-block',
+                    animation:  'fp-heart-float 0.7s cubic-bezier(0.2,0,0,1) 0.9s both',
+                    flexShrink: 0,
+                  }}>♡</span>
+                </div>
                 <p style={{ fontSize: 14, lineHeight: 1.75, color: '#6b6a66', marginBottom: 20, fontFamily: '"DM Sans", sans-serif', maxWidth: 400 }}>
                   It means the world to us that you chose FinePrint Studio. Your creativity, your vision, your art — proud to have you onboard.
                 </p>
@@ -368,12 +484,10 @@ export default function OnboardingPage() {
                   FinePrint takes a small 5% platform fee. The rest goes straight to you.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {/* 95% tile */}
                   <div style={{ background: '#f0faf5', border: '0.5px solid #b8e8d4', borderRadius: 12, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                     <p style={{ fontFamily: '"DM Serif Display", Georgia, serif', fontSize: 44, color: '#1D9E75', lineHeight: 1 }}>95%</p>
                     <p style={{ fontSize: 10, color: '#5DCAA5', letterSpacing: '0.06em', textTransform: 'uppercase', marginTop: 6, fontFamily: '"DM Sans", sans-serif' }}>Your earnings</p>
                   </div>
-                  {/* Steps tile */}
                   <div style={{ background: '#fff', border: '0.5px solid #e8e5dc', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                     {['Order approved — earnings credited', 'Request payout from dashboard', 'Payout in your account'].map((t, i) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -382,11 +496,10 @@ export default function OnboardingPage() {
                       </div>
                     ))}
                   </div>
-                  {/* Payout tile — full width blue */}
                   <div style={{ gridColumn: 'span 2', background: 'linear-gradient(135deg,#e8f4fd,#dff0f8)', border: '0.5px solid #a8d5ef', borderRadius: 12, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 16 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#e3f2fd', border: '0.5px solid #90caf9', borderRadius: 20, padding: '3px 10px', marginBottom: 6 }}>
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#1976D2', animation: 'fp-pulse-dot 1.5s ease-in-out infinite' }} />
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#1976D2', animation: 'fp-dot-pulse 1.5s ease-in-out infinite' }} />
                         <span style={{ fontSize: 10, fontWeight: 500, color: '#1565C0', letterSpacing: '0.04em', fontFamily: '"DM Sans", sans-serif' }}>FAST PAYOUT</span>
                       </div>
                       <p style={{ fontFamily: '"DM Serif Display", Georgia, serif', fontSize: 24, color: '#1565C0', lineHeight: 1.1, marginBottom: 4 }}>Within 24 hours</p>
@@ -407,7 +520,6 @@ export default function OnboardingPage() {
                   Everything you need to run your art business — from your artist dashboard.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridTemplateRows: 'auto auto', gap: 8 }}>
-                  {/* Tall — public page */}
                   <div style={{ gridRow: 'span 2', background: 'linear-gradient(160deg,#e8f8f2,#f0faf5)', border: '0.5px solid #b8e8d4', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
                     <span style={{ fontSize: 22, marginBottom: 8, display: 'block' }}>🌐</span>
                     <p style={{ fontSize: 13, fontWeight: 500, color: '#0F6E56', marginBottom: 2, fontFamily: '"DM Sans", sans-serif' }}>Public artist page</p>
@@ -423,7 +535,6 @@ export default function OnboardingPage() {
                     <p style={{ fontSize: 11, fontWeight: 500, color: '#1a1a18', marginBottom: 2, fontFamily: '"DM Sans", sans-serif' }}>Run promotions</p>
                     <p style={{ fontSize: 10, color: '#9a9890', lineHeight: 1.5, fontFamily: '"DM Sans", sans-serif' }}>Set discounts per artwork</p>
                   </div>
-                  {/* Wide bottom */}
                   <div style={{ gridColumn: 'span 2', background: '#fff', border: '0.5px solid #e8e5dc', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
                     <span style={{ fontSize: 18, marginBottom: 6, display: 'block' }}>📤</span>
                     <p style={{ fontSize: 11, fontWeight: 500, color: '#1a1a18', marginBottom: 2, fontFamily: '"DM Sans", sans-serif' }}>Upload once, sell forever</p>
@@ -436,12 +547,6 @@ export default function OnboardingPage() {
             {/* ── STEP 4: Done ── */}
             {step === 4 && (
               <>
-                <div style={{
-                  width: 64, height: 64, marginBottom: 20,
-                  animation: 'fp-heart-pop 0.5s cubic-bezier(0.34,1.45,0.64,1) 0.2s both',
-                }}>
-                  <HeartIcon />
-                </div>
                 <p style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9a9890', marginBottom: 14, fontFamily: '"DM Sans", sans-serif' }}>You're all set</p>
                 <WordTitle step={4} name={firstName} animKey={animKey} />
                 <p style={{ fontSize: 14, lineHeight: 1.75, color: '#6b6a66', fontFamily: '"DM Sans", sans-serif', maxWidth: 400 }}>
@@ -467,19 +572,35 @@ export default function OnboardingPage() {
             )}
 
             <button
-              onClick={step === 0 ? next : step === 4 ? complete : next}
-              disabled={finishing}
+              onClick={step === 4 ? complete : next}
+              disabled={transitioning}
               style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '10px 22px', borderRadius: 100, border: 'none',
-                fontSize: 13, fontWeight: 500, fontFamily: '"DM Sans", sans-serif',
-                cursor: finishing ? 'default' : 'pointer',
-                background: step === 0 || step === 4 ? '#1D9E75' : '#1a1a18',
-                color: '#fff', opacity: finishing ? 0.7 : 1,
-                transition: 'transform 0.15s',
+                display:       'flex',
+                alignItems:    'center',
+                gap:           8,
+                padding:       '10px 22px',
+                borderRadius:  100,
+                border:        'none',
+                fontSize:      13,
+                fontWeight:    500,
+                fontFamily:    '"DM Sans", sans-serif',
+                cursor:        transitioning ? 'default' : 'pointer',
+                background:    step === 0 || step === 4 ? '#1D9E75' : '#1a1a18',
+                color:         '#fff',
+                opacity:       transitioning ? 0.7 : 1,
+                transition:    'transform 0.15s, opacity 0.15s',
               }}
             >
-              {finishing ? 'Setting up...' : step === 0 ? 'Let\'s begin →' : step === 4 ? 'Go to dashboard →' : step === 3 ? 'Let\'s go →' : 'Next →'}
+              {transitioning
+                ? 'Setting up...'
+                : step === 0
+                ? "Let's begin →"
+                : step === 4
+                ? 'Go to dashboard →'
+                : step === 3
+                ? "Let's go →"
+                : 'Next →'
+              }
             </button>
           </div>
         </div>
