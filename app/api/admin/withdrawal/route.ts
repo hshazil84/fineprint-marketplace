@@ -60,6 +60,12 @@ export async function POST(req: Request) {
     }
 
     if (action === 'reactivate') {
+      const { data: artist } = await admin
+        .from('profiles')
+        .select('full_name, email, artist_code')
+        .eq('id', artistId)
+        .single()
+
       await admin
         .from('profiles')
         .update({
@@ -72,6 +78,25 @@ export async function POST(req: Request) {
         .from('artworks')
         .update({ is_active: true })
         .eq('artist_id', artistId)
+
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'FinePrint <no-reply@fineprintmv.com>',
+          to: artist?.email,
+          subject: 'Welcome back to FinePrint 🎨',
+          html: `
+            <p>Hi ${artist?.full_name},</p>
+            <p>Great news — your FinePrint account has been reactivated. Your listings are live again and buyers can find your work on the storefront.</p>
+            <p><a href="https://shop.fineprintmv.com/artist/dashboard">Log in to your dashboard</a></p>
+            <p>Welcome back! 🎨</p>
+          `,
+        }),
+      })
 
       return NextResponse.json({ ok: true })
     }
