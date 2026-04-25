@@ -9,7 +9,6 @@ import { ListingsTab }  from '@/app/admin/components/ListingsTab'
 import { OffersTab }    from '@/app/admin/components/OffersTab'
 import { ExportTab }    from '@/app/admin/components/ExportTab'
 import { CustomersTab } from '@/app/admin/components/CustomersTab'
-import { PaperCatalog } from '@/app/admin/components/PaperCatalog'
 
 const TABS = ['orders', 'artists', 'listings', 'offers', 'customers', 'papers', 'export']
 
@@ -151,7 +150,7 @@ function AdminDashboard() {
         {tab === 'listings'  && <ListingsTab  onBadgeRefresh={fetchBadges} />}
         {tab === 'offers'    && <OffersTab    />}
         {tab === 'customers' && <CustomersTab />}
-        {tab === 'papers'    && <PaperCatalog />}
+        {tab === 'papers'    && <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Paper catalog coming soon.</div>}
         {tab === 'export'    && <ExportTab    />}
       </div>
     </div>
