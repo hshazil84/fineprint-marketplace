@@ -1,75 +1,68 @@
-import { createRouteClient, createAdminClient } from '@/lib/supabase'
+import { createAdminClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const supabase = createRouteClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const { artistId, action } = await req.json()
+    if (!artistId) return NextResponse.json({ error: 'Missing artistId' }, { status: 400 })
 
-  const admin = createAdminClient()
+    const admin = createAdminClient()
 
-  const { data: adminProfile } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+    if (action === 'approve') {
+      const { data: artist } = await admin
+        .from('profiles')
+        .select('full_name, email, artist_code')
+        .eq('id', artistId)
+        .single()
 
-  if (adminProfile?.role !== 'admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+      await admin
+        .from('profiles')
+        .update({
+          account_status: 'withdrawn',
+          withdrawn_at: new Date().toISOString(),
+        })
+        .eq('id', artistId)
 
-  const { artistId, action } = await req.json()
+      await admin
+        .from('artworks')
+        .update({ is_active: false })
+        .eq('artist_id', artistId)
 
-  if (action === 'approve') {
-    const { data: artist } = await admin
-      .from('profiles')
-      .select('full_name, email, artist_code')
-      .eq('id', artistId)
-      .single()
-
-    await admin
-      .from('profiles')
-      .update({
-        account_status: 'withdrawn',
-        withdrawn_at: new Date().toISOString(),
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'FinePrint <no-reply@fineprintmv.com>',
+          to: artist?.email,
+          subject: 'Your FinePrint account has been withdrawn',
+          html: `
+            <p>Hi ${artist?.full_name},</p>
+            <p>Your withdrawal request has been approved. Your account and listings are now deactivated.</p>
+            <p>If you ever want to return, reach out to us at hello@fineprintmv.com.</p>
+            <p>Thank you for being part of FinePrint. 🎨</p>
+          `,
+        }),
       })
-      .eq('id', artistId)
 
-    await admin
-      .from('artworks')
-      .update({ is_active: false })
-      .eq('artist_id', artistId)
+      return NextResponse.json({ ok: true })
+    }
 
-    await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'FinePrint <no-reply@fineprintmv.com>',
-        to: artist?.email,
-        subject: 'Your FinePrint account has been withdrawn',
-        html: `
-          <p>Hi ${artist?.full_name},</p>
-          <p>Your withdrawal request has been approved. Your account and listings are now deactivated.</p>
-          <p>If you ever want to return, reach out to us at hello@fineprintmv.com.</p>
-          <p>Thank you for being part of FinePrint. 🎨</p>
-        `,
-      }),
-    })
+    if (action === 'reject') {
+      await admin
+        .from('profiles')
+        .update({ account_status: 'active' })
+        .eq('id', artistId)
 
-    return NextResponse.json({ ok: true })
+      return NextResponse.json({ ok: true })
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+
+  } catch (err: any) {
+    console.log('admin withdrawal error:', err.message)
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
-
-  if (action === 'reject') {
-    await admin
-      .from('profiles')
-      .update({ account_status: 'active' })
-      .eq('id', artistId)
-
-    return NextResponse.json({ ok: true })
-  }
-
-  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
