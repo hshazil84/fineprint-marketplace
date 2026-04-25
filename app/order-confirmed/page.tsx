@@ -62,18 +62,18 @@ function Typewriter({ text, delay = 0, speed = 45 }: { text: string; delay?: num
   )
 }
 
-// ── Zigzag SVG ────────────────────────────────────────────────────────────
-function ZigzagEdge({ flip = false, color = '#f5f0e8' }: { flip?: boolean; color?: string }) {
+// ── Zigzag SVG (bottom only) ──────────────────────────────────────────────
+function ZigzagEdge({ color = '#f5f0e8' }: { color?: string }) {
   const w = 400, h = 14, size = 12
   const pts: string[] = []
   let x = 0, top = true
-  pts.push(`0,${flip ? 0 : h}`)
+  pts.push(`0,0`)
   while (x <= w) {
-    pts.push(`${x},${top ? (flip ? h : 0) : (flip ? 0 : h)}`)
+    pts.push(`${x},${top ? h : 0}`)
     x += size / 2
     top = !top
   }
-  pts.push(`${w},${flip ? 0 : h}`)
+  pts.push(`${w},0`)
   return (
     <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: 'block' }}>
       <polygon points={pts.join(' ')} fill={color} />
@@ -98,7 +98,6 @@ function PrinterSlot() {
       gap: 6,
       zIndex: 10,
     }}>
-      {/* Slot opening */}
       <div style={{
         position: 'absolute',
         bottom: 0,
@@ -109,8 +108,7 @@ function PrinterSlot() {
         background: '#111',
         borderRadius: '0 0 2px 2px',
       }} />
-      {/* LED dots */}
-      {[0,1,2].map(i => (
+      {[0, 1, 2].map(i => (
         <div key={i} style={{
           width: 5, height: 5, borderRadius: '50%',
           background: i === 0 ? '#1D9E75' : '#555',
@@ -141,93 +139,87 @@ function Receipt({ data }: { data: any }) {
   const [receiptHeight, setReceiptHeight] = useState(0)
 
   useEffect(() => {
-    // Measure receipt height after mount
-    if (receiptRef.current) {
-      setReceiptHeight(receiptRef.current.scrollHeight)
-    }
+    if (receiptRef.current) setReceiptHeight(receiptRef.current.scrollHeight)
     const t = setTimeout(() => setPrinting(true), 900)
     return () => clearTimeout(t)
   }, [])
 
+  const duration = Math.max(2200, receiptHeight * 3.5)
+
   useEffect(() => {
     if (!printing) return
-    // Mark done after animation completes
-    const duration = Math.max(2000, receiptHeight * 3.5)
     const t = setTimeout(() => setDone(true), duration)
     return () => clearTimeout(t)
-  }, [printing, receiptHeight])
+  }, [printing, duration])
 
-  const duration  = Math.max(2000, receiptHeight * 3.5)
-  const total     = data.items?.reduce((s: number, i: any) => s + i.price, 0) || data.totalPaid || 0
+  const total = data.items?.reduce((s: number, i: any) => s + i.price, 0) || data.totalPaid || 0
 
   return (
     <>
       <style>{`
         @keyframes blink { 50% { opacity: 0; } }
 
-        /* Receipt feeds downward from printer slot */
         @keyframes feed-out {
           0%   { transform: translateY(-100%); }
+          80%  { transform: translateY(-4%); }
+          92%  { transform: translateY(1%); }
           100% { transform: translateY(0); }
         }
 
-        /* Subtle paper curl shadow grows as it emerges */
         @keyframes shadow-grow {
           0%   { box-shadow: 0 0 0 rgba(0,0,0,0); }
           100% { box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08); }
         }
 
+        @keyframes scan-line {
+          0%   { top: 0%;   opacity: 0.08; }
+          100% { top: 100%; opacity: 0; }
+        }
+
         .receipt-feed {
           animation:
-            feed-out ${duration}ms cubic-bezier(0.25, 0.1, 0.25, 1) 0.9s both,
+            feed-out ${duration}ms cubic-bezier(0.12, 0, 0.08, 1) 0.9s both,
             shadow-grow ${duration}ms ease-out 0.9s both;
         }
 
         .receipt-done {
           box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
+          transform: translateY(0);
         }
 
-        /* Printer sound lines — horizontal scan lines on the paper */
-        @keyframes scan-line {
-          0%   { top: 0%; opacity: 0.06; }
-          100% { top: 100%; opacity: 0; }
-        }
         .scan-line {
           position: absolute;
           left: 0; right: 0;
           height: 2px;
-          background: rgba(0,0,0,0.12);
+          background: rgba(0,0,0,0.1);
           pointer-events: none;
+          z-index: 5;
           animation: scan-line ${duration}ms linear 0.9s both;
         }
       `}</style>
 
       <div style={{ maxWidth: 300, margin: '0 auto 40px', position: 'relative' }}>
 
-        {/* Printer body */}
         <PrinterSlot />
 
-        {/* Clipping container — hides receipt above slot */}
-        <div style={{
-          overflow: 'hidden',
-          position: 'relative',
-          borderRadius: '0 0 4px 4px',
-        }}>
-          {/* The receipt itself feeds downward */}
+        {/* Clip container */}
+        <div style={{ overflow: 'hidden', position: 'relative', borderRadius: '0 0 4px 4px' }}>
+
+          {/* Feeding receipt */}
           <div
             ref={receiptRef}
             className={printing ? (done ? 'receipt-done' : 'receipt-feed') : ''}
             style={{
-              transform: printing ? undefined : 'translateY(-100%)',
-              position: 'relative',
+              transform:    printing ? undefined : 'translateY(-100%)',
+              position:     'relative',
               borderRadius: '0 0 4px 4px',
-              overflow: 'hidden',
+              overflow:     'hidden',
             }}
           >
-            {/* Scanning line overlay while printing */}
+            {/* Scan line while printing */}
             {printing && !done && <div className="scan-line" />}
 
-            {/* Top tear line */}
+            {/* ── Top tear line ── */}
             <div style={{
               background: '#f5f0e8',
               padding: '10px 24px 0',
@@ -246,7 +238,7 @@ function Receipt({ data }: { data: any }) {
               <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
             </div>
 
-            {/* Body */}
+            {/* ── Body ── */}
             <div style={{
               background:  '#f5f0e8',
               padding:     '8px 24px 16px',
@@ -273,7 +265,7 @@ function Receipt({ data }: { data: any }) {
                 <span>{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
 
-              {/* Invoice number */}
+              {/* Invoice */}
               <div style={{ marginBottom: 6 }}>
                 <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>INVOICE NO.</p>
                 <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em' }}>
@@ -323,7 +315,7 @@ function Receipt({ data }: { data: any }) {
               </div>
 
               <div style={{ textAlign: 'center', margin: '10px 0 6px' }}>
-                {[0,1,2].map(i => (
+                {[0, 1, 2].map(i => (
                   <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
                 ))}
               </div>
@@ -345,14 +337,15 @@ function Receipt({ data }: { data: any }) {
               </div>
 
               <div style={{ textAlign: 'center', margin: '10px 0 4px' }}>
-                {[0,1,2].map(i => (
+                {[0, 1, 2].map(i => (
                   <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
                 ))}
               </div>
             </div>
 
-            {/* Bottom zigzag */}
-            <ZigzagEdge flip color="#f5f0e8" />
+            {/* ── Bottom zigzag ── */}
+            <ZigzagEdge color="#f5f0e8" />
+
           </div>
         </div>
       </div>
