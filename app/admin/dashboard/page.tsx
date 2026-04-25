@@ -2,7 +2,6 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 import { OrdersTab }    from '@/app/admin/components/OrdersTab'
 import { ArtistsTab }   from '@/app/admin/components/ArtistsTab'
@@ -10,20 +9,21 @@ import { ListingsTab }  from '@/app/admin/components/ListingsTab'
 import { OffersTab }    from '@/app/admin/components/OffersTab'
 import { ExportTab }    from '@/app/admin/components/ExportTab'
 import { CustomersTab } from '@/app/admin/components/CustomersTab'
+import { PaperCatalog } from '@/app/admin/components/PaperCatalog'
 
-const TABS = ['orders', 'artists', 'listings', 'offers', 'customers', 'export']
+const TABS = ['orders', 'artists', 'listings', 'offers', 'customers', 'papers', 'export']
 
 interface BadgeCounts {
-  pendingOrders:    number
-  pendingPayouts:   number
+  pendingOrders:      number
+  pendingPayouts:     number
   pendingWithdrawals: number
-  waitlistTotal:    number
+  waitlistTotal:      number
 }
 
 function AdminDashboard() {
   const router       = useRouter()
   const searchParams = useSearchParams()
-  const [tab, setTab]       = useState(searchParams.get('tab') || 'orders')
+  const [tab, setTab]         = useState(searchParams.get('tab') || 'orders')
   const [loading, setLoading] = useState(true)
   const [badges, setBadges]   = useState<BadgeCounts>({
     pendingOrders:      0,
@@ -71,8 +71,8 @@ function AdminDashboard() {
       : 0
 
     setBadges({
-      pendingOrders:      pendingOrders    || 0,
-      pendingPayouts:     pendingPayouts   || 0,
+      pendingOrders:      pendingOrders      || 0,
+      pendingPayouts:     pendingPayouts     || 0,
       pendingWithdrawals: pendingWithdrawals || 0,
       waitlistTotal,
     })
@@ -108,7 +108,6 @@ function AdminDashboard() {
           Admin dashboard
         </h1>
 
-        {/* Alert banners */}
         {badges.pendingWithdrawals > 0 && (
           <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#A32D2D' }}>
             {badges.pendingWithdrawals} artist{badges.pendingWithdrawals > 1 ? 's have' : ' has'} requested to withdraw. Check the Artists tab.
@@ -120,7 +119,6 @@ function AdminDashboard() {
           </div>
         )}
 
-        {/* Tab bar */}
         <div className="tab-bar">
           {TABS.map(t => (
             <button
@@ -148,12 +146,12 @@ function AdminDashboard() {
           ))}
         </div>
 
-        {/* Tab content */}
         {tab === 'orders'    && <OrdersTab    onBadgeRefresh={fetchBadges} />}
         {tab === 'artists'   && <ArtistsTab   onBadgeRefresh={fetchBadges} />}
         {tab === 'listings'  && <ListingsTab  onBadgeRefresh={fetchBadges} />}
         {tab === 'offers'    && <OffersTab    />}
         {tab === 'customers' && <CustomersTab />}
+        {tab === 'papers'    && <PaperCatalog />}
         {tab === 'export'    && <ExportTab    />}
       </div>
     </div>
