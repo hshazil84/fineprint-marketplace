@@ -1,17 +1,14 @@
-import { createAdminClient } from '@/lib/supabase'
+import { createRouteClient, createAdminClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const supabase = createAdminClient()
-
-  const authHeader = req.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: { user } } = await supabase.auth.getUser(token)
+  const supabase = createRouteClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: adminProfile } = await supabase
+  const admin = createAdminClient()
+
+  const { data: adminProfile } = await admin
     .from('profiles')
     .select('role')
     .eq('id', user.id)
@@ -24,13 +21,13 @@ export async function POST(req: Request) {
   const { artistId, action } = await req.json()
 
   if (action === 'approve') {
-    const { data: artist } = await supabase
+    const { data: artist } = await admin
       .from('profiles')
       .select('full_name, email, artist_code')
       .eq('id', artistId)
       .single()
 
-    await supabase
+    await admin
       .from('profiles')
       .update({
         account_status: 'withdrawn',
@@ -38,7 +35,7 @@ export async function POST(req: Request) {
       })
       .eq('id', artistId)
 
-    await supabase
+    await admin
       .from('artworks')
       .update({ is_active: false })
       .eq('artist_id', artistId)
@@ -66,7 +63,7 @@ export async function POST(req: Request) {
   }
 
   if (action === 'reject') {
-    await supabase
+    await admin
       .from('profiles')
       .update({ account_status: 'active' })
       .eq('id', artistId)
