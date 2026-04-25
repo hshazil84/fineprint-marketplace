@@ -1,5 +1,4 @@
 import { createBrowserClient, createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -9,13 +8,15 @@ export function createClient() {
 }
 
 export function createRouteClient() {
+  // lazy import to avoid breaking client components
+  const { cookies } = require('next/headers')
   const cookieStore = cookies()
   return createServerClient(url, key, {
     cookies: {
       getAll() { return cookieStore.getAll() },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: any[]) {
         try {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value, options }: any) =>
             cookieStore.set(name, value, options)
           )
         } catch {}
