@@ -81,54 +81,50 @@ function ZigzagBottom({ color = '#f0ebe0' }: { color?: string }) {
   )
 }
 
-// ── Compact thermal printer ───────────────────────────────────────────────
+// ── White printer body ────────────────────────────────────────────────────
 function PrinterBody() {
   return (
-    <div style={{ width: 280, margin: '0 auto', position: 'relative', zIndex: 10 }}>
-      {/* Chrome body */}
+    <div style={{ width: 300, margin: '0 auto', position: 'relative', zIndex: 10 }}>
       <div style={{
-        background:   'linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 30%, #c0c0c0 60%, #b8b8b8 100%)',
-        borderRadius: '18px 18px 6px 6px',
-        padding:      '10px 16px 0',
+        background:   'linear-gradient(to bottom, #f8f8f6 0%, #efefed 60%, #e4e4e1 100%)',
+        borderRadius: '14px 14px 0 0',
+        padding:      '12px 16px 0',
         boxShadow:
           'inset 0 1px 0 rgba(255,255,255,0.9), ' +
-          'inset 0 -1px 0 rgba(0,0,0,0.15), ' +
-          '0 4px 20px rgba(0,0,0,0.2), ' +
-          '0 1px 3px rgba(0,0,0,0.15)',
-        border:       '0.5px solid #aaa',
-        position:     'relative',
+          'inset 0 -1px 0 rgba(0,0,0,0.06), ' +
+          '0 4px 20px rgba(0,0,0,0.12)',
+        border:   '0.5px solid #d8d8d4',
+        position: 'relative',
       }}>
 
-        {/* Subtle brushed metal lines */}
+        {/* Brushed metal texture */}
         <div style={{
-          position:   'absolute',
-          inset:      0,
-          borderRadius: '18px 18px 6px 6px',
-          background: 'repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(255,255,255,0.04) 3px, rgba(255,255,255,0.04) 4px)',
+          position:      'absolute',
+          inset:         0,
+          borderRadius:  '14px 14px 0 0',
+          background:    'repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(255,255,255,0.04) 3px, rgba(255,255,255,0.04) 4px)',
           pointerEvents: 'none',
         }} />
 
-        {/* Top row — LED only, right aligned */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 10, paddingRight: 4 }}>
-          {/* Green LED */}
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              width: 9, height: 9, borderRadius: '50%',
-              background: 'radial-gradient(circle at 35% 35%, #6aff9e, #22c55e 60%, #15803d)',
-              boxShadow: '0 0 8px rgba(34,197,94,0.9), 0 0 16px rgba(34,197,94,0.4)',
-              border: '0.5px solid rgba(0,0,0,0.2)',
-            }} />
-          </div>
+        {/* Single green LED — top right */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10, paddingRight: 4 }}>
+          <div style={{
+            width:        9,
+            height:       9,
+            borderRadius: '50%',
+            background:   'radial-gradient(circle at 35% 35%, #6aff9e, #22c55e 60%, #15803d)',
+            boxShadow:    '0 0 8px rgba(34,197,94,0.9), 0 0 16px rgba(34,197,94,0.4)',
+            border:       '0.5px solid rgba(0,0,0,0.2)',
+          }} />
         </div>
 
-        {/* Paper slot */}
+        {/* Dark slot */}
         <div style={{
-          background:   'linear-gradient(180deg, #1a1a1a, #2a2a2a)',
-          borderRadius: '2px 2px 0 0',
-          height:       18,
+          background:   'linear-gradient(to bottom, #111, #222)',
+          borderRadius: '3px 3px 0 0',
+          height:       22,
           position:     'relative',
-          boxShadow:    'inset 0 3px 8px rgba(0,0,0,0.6)',
-          overflow:     'hidden',
+          boxShadow:    'inset 0 3px 10px rgba(0,0,0,0.8)',
         }}>
           {/* Slot opening */}
           <div style={{
@@ -136,99 +132,34 @@ function PrinterBody() {
             bottom:       0,
             left:         '50%',
             transform:    'translateX(-50%)',
-            width:        200,
+            width:        220,
             height:       6,
-            background:   '#0a0a0a',
+            background:   '#050505',
             borderRadius: '1px 1px 0 0',
           }} />
-          {/* Inner slot glow */}
+          {/* Warm thermal glow */}
           <div style={{
             position:   'absolute',
-            bottom:     6,
+            bottom:     7,
             left:       '50%',
             transform:  'translateX(-50%)',
             width:      180,
             height:     1,
-            background: 'rgba(255,140,0,0.3)',
-            boxShadow:  '0 0 4px rgba(255,140,0,0.3)',
+            background: 'rgba(255,140,0,0.25)',
+            boxShadow:  '0 0 6px rgba(255,120,0,0.35)',
           }} />
           {/* Guide marks */}
-          {[-70, 70].map((x, i) => (
+          {[-80, 80].map((x, i) => (
             <div key={i} style={{
               position:   'absolute',
-              bottom:     8,
+              bottom:     9,
               left:       `calc(50% + ${x}px)`,
               width:      1,
-              height:     6,
-              background: '#555',
+              height:     7,
+              background: '#444',
             }} />
           ))}
         </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Receipt curl top ──────────────────────────────────────────────────────
-function ReceiptCurlTop() {
-  return (
-    <div style={{
-      background:   '#f0ebe0',
-      height:       32,
-      position:     'relative',
-      overflow:     'hidden',
-      // Perspective taper — wider at top, narrowing slightly
-      clipPath:     'polygon(0% 0%, 100% 0%, 97% 100%, 3% 100%)',
-    }}>
-      {/* Left curl shadow */}
-      <div style={{
-        position:   'absolute',
-        left:       0,
-        top:        0,
-        bottom:     0,
-        width:      '30%',
-        background: 'linear-gradient(to right, rgba(0,0,0,0.12), transparent)',
-        pointerEvents: 'none',
-      }} />
-      {/* Right curl shadow */}
-      <div style={{
-        position:   'absolute',
-        right:      0,
-        top:        0,
-        bottom:     0,
-        width:      '30%',
-        background: 'linear-gradient(to left, rgba(0,0,0,0.12), transparent)',
-        pointerEvents: 'none',
-      }} />
-      {/* Top curl highlight */}
-      <div style={{
-        position:   'absolute',
-        top:        0,
-        left:       '10%',
-        right:      '10%',
-        height:     8,
-        background: 'linear-gradient(to bottom, rgba(255,255,255,0.5), transparent)',
-        pointerEvents: 'none',
-      }} />
-      {/* Tear dashes */}
-      <div style={{
-        position:   'absolute',
-        bottom:     6,
-        left:       '5%',
-        right:      '5%',
-        display:    'flex',
-        alignItems: 'center',
-        gap:        8,
-      }}>
-        <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
-        <span style={{
-          fontSize:      7,
-          color:         '#b0a99e',
-          letterSpacing: '0.08em',
-          fontFamily:    '"Courier New", Courier, monospace',
-          flexShrink:    0,
-        }}>✂ TEAR</span>
-        <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
       </div>
     </div>
   )
@@ -273,7 +204,7 @@ function Receipt({ data }: { data: any }) {
 
         @keyframes shadow-grow {
           0%   { filter: drop-shadow(0 0px 0px rgba(0,0,0,0)); }
-          100% { filter: drop-shadow(0 10px 24px rgba(0,0,0,0.14)); }
+          100% { filter: drop-shadow(0 10px 24px rgba(0,0,0,0.13)); }
         }
 
         @keyframes scan-line {
@@ -286,10 +217,12 @@ function Receipt({ data }: { data: any }) {
             feed-out ${duration}ms linear 0.9s both,
             shadow-grow ${duration}ms ease-out 0.9s both;
         }
+
         .receipt-done {
           transform: translateY(0);
-          filter: drop-shadow(0 10px 24px rgba(0,0,0,0.14));
+          filter: drop-shadow(0 10px 24px rgba(0,0,0,0.13));
         }
+
         .scan-line {
           position: absolute;
           left: 0; right: 0; height: 2px;
@@ -299,35 +232,30 @@ function Receipt({ data }: { data: any }) {
           animation: scan-line ${duration}ms linear 0.9s both;
         }
 
-        /* Side curl shadows on the receipt body */
-        .receipt-body-wrap {
-          position: relative;
-        }
+        .receipt-body-wrap { position: relative; }
         .receipt-body-wrap::before {
           content: '';
           position: absolute;
-          left: 0; top: 0; bottom: 0;
-          width: 18px;
-          background: linear-gradient(to right, rgba(0,0,0,0.07), transparent);
+          left: 0; top: 0; bottom: 0; width: 18px;
+          background: linear-gradient(to right, rgba(0,0,0,0.06), transparent);
           pointer-events: none;
           z-index: 2;
         }
         .receipt-body-wrap::after {
           content: '';
           position: absolute;
-          right: 0; top: 0; bottom: 0;
-          width: 18px;
-          background: linear-gradient(to left, rgba(0,0,0,0.07), transparent);
+          right: 0; top: 0; bottom: 0; width: 18px;
+          background: linear-gradient(to left, rgba(0,0,0,0.06), transparent);
           pointer-events: none;
           z-index: 2;
         }
       `}</style>
 
-      <div style={{ maxWidth: 280, margin: '0 auto 40px', position: 'relative' }}>
+      <div style={{ maxWidth: 300, margin: '0 auto 40px', position: 'relative' }}>
 
         <PrinterBody />
 
-        {/* Clip container */}
+        {/* Clip container — hides receipt above slot */}
         <div style={{ overflow: 'hidden', position: 'relative' }}>
           <div
             ref={receiptRef}
@@ -341,14 +269,30 @@ function Receipt({ data }: { data: any }) {
           >
             {printing && !done && <div className="scan-line" />}
 
-            {/* Curl top */}
-            <ReceiptCurlTop />
+            {/* ── Top tear line ── */}
+            <div style={{
+              background: '#f0ebe0',
+              padding:    '10px 24px 0',
+              display:    'flex',
+              alignItems: 'center',
+              gap:        8,
+            }}>
+              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
+              <span style={{
+                fontSize:      8,
+                color:         '#b0a99e',
+                letterSpacing: '0.08em',
+                fontFamily:    '"Courier New", Courier, monospace',
+                flexShrink:    0,
+              }}>✂ TEAR HERE</span>
+              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
+            </div>
 
-            {/* Body with side curl shadows */}
+            {/* ── Body ── */}
             <div className="receipt-body-wrap">
               <div style={{
                 background:  '#f0ebe0',
-                padding:     '4px 24px 16px',
+                padding:     '8px 24px 16px',
                 fontFamily:  '"Courier New", Courier, monospace',
                 fontSize:    11,
                 color:       '#2a2520',
