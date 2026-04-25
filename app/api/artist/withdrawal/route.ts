@@ -1,10 +1,14 @@
-import { createRouteClient, createAdminClient } from '@/lib/supabase'
+import { createAdminClient, createAnonClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
-    const supabase = createRouteClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
+    const authHeader = req.headers.get('authorization')
+    const token = authHeader?.replace('Bearer ', '')
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const anon = createAnonClient()
+    const { data: { user }, error } = await anon.auth.getUser(token)
     console.log('user:', user?.id, 'error:', error)
     if (!user) return NextResponse.json({ error: 'Unauthorized', detail: error?.message }, { status: 401 })
 
