@@ -85,10 +85,10 @@ function ZigzagEdge({ color = '#f5f0e8' }: { color?: string }) {
 function PrinterSlot() {
   return (
     <div style={{
-      width: 450,
+      width: 300,
       margin: '0 auto',
-      height: 16,
-      background: 'linear-gradient(to bottom, #2a2a2a, #3a3a3a)',
+      height: 28,
+      background: 'linear-gradient(to bottom, #d8d8d8, #afafaf)',
       borderRadius: '10px 10px 4px 4px',
       position: 'relative',
       boxShadow: '0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
