@@ -47,15 +47,19 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
     setOrders(data || [])
   }
 
-  async function handleWithdrawalAction(artistId: string, action: 'approve' | 'reject') {
-    const res  = await fetch('/api/admin/withdrawal', {
+  async function handleWithdrawalAction(artistId: string, action: 'approve' | 'reject' | 'reactivate') {
+    const res = await fetch('/api/admin/withdrawal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ artistId, action }),
     })
     const data = await res.json()
     if (data.ok) {
-      toast.success(action === 'approve' ? 'Artist withdrawn' : 'Withdrawal rejected')
+      toast.success(
+        action === 'approve'    ? 'Artist withdrawn' :
+        action === 'reject'     ? 'Withdrawal rejected' :
+        'Artist reactivated'
+      )
       fetchArtists()
       onBadgeRefresh()
     } else {
@@ -214,7 +218,7 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
           return (
             <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2, flexWrap: 'wrap' }}>
                   <p style={{ fontSize: 14, fontWeight: 500 }}>{a.display_name || a.full_name}</p>
                   {a.shop_status === 'closed' && (
                     <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>
@@ -223,7 +227,16 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                     <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
                   )}
                   {a.account_status === 'withdrawn' && (
-                    <span style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>Withdrawn</span>
+                    <>
+                      <span style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>Withdrawn</span>
+                      <button
+                        className="btn btn-sm"
+                        style={{ fontSize: 11, padding: '2px 10px' }}
+                        onClick={() => handleWithdrawalAction(a.id, 'reactivate')}
+                      >
+                        Reactivate
+                      </button>
+                    </>
                   )}
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
