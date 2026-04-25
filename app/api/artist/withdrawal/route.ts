@@ -1,53 +1,33 @@
+import { createClient } from '@/lib/supabase'
 import { createAdminClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const supabase = createAdminClient()
-
-  const authHeader = req.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
-  const { data: { user } } = await supabase.auth.getUser(token)
+  // Get user from session cookie
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // Use admin client for DB operations
+  const admin = createAdminClient()
   const { action } = await req.json()
 
   if (action === 'pause') {
-    await supabase
-      .from('profiles')
-      .update({ account_status: 'paused' })
-      .eq('id', user.id)
-
-    await supabase
-      .from('artworks')
-      .update({ is_active: false })
-      .eq('artist_id', user.id)
-
+    await admin.from('profiles').update({ account_status: 'paused' }).eq('id', user.id)
+    await admin.from('artworks').update({ is_active: false }).eq('artist_id', user.id)
     return NextResponse.json({ ok: true, status: 'paused' })
   }
 
   if (action === 'unpause') {
-    await supabase
-      .from('profiles')
-      .update({ account_status: 'active' })
-      .eq('id', user.id)
-
-    await supabase
-      .from('artworks')
-      .update({ is_active: true })
-      .eq('artist_id', user.id)
-
+    await admin.from('profiles').update({ account_status: 'active' }).eq('id', user.id)
+    await admin.from('artworks').update({ is_active: true }).eq('artist_id', user.id)
     return NextResponse.json({ ok: true, status: 'active' })
   }
 
   if (action === 'request_withdrawal') {
-    await supabase
-      .from('profiles')
-      .update({ account_status: 'pending_withdrawal' })
-      .eq('id', user.id)
+    await admin.from('profiles').update({ account_status: 'pending_withdrawal' }).eq('id', user.id)
 
-    const { data: profile } = await supabase
+    const { data: profile } = await admin
       .from('profiles')
       .select('full_name, email, artist_code')
       .eq('id', user.id)
@@ -76,4 +56,3 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
-
