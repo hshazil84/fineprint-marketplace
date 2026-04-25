@@ -59,6 +59,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true })
     }
 
+    if (action === 'reactivate') {
+      await admin
+        .from('profiles')
+        .update({
+          account_status: 'active',
+          withdrawn_at: null,
+        })
+        .eq('id', artistId)
+
+      await admin
+        .from('artworks')
+        .update({ is_active: true })
+        .eq('artist_id', artistId)
+
+      return NextResponse.json({ ok: true })
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 
   } catch (err: any) {
