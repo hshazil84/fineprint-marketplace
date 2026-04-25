@@ -63,7 +63,7 @@ function Typewriter({ text, delay = 0, speed = 45 }: { text: string; delay?: num
 }
 
 // ── Zigzag SVG (bottom only) ──────────────────────────────────────────────
-function ZigzagEdge({ color = '#f5f0e8' }: { color?: string }) {
+function ZigzagBottom({ color = '#f5f0e8' }: { color?: string }) {
   const w = 400, h = 14, size = 12
   const pts: string[] = []
   let x = 0, top = true
@@ -81,52 +81,99 @@ function ZigzagEdge({ color = '#f5f0e8' }: { color?: string }) {
   )
 }
 
-// ── Printer slot ──────────────────────────────────────────────────────────
-function PrinterSlot() {
+// ── HP-style white printer ────────────────────────────────────────────────
+function PrinterBody() {
   return (
     <div style={{
       width: 300,
       margin: '0 auto',
-      height: 28,
-      background: 'linear-gradient(to bottom, #2a2a2a, #3a3a3a)',
-      borderRadius: '10px 10px 4px 4px',
       position: 'relative',
-      boxShadow: '0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
       zIndex: 10,
     }}>
+      {/* Main body */}
       <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 220,
-        height: 4,
-        background: '#111',
-        borderRadius: '0 0 2px 2px',
-      }} />
-      {[0, 1, 2].map(i => (
-        <div key={i} style={{
-          width: 5, height: 5, borderRadius: '50%',
-          background: i === 0 ? '#1D9E75' : '#555',
-          boxShadow: i === 0 ? '0 0 6px #1D9E75' : 'none',
-          marginBottom: 6,
-        }} />
-      ))}
-      <div style={{
-        position: 'absolute',
-        right: 16,
-        top: '50%',
-        transform: 'translateY(-60%)',
-        width: 28,
-        height: 10,
-        background: '#222',
-        borderRadius: 3,
-        border: '0.5px solid #444',
-      }} />
+        background:   'linear-gradient(to bottom, #f8f8f6 0%, #efefed 60%, #e4e4e1 100%)',
+        borderRadius: '14px 14px 0 0',
+        padding:      '14px 16px 0',
+        boxShadow:
+          '0 -2px 0 rgba(255,255,255,0.9) inset, ' +
+          '0 2px 0 rgba(0,0,0,0.06) inset, ' +
+          '0 6px 24px rgba(0,0,0,0.12)',
+        border: '0.5px solid #d8d8d4',
+      }}>
+        {/* Top panel — logo + controls */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          {/* HP logo area */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 28, height: 18,
+              background: 'linear-gradient(135deg, #0096d6, #005f8e)',
+              borderRadius: 4,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ color: '#fff', fontSize: 10, fontWeight: 700, fontFamily: 'sans-serif', letterSpacing: '-0.5px' }}>hp</span>
+            </div>
+            <span style={{ fontSize: 9, color: '#aaa', letterSpacing: '0.06em', fontFamily: 'sans-serif' }}>DESKJET</span>
+          </div>
+
+          {/* Control buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Power LED */}
+            <div style={{
+              width: 8, height: 8, borderRadius: '50%',
+              background: '#22c55e',
+              boxShadow: '0 0 6px rgba(34,197,94,0.8)',
+            }} />
+            {/* Cancel button */}
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%',
+              background: 'linear-gradient(to bottom, #f0f0ee, #e0e0dc)',
+              border: '0.5px solid #ccc',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 8, color: '#888' }}>✕</span>
+            </div>
+            {/* Resume button */}
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%',
+              background: 'linear-gradient(to bottom, #f0f0ee, #e0e0dc)',
+              border: '0.5px solid #ccc',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span style={{ fontSize: 8, color: '#888' }}>▶</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Paper slot area */}
+        <div style={{
+          background:   'linear-gradient(to bottom, #1a1a1a, #2a2a2a)',
+          borderRadius: '3px 3px 0 0',
+          height:       20,
+          position:     'relative',
+          boxShadow:    'inset 0 2px 6px rgba(0,0,0,0.5)',
+          display:      'flex',
+          alignItems:   'center',
+          justifyContent: 'center',
+        }}>
+          {/* Slot opening */}
+          <div style={{
+            position:   'absolute',
+            bottom:     0,
+            left:       '50%',
+            transform:  'translateX(-50%)',
+            width:      220,
+            height:     5,
+            background: '#0a0a0a',
+            borderRadius: '1px 1px 0 0',
+          }} />
+          {/* Slot guide lines */}
+          <div style={{ position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)', width: 1, height: 8, background: '#444', borderRadius: 1 }} />
+          <div style={{ position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)', width: 1, height: 8, background: '#444', borderRadius: 1 }} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -136,7 +183,7 @@ function Receipt({ data }: { data: any }) {
   const [printing, setPrinting] = useState(false)
   const [done, setDone]         = useState(false)
   const receiptRef              = useRef<HTMLDivElement>(null)
-  const [receiptHeight, setReceiptHeight] = useState(0)
+  const [receiptHeight, setReceiptHeight] = useState(600)
 
   useEffect(() => {
     if (receiptRef.current) setReceiptHeight(receiptRef.current.scrollHeight)
@@ -144,11 +191,11 @@ function Receipt({ data }: { data: any }) {
     return () => clearTimeout(t)
   }, [])
 
-  const duration = Math.max(2200, receiptHeight * 3.5)
+  const duration = Math.max(2800, receiptHeight * 4)
 
   useEffect(() => {
     if (!printing) return
-    const t = setTimeout(() => setDone(true), duration)
+    const t = setTimeout(() => setDone(true), duration + 900)
     return () => clearTimeout(t)
   }, [printing, duration])
 
@@ -160,38 +207,40 @@ function Receipt({ data }: { data: any }) {
         @keyframes blink { 50% { opacity: 0; } }
 
         @keyframes feed-out {
-          0%   { transform: translateY(-100%); }
-          80%  { transform: translateY(-4%); }
-          92%  { transform: translateY(1%); }
-          100% { transform: translateY(0); }
+          0%    { transform: translateY(-100%); }
+          70%   { transform: translateY(-8%);   animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+          84%   { transform: translateY(-2%);   animation-timing-function: cubic-bezier(0.0, 0, 0.2, 1); }
+          92%   { transform: translateY(0.8%);  animation-timing-function: cubic-bezier(0.0, 0, 0.2, 1); }
+          96%   { transform: translateY(0.2%);  }
+          100%  { transform: translateY(0); }
         }
 
         @keyframes shadow-grow {
-          0%   { box-shadow: 0 0 0 rgba(0,0,0,0); }
-          100% { box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08); }
+          0%   { filter: drop-shadow(0 0px 0px rgba(0,0,0,0)); }
+          100% { filter: drop-shadow(0 8px 20px rgba(0,0,0,0.12)); }
         }
 
         @keyframes scan-line {
-          0%   { top: 0%;   opacity: 0.08; }
+          0%   { top: 0%;   opacity: 0.07; }
           100% { top: 100%; opacity: 0; }
         }
 
         .receipt-feed {
           animation:
-            feed-out ${duration}ms cubic-bezier(0.12, 0, 0.08, 1) 0.9s both,
+            feed-out ${duration}ms linear 0.9s both,
             shadow-grow ${duration}ms ease-out 0.9s both;
         }
 
         .receipt-done {
-          box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 2px 8px rgba(0,0,0,0.08);
           transform: translateY(0);
+          filter: drop-shadow(0 8px 20px rgba(0,0,0,0.12));
         }
 
         .scan-line {
           position: absolute;
           left: 0; right: 0;
           height: 2px;
-          background: rgba(0,0,0,0.1);
+          background: rgba(0,0,0,0.08);
           pointer-events: none;
           z-index: 5;
           animation: scan-line ${duration}ms linear 0.9s both;
@@ -200,37 +249,35 @@ function Receipt({ data }: { data: any }) {
 
       <div style={{ maxWidth: 300, margin: '0 auto 40px', position: 'relative' }}>
 
-        <PrinterSlot />
+        <PrinterBody />
 
-        {/* Clip container */}
-        <div style={{ overflow: 'hidden', position: 'relative', borderRadius: '0 0 4px 4px' }}>
-
-          {/* Feeding receipt */}
+        {/* Clip container — hides receipt above slot */}
+        <div style={{ overflow: 'hidden', position: 'relative' }}>
           <div
             ref={receiptRef}
             className={printing ? (done ? 'receipt-done' : 'receipt-feed') : ''}
             style={{
-              transform:    printing ? undefined : 'translateY(-100%)',
-              position:     'relative',
-              borderRadius: '0 0 4px 4px',
-              overflow:     'hidden',
+              transform: printing ? undefined : 'translateY(-100%)',
+              position:  'relative',
+              overflow:  'hidden',
+              // Curved bottom corners on the receipt
+              borderRadius: '0 0 8px 8px',
             }}
           >
-            {/* Scan line while printing */}
             {printing && !done && <div className="scan-line" />}
 
             {/* ── Top tear line ── */}
             <div style={{
               background: '#f5f0e8',
-              padding: '10px 24px 0',
-              display: 'flex',
+              padding:    '10px 24px 0',
+              display:    'flex',
               alignItems: 'center',
-              gap: 8,
+              gap:        8,
             }}>
               <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
               <span style={{
-                fontSize: 8,
-                color: '#b0a99e',
+                fontSize:   8,
+                color:      '#b0a99e',
                 letterSpacing: '0.08em',
                 fontFamily: '"Courier New", Courier, monospace',
                 flexShrink: 0,
@@ -344,7 +391,7 @@ function Receipt({ data }: { data: any }) {
             </div>
 
             {/* ── Bottom zigzag ── */}
-            <ZigzagEdge color="#f5f0e8" />
+            <ZigzagBottom color="#f5f0e8" />
 
           </div>
         </div>
