@@ -245,7 +245,11 @@ function AdminDashboard() {
   }
 
   async function fetchArtists() {
-    const { data } = await supabase.from('profiles').select('*').eq('role', 'artist').order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'artist')
+      .order('created_at', { ascending: false })
     setArtists(data || [])
   }
 
@@ -295,6 +299,21 @@ function AdminDashboard() {
     fetchArtworks()
   }
 
+  async function handleWithdrawalAction(artistId: string, action: 'approve' | 'reject') {
+    const res = await fetch('/api/admin/withdrawal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artistId, action }),
+    })
+    const data = await res.json()
+    if (data.ok) {
+      toast.success(action === 'approve' ? 'Artist withdrawn' : 'Withdrawal rejected')
+      fetchArtists()
+    } else {
+      toast.error(data.error || 'Something went wrong')
+    }
+  }
+
   async function downloadHires(hiresPath: string) {
     const { data } = await supabase.storage.from('artwork-hires').createSignedUrl(hiresPath, 60)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
@@ -330,8 +349,6 @@ function AdminDashboard() {
   async function handlePrintLabel(order: any) {
     try {
       const { printLabel } = await import('@/lib/label')
-
-      // Build size counts from order_items — fall back to legacy single-item
       const items = order.order_items && order.order_items.length > 0
         ? order.order_items
         : [{ print_size: order.print_size || 'A4' }]
@@ -342,7 +359,6 @@ function AdminDashboard() {
         sizeCounts[size] = (sizeCounts[size] || 0) + 1
       })
 
-      // Auto-resolve packaging
       const sizes    = Object.keys(sizeCounts)
       const hasLarge = sizes.some(s => s === 'A2' || s === '12x16')
       const hasSmall = sizes.some(s => s === 'A4' || s === 'A3')
@@ -372,7 +388,7 @@ function AdminDashboard() {
   const pendingOrders    = orders.filter(o => o.status === 'pending')
   const pendingPayouts   = payouts.filter(p => p.status === 'pending')
   const paidPayouts      = payouts.filter(p => p.status === 'paid')
-  const withdrawRequests = artists.filter(a => a.withdraw_requested)
+  const withdrawRequests = artists.filter(a => a.account_status === 'pending_withdrawal')
   const closedShops      = artists.filter(a => a.shop_status === 'closed')
   const aprRevenue       = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.original_price, 0)
   const aprComm          = orders.filter(o => o.status === 'approved').reduce((s: number, o: any) => s + o.fp_commission, 0)
@@ -398,7 +414,7 @@ function AdminDashboard() {
     return matchSearch && matchStatus
   })
 
-  return (
+return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
       <Header
         minimal={true}
@@ -515,12 +531,32 @@ function AdminDashboard() {
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                   {withdrawRequests.map(a => (
                     <div key={a.id} style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: '#FCEBEB' }}>
-                      <p style={{ fontSize: 14, fontWeight: 500 }}>
-                        {a.display_name || a.full_name}
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#A32D2D', marginLeft: 8 }}>FP-{a.artist_code}</span>
-                      </p>
-                      <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>Reason: {a.withdraw_reason || 'No reason provided'}</p>
-                      <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 2 }}>{a.email}</p>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 500 }}>
+                            {a.display_name || a.full_name}
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#A32D2D', marginLeft: 8 }}>FP-{a.artist_code}</span>
+                          </p>
+                          <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>Reason: {a.withdraw_reason || 'No reason provided'}</p>
+                          <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 2 }}>{a.email}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            style={{ fontSize: 11 }}
+                            onClick={() => handleWithdrawalAction(a.id, 'approve')}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            style={{ fontSize: 11 }}
+                            onClick={() => handleWithdrawalAction(a.id, 'reject')}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -567,8 +603,277 @@ function AdminDashboard() {
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                         <p style={{ fontSize: 14, fontWeight: 500 }}>{a.display_name || a.full_name}</p>
-                        {a.shop_status === 'closed' && <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>}
-                        {a.withdraw_requested && <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>}
+                        {a.shop_status === 'closed' && (
+                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>
+                        )}
+                        {a.account_status === 'pending_withdrawal' && (
+                          <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
+                        )}
+                        {a.account_status === 'withdrawn' && (
+                          <span style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>Withdrawn</span>
+                        )}
+                      </div>
+                      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                        FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales
+                      </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(totalEarned - totalPaid)} pending</p>
+                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{formatMVR(totalPaid)} paid out</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {tab === 'listings' && (
+          <ListingsTab
+            artworks={filteredArtworks}
+            allArtworks={artworks}
+            listingSearch={listingSearch}
+            setListingSearch={setListingSearch}
+            listingStatus={listingStatus}
+            setListingStatus={setListingStatus}
+            waitlistCounts={waitlistCounts}
+            notifyingId={notifyingId}
+            onArtworkAction={handleArtworkAction}
+            onDownloadHires={downloadHires}
+            onNotifyWaitlist={handleNotifyWaitlist}
+          />
+        )}
+
+        {tab === 'offers' && (
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: 'rgba(0,0,0,0.02)' }}>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Your commission is always based on the original price regardless of artist discounts.</p>
+            </div>
+            {artworks.filter(a => a.offer_pct).length === 0 ? (
+              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No active offers.</p>
+            ) : artworks.filter(a => a.offer_pct).map(a => (
+              <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 500 }}>{a.offer_label} — {a.profiles?.display_name || a.profiles?.full_name}</p>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
+                    {a.sku} · {a.offer_pct}% off{a.offer_expires ? ' · Expires ' + a.offer_expires : ' · No expiry'}
+                  </p>
+                </div>
+                <span className="badge" style={{ background: 'var(--color-red-light)', color: '#A32D2D' }}>Active</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'customers' && <CustomersTab />}
+        {tab === 'export'    && <AdminExportTab artists={artists} onExport={handleExport} orders={orders} />}
+      </div>
+
+      {selectedOrder    && <SlipModal order={selectedOrder} onClose={() => setSelectedOrder(null)} onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }} />}
+      {selectedPayout   && <PayoutModal payout={selectedPayout} onClose={() => setSelectedPayout(null)} onPaid={() => { fetchPayouts(); fetchOrders() }} />}
+      {invoiceOrder     && <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrder(null)} />}
+      {remittancePayout && <RemittanceModal payout={remittancePayout} onClose={() => setRemittancePayout(null)} />}
+    </div>
+  )
+}
+return (
+    <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
+      <Header
+        minimal={true}
+        rightContent={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 12, background: 'var(--color-red-light)', color: '#A32D2D', padding: '3px 10px', borderRadius: 20 }}>Admin</span>
+            <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>Log out</button>
+          </div>
+        }
+      />
+
+      <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 24 }}>Admin dashboard</h1>
+
+        <div className="grid-4" style={{ marginBottom: 24 }}>
+          {[
+            ['Pending orders',   pendingOrders.length],
+            ['Total orders',     orders.length],
+            ['Gross revenue',    formatMVR(aprRevenue)],
+            ['Total commission', formatMVR(aprComm)],
+          ].map(([label, value]) => (
+            <div key={label as string} className="stat-card">
+              <p className="stat-label">{label}</p>
+              <p className="stat-value">{value}</p>
+            </div>
+          ))}
+        </div>
+
+        {withdrawRequests.length > 0 && (
+          <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#A32D2D' }}>
+            {withdrawRequests.length} artist{withdrawRequests.length > 1 ? 's have' : ' has'} requested to withdraw. Check the Artists tab.
+          </div>
+        )}
+        {closedShops.length > 0 && (
+          <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#633806' }}>
+            {closedShops.length} artist{closedShops.length > 1 ? 's have' : ' has'} temporarily closed their shop.
+          </div>
+        )}
+        {totalWaiting > 0 && (
+          <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#0F6E56' }}>
+            {totalWaiting} buyer{totalWaiting !== 1 ? 's' : ''} waiting on sold-out artworks. Check the Listings tab to notify them.
+          </div>
+        )}
+
+        <div className="tab-bar">
+          {TABS.map(t => (
+            <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+              {t === 'orders' && pendingOrders.length > 0 && (
+                <span style={{ marginLeft: 6, background: 'var(--color-red)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{pendingOrders.length}</span>
+              )}
+              {t === 'artists' && pendingPayouts.length > 0 && (
+                <span style={{ marginLeft: 6, background: 'var(--color-teal)', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{pendingPayouts.length}</span>
+              )}
+              {t === 'listings' && totalWaiting > 0 && (
+                <span style={{ marginLeft: 6, background: '#1D9E75', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>{totalWaiting}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'orders' && (
+          <OrdersTab
+            orders={filteredOrders}
+            allOrders={orders}
+            orderSearch={orderSearch}
+            setOrderSearch={setOrderSearch}
+            orderStatus={orderStatus}
+            setOrderStatus={setOrderStatus}
+            onAction={handleOrderAction}
+            onStatusChange={fetchOrders}
+            onViewInvoice={setInvoiceOrder}
+            onViewSlip={setSelectedOrder}
+            onPrintLabel={handlePrintLabel}
+          />
+        )}
+
+        {tab === 'artists' && (
+          <div>
+            {pendingPayouts.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>
+                  Pending payout requests
+                  <span style={{ marginLeft: 8, background: 'var(--color-teal)', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>{pendingPayouts.length}</span>
+                </p>
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  {pendingPayouts.map(p => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 500 }}>
+                          {p.profiles?.display_name || p.profiles?.full_name}
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>FP-{p.profiles?.artist_code}</span>
+                        </p>
+                        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_name}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13 }}>{p.account_number}</span>
+                          <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => { navigator.clipboard.writeText(p.account_number); toast.success('Copied!') }}>Copy</button>
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>Requested {new Date(p.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>{formatMVR(p.amount)}</p>
+                        <button className="btn btn-sm btn-success" onClick={() => setSelectedPayout(p)}>Pay and confirm</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {withdrawRequests.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12, color: '#A32D2D' }}>Withdrawal requests</p>
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  {withdrawRequests.map(a => (
+                    <div key={a.id} style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', background: '#FCEBEB' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 500 }}>
+                            {a.display_name || a.full_name}
+                            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: '#A32D2D', marginLeft: 8 }}>FP-{a.artist_code}</span>
+                          </p>
+                          <p style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>Reason: {a.withdraw_reason || 'No reason provided'}</p>
+                          <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 2 }}>{a.email}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          <button
+                            className="btn btn-sm btn-danger"
+                            style={{ fontSize: 11 }}
+                            onClick={() => handleWithdrawalAction(a.id, 'approve')}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            style={{ fontSize: 11 }}
+                            onClick={() => handleWithdrawalAction(a.id, 'reject')}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {paidPayouts.length > 0 && (
+              <div style={{ marginBottom: 24 }}>
+                <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>Payout history</p>
+                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                  {paidPayouts.map(p => (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', gap: 12 }}>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 500 }}>
+                          {p.profiles?.display_name || p.profiles?.full_name}
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 8 }}>FP-{p.profiles?.artist_code}</span>
+                        </p>
+                        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.bank_name} · {p.account_number}</p>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{p.paid_at ? 'Paid ' + new Date(p.paid_at).toLocaleDateString() : ''}</p>
+                        <button className="btn btn-sm" style={{ marginTop: 6, fontSize: 11 }} onClick={() => setRemittancePayout(p)}>View remittance</button>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 15, fontWeight: 500 }}>{formatMVR(p.amount)}</p>
+                        <span className="badge" style={{ background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', marginTop: 4, display: 'inline-block' }}>paid</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 12 }}>All artists</p>
+            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              {artists.length === 0 ? (
+                <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No artists yet.</p>
+              ) : artists.map(a => {
+                const artistOrders     = orders.filter(o => o.artworks?.artist_id === a.id && o.status === 'approved')
+                const artistPayoutsArr = payouts.filter(p => p.artist_id === a.id && p.status === 'paid')
+                const totalEarned      = artistOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+                const totalPaid        = artistPayoutsArr.reduce((s: number, p: any) => s + p.amount, 0)
+                const artworkCount     = artworks.filter(w => w.artist_id === a.id).length
+                return (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <p style={{ fontSize: 14, fontWeight: 500 }}>{a.display_name || a.full_name}</p>
+                        {a.shop_status === 'closed' && (
+                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>Shop closed</span>
+                        )}
+                        {a.account_status === 'pending_withdrawal' && (
+                          <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
+                        )}
+                        {a.account_status === 'withdrawn' && (
+                          <span style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>Withdrawn</span>
+                        )}
                       </div>
                       <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
                         FP-{a.artist_code} · {a.email} · {artworkCount} listings · {artistOrders.length} sales
