@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 import { formatMVR } from '@/lib/pricing'
@@ -34,24 +34,47 @@ function AnimatedCheck() {
       `}</style>
       <div className="check-wrap" style={{ margin: '0 auto 24px', width: 72, height: 72 }}>
         <svg width="72" height="72" viewBox="0 0 52 52">
-          <circle className="check-circle" cx="26" cy="26" r="25" fill="none" stroke="#5DCAA5" strokeWidth="2" />
-          <path className="check-tick" fill="none" stroke="#1D9E75" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" d="M14 27 l8 8 l16 -16" />
+          <circle
+            className="check-circle"
+            cx="26" cy="26" r="25"
+            fill="none"
+            stroke="#5DCAA5"
+            strokeWidth="2"
+          />
+          <path
+            className="check-tick"
+            fill="none"
+            stroke="#1D9E75"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M14 27 l8 8 l16 -16"
+          />
         </svg>
       </div>
     </>
   )
 }
 
-// ── Typewriter ────────────────────────────────────────────────────────────
+// ── Typewriter text ───────────────────────────────────────────────────────
 function Typewriter({ text, delay = 0, speed = 45 }: { text: string; delay?: number; speed?: number }) {
   const [displayed, setDisplayed] = useState('')
   const [started, setStarted]     = useState(false)
-  useEffect(() => { const t = setTimeout(() => setStarted(true), delay); return () => clearTimeout(t) }, [delay])
+
   useEffect(() => {
-    if (!started || displayed.length >= text.length) return
-    const t = setTimeout(() => setDisplayed(text.slice(0, displayed.length + 1)), speed)
+    const t = setTimeout(() => setStarted(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+
+  useEffect(() => {
+    if (!started) return
+    if (displayed.length >= text.length) return
+    const t = setTimeout(() => {
+      setDisplayed(text.slice(0, displayed.length + 1))
+    }, speed)
     return () => clearTimeout(t)
   }, [started, displayed, text, speed])
+
   return (
     <span>
       {displayed}
@@ -62,129 +85,42 @@ function Typewriter({ text, delay = 0, speed = 45 }: { text: string; delay?: num
   )
 }
 
-// ── Zigzag bottom ─────────────────────────────────────────────────────────
-function ZigzagBottom({ color = '#f5f5f2' }: { color?: string }) {
-  const w = 400, h = 14, size = 12
-  const pts: string[] = []
-  let x = 0, top = true
-  pts.push(`0,0`)
+// ── Zigzag SVG edge ───────────────────────────────────────────────────────
+function ZigzagEdge({ flip = false }: { flip?: boolean }) {
+  const w    = 400
+  const h    = 12
+  const size = 10
+  const points: string[] = []
+  let x = 0
+  let top = true
+  points.push(`0,${flip ? 0 : h}`)
   while (x <= w) {
-    pts.push(`${x},${top ? h : 0}`)
+    points.push(`${x},${top ? (flip ? h : 0) : (flip ? 0 : h)}`)
     x += size / 2
     top = !top
   }
-  pts.push(`${w},0`)
+  points.push(`${w},${flip ? 0 : h}`)
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-      <polygon points={pts.join(' ')} fill={color} />
+    <svg
+      width="100%"
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      style={{ display: 'block', transform: flip ? 'scaleY(-1)' : 'none' }}
+    >
+      <polygon points={points.join(' ')} fill="#f5f0e8" />
     </svg>
-  )
-}
-
-// ── White printer body ────────────────────────────────────────────────────
-function PrinterBody() {
-  return (
-    <div style={{ width: 300, margin: '0 auto', position: 'relative', zIndex: 10 }}>
-      <div style={{
-        background:   'linear-gradient(to bottom, #f8f8f6 0%, #efefed 60%, #e4e4e1 100%)',
-        borderRadius: '14px 14px 0 0',
-        padding:      '12px 16px 0',
-        boxShadow:
-          'inset 0 1px 0 rgba(255,255,255,0.9), ' +
-          'inset 0 -1px 0 rgba(0,0,0,0.06), ' +
-          '0 4px 20px rgba(0,0,0,0.12)',
-        border:   '0.5px solid #d8d8d4',
-        position: 'relative',
-      }}>
-
-        {/* Brushed metal texture */}
-        <div style={{
-          position:      'absolute',
-          inset:         0,
-          borderRadius:  '14px 14px 0 0',
-          background:    'repeating-linear-gradient(90deg, transparent, transparent 3px, rgba(255,255,255,0.04) 3px, rgba(255,255,255,0.04) 4px)',
-          pointerEvents: 'none',
-        }} />
-
-        {/* Single green LED — top right */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10, paddingRight: 4 }}>
-          <div style={{
-            width:        9,
-            height:       9,
-            borderRadius: '50%',
-            background:   'radial-gradient(circle at 35% 35%, #6aff9e, #22c55e 60%, #15803d)',
-            boxShadow:    '0 0 8px rgba(34,197,94,0.9), 0 0 16px rgba(34,197,94,0.4)',
-            border:       '0.5px solid rgba(0,0,0,0.2)',
-          }} />
-        </div>
-
-        {/* Dark slot */}
-        <div style={{
-          background:   'linear-gradient(to bottom, #111, #222)',
-          borderRadius: '3px 3px 0 0',
-          height:       22,
-          position:     'relative',
-          boxShadow:    'inset 0 3px 10px rgba(0,0,0,0.8)',
-        }}>
-          {/* Slot opening */}
-          <div style={{
-            position:     'absolute',
-            bottom:       0,
-            left:         '50%',
-            transform:    'translateX(-50%)',
-            width:        220,
-            height:       6,
-            background:   '#050505',
-            borderRadius: '1px 1px 0 0',
-          }} />
-          {/* Warm thermal glow */}
-          <div style={{
-            position:   'absolute',
-            bottom:     7,
-            left:       '50%',
-            transform:  'translateX(-50%)',
-            width:      180,
-            height:     1,
-            background: 'rgba(255,140,0,0.25)',
-            boxShadow:  '0 0 6px rgba(255,120,0,0.35)',
-          }} />
-          {/* Guide marks */}
-          {[-80, 80].map((x, i) => (
-            <div key={i} style={{
-              position:   'absolute',
-              bottom:     9,
-              left:       `calc(50% + ${x}px)`,
-              width:      1,
-              height:     7,
-              background: '#444',
-            }} />
-          ))}
-        </div>
-      </div>
-    </div>
   )
 }
 
 // ── Receipt ───────────────────────────────────────────────────────────────
 function Receipt({ data }: { data: any }) {
-  const [printing, setPrinting] = useState(false)
-  const [done, setDone]         = useState(false)
-  const receiptRef              = useRef<HTMLDivElement>(null)
-  const [receiptHeight, setReceiptHeight] = useState(600)
+  const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    if (receiptRef.current) setReceiptHeight(receiptRef.current.scrollHeight)
-    const t = setTimeout(() => setPrinting(true), 900)
+    const t = setTimeout(() => setVisible(true), 700)
     return () => clearTimeout(t)
   }, [])
-
-  const duration = Math.max(2800, receiptHeight * 4)
-
-  useEffect(() => {
-    if (!printing) return
-    const t = setTimeout(() => setDone(true), duration + 900)
-    return () => clearTimeout(t)
-  }, [printing, duration])
 
   const total = data.items?.reduce((s: number, i: any) => s + i.price, 0) || data.totalPaid || 0
 
@@ -192,215 +128,140 @@ function Receipt({ data }: { data: any }) {
     <>
       <style>{`
         @keyframes blink { 50% { opacity: 0; } }
-
-        @keyframes feed-out {
-          0%   { transform: translateY(-100%); }
-          70%  { transform: translateY(-8%);  animation-timing-function: cubic-bezier(0.4,0,0.6,1); }
-          84%  { transform: translateY(-2%);  animation-timing-function: cubic-bezier(0.0,0,0.2,1); }
-          92%  { transform: translateY(0.8%); animation-timing-function: cubic-bezier(0.0,0,0.2,1); }
-          96%  { transform: translateY(0.2%); }
-          100% { transform: translateY(0); }
+        @keyframes receipt-in {
+          0%   { transform: translateY(30px); opacity: 0; }
+          100% { transform: translateY(0);    opacity: 1; }
         }
-
-        @keyframes shadow-grow {
-          0%   { filter: drop-shadow(0 0px 0px rgba(0,0,0,0)); }
-          100% { filter: drop-shadow(0 10px 24px rgba(0,0,0,0.13)); }
+        @keyframes receipt-print {
+          0%   { clip-path: inset(0 0 100% 0); }
+          100% { clip-path: inset(0 0 0% 0); }
         }
-
-        @keyframes scan-line {
-          0%   { top: 0%;   opacity: 0.07; }
-          100% { top: 100%; opacity: 0; }
+        .receipt-wrap {
+          animation: receipt-in 0.6s cubic-bezier(0.34,1.2,0.64,1) 0.6s both;
         }
-
-        .receipt-feed {
-          animation:
-            feed-out ${duration}ms linear 0.9s both,
-            shadow-grow ${duration}ms ease-out 0.9s both;
+        .receipt-body {
+          animation: receipt-print 1.2s ease-out 1s both;
         }
-
-        .receipt-done {
-          transform: translateY(0);
-          filter: drop-shadow(0 10px 24px rgba(0,0,0,0.13));
-        }
-
-        .scan-line {
-          position: absolute;
-          left: 0; right: 0; height: 2px;
-          background: rgba(0,0,0,0.08);
-          pointer-events: none;
-          z-index: 5;
-          animation: scan-line ${duration}ms linear 0.9s both;
-        }
-
-        .receipt-body-wrap { position: relative; }
-        .receipt-body-wrap::before {
-          content: '';
-          position: absolute;
-          left: 0; top: 0; bottom: 0; width: 18px;
-          background: linear-gradient(to right, rgba(0,0,0,0.06), transparent);
-          pointer-events: none;
-          z-index: 2;
-        }
-        .receipt-body-wrap::after {
-          content: '';
-          position: absolute;
-          right: 0; top: 0; bottom: 0; width: 18px;
-          background: linear-gradient(to left, rgba(0,0,0,0.06), transparent);
-          pointer-events: none;
-          z-index: 2;
+        .receipt-dot {
+          width: 5px; height: 5px; border-radius: 50%;
+          background: #d4cfc6;
+          display: inline-block;
+          margin: 0 2px;
         }
       `}</style>
 
-      <div style={{ maxWidth: 300, margin: '0 auto 40px', position: 'relative' }}>
+      <div className="receipt-wrap" style={{ maxWidth: 340, margin: '0 auto 32px' }}>
+        {/* Top zigzag */}
+        <div style={{ background: '#f5f0e8' }}>
+          <ZigzagEdge />
+        </div>
 
-        <PrinterBody />
-
-        {/* Clip container — hides receipt above slot */}
-        <div style={{ overflow: 'hidden', position: 'relative' }}>
-          <div
-            ref={receiptRef}
-            className={printing ? (done ? 'receipt-done' : 'receipt-feed') : ''}
-            style={{
-              transform:    printing ? undefined : 'translateY(-100%)',
-              position:     'relative',
-              borderRadius: '0 0 6px 6px',
-              overflow:     'hidden',
-            }}
-          >
-            {printing && !done && <div className="scan-line" />}
-
-            {/* ── Top tear line ── */}
-            <div style={{
-              background: '#f5f5f2',
-              padding:    '10px 24px 0',
-              display:    'flex',
-              alignItems: 'center',
-              gap:        8,
-            }}>
-              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
-              <span style={{
-                fontSize:      8,
-                color:         '#b0a99e',
-                letterSpacing: '0.08em',
-                fontFamily:    '"Courier New", Courier, monospace',
-                flexShrink:    0,
-              }}>✂ TEAR HERE</span>
-              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
-            </div>
-
-            {/* ── Body ── */}
-            <div className="receipt-body-wrap">
-              <div style={{
-                background:  '#f5f5f2',
-                padding:     '8px 24px 16px',
-                fontFamily:  '"Courier New", Courier, monospace',
-                fontSize:    11,
-                color:       '#2a2520',
-                lineHeight:  1.9,
-              }}>
-
-                {/* Header */}
-                <div style={{ textAlign: 'center', marginBottom: 10 }}>
-                  <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.14em', marginBottom: 2 }}>FINEPRINT STUDIO</p>
-                  <p style={{ fontSize: 9, color: '#7a7068', letterSpacing: '0.06em', lineHeight: 1.6 }}>
-                    H. DHUNBURIMAAGE, JANAVAREE MAGU<br />
-                    MALÉ, MALDIVES<br />
-                    hello@fineprintmv.com
-                  </p>
-                </div>
-
-                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
-
-                {/* Date + time */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7a7068', marginBottom: 8 }}>
-                  <span>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                  <span>{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-
-                {/* Invoice */}
-                <div style={{ marginBottom: 6 }}>
-                  <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>INVOICE NO.</p>
-                  <p style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.08em' }}>
-                    <Typewriter text={data.invoiceNumber || ''} delay={1400} speed={55} />
-                  </p>
-                </div>
-
-                {/* Order SKU */}
-                {data.orderSku && (
-                  <div style={{ marginBottom: 8 }}>
-                    <p style={{ fontSize: 9, color: '#7a7068', marginBottom: 1 }}>ORDER REF.</p>
-                    <p style={{ fontSize: 10, letterSpacing: '0.04em' }}>
-                      <Typewriter text={data.orderSku} delay={2000} speed={40} />
-                    </p>
-                  </div>
-                )}
-
-                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
-
-                {/* Items */}
-                <div style={{ marginBottom: 6 }}>
-                  {data.items?.map((item: any, i: number) => (
-                    <div key={i} style={{ marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, flex: 1, lineHeight: 1.4 }}>{item.title}</span>
-                        <span style={{ fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{formatMVR(item.price)}</span>
-                      </div>
-                      <p style={{ fontSize: 9, color: '#7a7068' }}>
-                        {item.artistName} · {item.printSize}{item.quantity > 1 ? ' · ×' + item.quantity : ''}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-
-                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
-
-                {/* Delivery */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
-                  <span>{data.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-                  <span>{data.deliveryMethod === 'pickup' ? 'FREE' : 'MVR 100'}</span>
-                </div>
-
-                {/* Total */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, paddingTop: 8, borderTop: '1px solid #c4bfb6', marginTop: 4 }}>
-                  <span>TOTAL</span>
-                  <span>{formatMVR(data.totalPaid || total)}</span>
-                </div>
-
-                <div style={{ textAlign: 'center', margin: '10px 0 6px' }}>
-                  {[0, 1, 2].map(i => (
-                    <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
-                  ))}
-                </div>
-
-                {/* Payment */}
-                <div style={{ textAlign: 'center', fontSize: 9, color: '#7a7068', lineHeight: 1.8 }}>
-                  <p>{data.paymentMethod === 'swipe' ? 'PAID VIA SWIPE' : 'BANK TRANSFER — BML'}</p>
-                  <p>PENDING VERIFICATION</p>
-                </div>
-
-                <div style={{ borderTop: '1px dashed #c4bfb6', margin: '8px 0' }} />
-
-                {/* Footer */}
-                <div style={{ textAlign: 'center', fontSize: 9, color: '#7a7068', lineHeight: 1.9 }}>
-                  <p>GICLÉE ARCHIVAL PRINTS</p>
-                  <p>HAHNEMÜHLE PAPERS</p>
-                  <p style={{ marginTop: 4, fontWeight: 600 }}>THANK YOU FOR YOUR ORDER!</p>
-                  <p>fineprintmv.com</p>
-                </div>
-
-                <div style={{ textAlign: 'center', margin: '10px 0 4px' }}>
-                  {[0, 1, 2].map(i => (
-                    <span key={i} style={{ display: 'inline-block', width: 4, height: 4, borderRadius: '50%', background: '#c4bfb6', margin: '0 3px' }} />
-                  ))}
-                </div>
-
-              </div>
-            </div>
-
-            {/* Bottom zigzag */}
-            <ZigzagBottom color="#f5f5f2" />
-
+        {/* Receipt body */}
+        <div
+          className="receipt-body"
+          style={{
+            background:  '#f5f0e8',
+            padding:     '4px 28px 16px',
+            fontFamily:  '"Courier New", Courier, monospace',
+            fontSize:    12,
+            color:       '#2a2520',
+            lineHeight:  1.8,
+          }}
+        >
+          {/* Header */}
+          <div style={{ textAlign: 'center', marginBottom: 12, paddingTop: 8 }}>
+            <p style={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.12em', marginBottom: 2 }}>FINEPRINT STUDIO</p>
+            <p style={{ fontSize: 10, color: '#7a7068', letterSpacing: '0.06em' }}>H. DHUNBURIMAAGE, JANAVAREE MAGU</p>
+            <p style={{ fontSize: 10, color: '#7a7068', letterSpacing: '0.06em' }}>MALE, MALDIVES</p>
+            <p style={{ fontSize: 10, color: '#7a7068', marginTop: 2 }}>hello@fineprintmv.com</p>
           </div>
+
+          <div style={{ borderTop: '1px dashed #c4bfb6', marginBottom: 10 }} />
+
+          {/* Date + invoice */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#7a7068', marginBottom: 6 }}>
+            <span>{new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+            <span>{new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <p style={{ fontSize: 10, color: '#7a7068' }}>INVOICE NO.</p>
+            <p style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.08em' }}>
+              <Typewriter text={data.invoiceNumber || ''} delay={1200} speed={55} />
+            </p>
+          </div>
+
+          <div style={{ marginBottom: 10 }}>
+            <p style={{ fontSize: 10, color: '#7a7068' }}>ORDER REF.</p>
+            <p style={{ fontSize: 11, letterSpacing: '0.04em' }}>
+              <Typewriter text={data.orderSku || ''} delay={1800} speed={40} />
+            </p>
+          </div>
+
+          <div style={{ borderTop: '1px dashed #c4bfb6', margin: '10px 0' }} />
+
+          {/* Items */}
+          <div style={{ marginBottom: 10 }}>
+            {data.items?.map((item: any, i: number) => (
+              <div key={i} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ flex: 1, fontSize: 11, fontWeight: 600, lineHeight: 1.4 }}>{item.title}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, flexShrink: 0 }}>{formatMVR(item.price)}</span>
+                </div>
+                <p style={{ fontSize: 10, color: '#7a7068' }}>
+                  {item.artistName} · {item.printSize}
+                  {item.quantity > 1 ? ' · ×' + item.quantity : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ borderTop: '1px dashed #c4bfb6', margin: '10px 0' }} />
+
+          {/* Delivery */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+            <span>{data.deliveryMethod === 'pickup' ? 'Pickup' : 'Delivery'}</span>
+            <span>{data.deliveryMethod === 'pickup' ? 'FREE' : 'MVR 100'}</span>
+          </div>
+
+          {/* Total */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, marginTop: 8, paddingTop: 8, borderTop: '1px solid #c4bfb6' }}>
+            <span>TOTAL</span>
+            <span>{formatMVR(data.totalPaid || total)}</span>
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 14, marginBottom: 6 }}>
+            <span className="receipt-dot" />
+            <span className="receipt-dot" />
+            <span className="receipt-dot" />
+          </div>
+
+          {/* Payment method */}
+          <div style={{ textAlign: 'center', fontSize: 10, color: '#7a7068', marginBottom: 8 }}>
+            <p>{data.paymentMethod === 'swipe' ? 'PAID VIA SWIPE' : 'BANK TRANSFER — BML'}</p>
+            <p style={{ marginTop: 2 }}>PENDING VERIFICATION</p>
+          </div>
+
+          <div style={{ borderTop: '1px dashed #c4bfb6', margin: '10px 0' }} />
+
+          {/* Footer */}
+          <div style={{ textAlign: 'center', fontSize: 10, color: '#7a7068', lineHeight: 1.8 }}>
+            <p>GICLÉE ARCHIVAL PRINTS</p>
+            <p>HAHNEMÜHLE PAPERS</p>
+            <p style={{ marginTop: 6 }}>THANK YOU FOR YOUR ORDER!</p>
+            <p>fineprintmv.com</p>
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: 10 }}>
+            <span className="receipt-dot" />
+            <span className="receipt-dot" />
+            <span className="receipt-dot" />
+          </div>
+        </div>
+
+        {/* Bottom zigzag */}
+        <div style={{ background: '#f5f0e8' }}>
+          <ZigzagEdge flip />
         </div>
       </div>
     </>
@@ -426,7 +287,7 @@ export default function OrderConfirmedPage() {
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 8 }}>
           Order submitted!
         </h1>
-        <p style={{ fontSize: 14, color: 'var(--color-text-muted)', maxWidth: 380, margin: '0 auto 36px', lineHeight: 1.7 }}>
+        <p style={{ fontSize: 14, color: 'var(--color-text-muted)', maxWidth: 380, margin: '0 auto 32px', lineHeight: 1.7 }}>
           {data?.deliveryMethod === 'pickup'
             ? 'Your print(s) will be ready for pickup at FinePrint Studio, Malé.'
             : 'Your print(s) will be delivered to your address.'}
@@ -435,7 +296,7 @@ export default function OrderConfirmedPage() {
 
         {data && <Receipt data={data} />}
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <Link href="/storefront" className="btn btn-primary">Continue browsing</Link>
           <Link href="/orders/track" className="btn btn-sm">Track your order</Link>
         </div>
