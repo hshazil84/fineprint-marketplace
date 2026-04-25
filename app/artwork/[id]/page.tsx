@@ -9,23 +9,51 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 
+// ── Animated MVR ─────────────────────────────────────────────────────────
+function AnimatedMVR({ amount, size = 16 }: { amount: number; size?: number }) {
+  const [animKey, setAnimKey] = useState(0)
+  useEffect(() => { setAnimKey(k => k + 1) }, [amount])
+  const digits = amount.toLocaleString()
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, fontSize: size, fontWeight: 500 }}>
+      <span>MVR </span>
+      <span key={animKey} className="t-digit-group is-animating">
+        {digits.split('').map((char, i) => (
+          <span
+            key={i}
+            className="t-digit"
+            {...(i >= 2 && i < 4 ? { 'data-stagger': '1' } : {})}
+            {...(i >= 4 ? { 'data-stagger': '2' } : {})}
+          >
+            {char}
+          </span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
 export default function ArtworkPage() {
   const { id }   = useParams()
   const router   = useRouter()
-  const [artwork, setArtwork]           = useState<any>(null)
-  const [artist, setArtist]             = useState<any>(null)
-  const [related, setRelated]           = useState<any[]>([])
-  const [galleryImages, setGalleryImages] = useState<any[]>([])
-  const [activeImage, setActiveImage]   = useState<string | null>(null)
-  const [selectedSize, setSelectedSize] = useState('A4')
+  const [artwork, setArtwork]               = useState<any>(null)
+  const [artist, setArtist]                 = useState<any>(null)
+  const [related, setRelated]               = useState<any[]>([])
+  const [galleryImages, setGalleryImages]   = useState<any[]>([])
+  const [activeImage, setActiveImage]       = useState<string | null>(null)
+  const [selectedSize, setSelectedSize]     = useState('A4')
+  const [qty, setQty]                       = useState(1)
   const [showArtistModal, setShowArtistModal] = useState(false)
-  const [waitlistEmail, setWaitlistEmail] = useState('')
-  const [waitlistDone, setWaitlistDone]   = useState(false)
+  const [waitlistEmail, setWaitlistEmail]   = useState('')
+  const [waitlistDone, setWaitlistDone]     = useState(false)
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const { add, has } = useCart()
   const supabase = createClient()
 
   useEffect(() => { fetchArtwork() }, [id])
+
+  // Reset qty when size changes
+  useEffect(() => { setQty(1) }, [selectedSize])
 
   async function fetchArtwork() {
     const { data } = await supabase
@@ -62,7 +90,7 @@ export default function ArtworkPage() {
     }
     setWaitlistLoading(true)
     try {
-      const res = await fetch('/api/waitlist', {
+      const res  = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ artworkId: artwork.id, email: waitlistEmail }),
@@ -70,7 +98,7 @@ export default function ArtworkPage() {
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
       setWaitlistDone(true)
-      toast.success('We\'ll notify you when this is back in stock!')
+      toast.success("We'll notify you when this is back in stock!")
     } catch (err: any) {
       toast.error(err.message || 'Something went wrong')
     } finally {
@@ -85,12 +113,13 @@ export default function ArtworkPage() {
     </div>
   )
 
-  const paperType    = artwork.paper_type || DEFAULT_PAPER
-  const paperOption  = getPaperOption(paperType)
-  const paperAddOn   = getPaperAddOn(paperType, selectedSize)
+  const paperType     = artwork.paper_type || DEFAULT_PAPER
+  const paperOption   = getPaperOption(paperType)
+  const paperAddOn    = getPaperAddOn(paperType, selectedSize)
   const availableSizes = artwork.sizes || SIZES
-  const prices       = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType)
-  const orderSKU     = buildOrderSKU(artwork.sku, selectedSize)
+  const prices        = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType)
+  const lineTotal     = prices.artworkLineItem * qty
+  const orderSKU      = buildOrderSKU(artwork.sku, selectedSize)
   const alreadyInCart = has(artwork.id, selectedSize)
 
   // Edition logic
@@ -100,6 +129,7 @@ export default function ArtworkPage() {
   const isLimited    = !!editionSize
   const isSoldOut    = isLimited && remaining === 0
   const isLowStock   = isLimited && remaining !== null && remaining > 0 && remaining <= 10
+  const maxQty       = remaining !== null ? Math.min(10, remaining) : 10
 
   const allThumbnails = [
     { url: artwork.preview_url, isMain: true },
@@ -108,42 +138,85 @@ export default function ArtworkPage() {
 
   function addToCart() {
     if (isSoldOut) return
-    add({
-      artworkId:    artwork.id,
-      artworkSku:   artwork.sku,
-      artworkTitle: artwork.title,
-      artistName:   artist?.display_name || artist?.full_name,
-      artistId:     artwork.artist_id,
-      printSize:    selectedSize,
-      artistPrice:  artwork.price,
-      printingFee:  prices.totalPrintFee,
-      offerLabel:   artwork.offer_label,
-      offerPct:     artwork.offer_pct,
-      previewUrl:   artwork.preview_url,
-    })
-    toast.success('Added to cart!')
+    for (let i = 0; i < qty; i++) {
+      add({
+        artworkId:    artwork.id,
+        artworkSku:   artwork.sku,
+        artworkTitle: artwork.title,
+        artistName:   artist?.display_name || artist?.full_name,
+        artistId:     artwork.artist_id,
+        printSize:    selectedSize,
+        artistPrice:  artwork.price,
+        printingFee:  prices.totalPrintFee,
+        offerLabel:   artwork.offer_label,
+        offerPct:     artwork.offer_pct,
+        previewUrl:   artwork.preview_url,
+      })
+    }
+    toast.success(qty > 1 ? qty + '× added to cart!' : 'Added to cart!')
   }
 
   function buyNow() {
     if (isSoldOut) return
-    add({
-      artworkId:    artwork.id,
-      artworkSku:   artwork.sku,
-      artworkTitle: artwork.title,
-      artistName:   artist?.display_name || artist?.full_name,
-      artistId:     artwork.artist_id,
-      printSize:    selectedSize,
-      artistPrice:  artwork.price,
-      printingFee:  prices.totalPrintFee,
-      offerLabel:   artwork.offer_label,
-      offerPct:     artwork.offer_pct,
-      previewUrl:   artwork.preview_url,
-    })
+    for (let i = 0; i < qty; i++) {
+      add({
+        artworkId:    artwork.id,
+        artworkSku:   artwork.sku,
+        artworkTitle: artwork.title,
+        artistName:   artist?.display_name || artist?.full_name,
+        artistId:     artwork.artist_id,
+        printSize:    selectedSize,
+        artistPrice:  artwork.price,
+        printingFee:  prices.totalPrintFee,
+        offerLabel:   artwork.offer_label,
+        offerPct:     artwork.offer_pct,
+        previewUrl:   artwork.preview_url,
+      })
+    }
     router.push('/checkout')
   }
 
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
+
+      {/* ── Animation CSS ── */}
+      <style>{`
+        :root {
+          --digit-dur: 500ms;
+          --digit-distance: 8px;
+          --digit-stagger: 70ms;
+          --digit-blur: 2px;
+          --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+          --digit-dir-x: 0;
+          --digit-dir-y: 1;
+        }
+        @keyframes t-digit-pop-in {
+          0% {
+            transform: translate(
+              calc(var(--digit-distance) * var(--digit-dir-x)),
+              calc(var(--digit-distance) * var(--digit-dir-y))
+            );
+            opacity: 0;
+            filter: blur(var(--digit-blur));
+          }
+          100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+        }
+        .t-digit-group { display: inline-flex; align-items: baseline; }
+        .t-digit { display: inline-block; will-change: transform, opacity, filter; }
+        .t-digit-group.is-animating .t-digit {
+          animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+        }
+        .t-digit-group.is-animating .t-digit[data-stagger="1"] {
+          animation-delay: var(--digit-stagger);
+        }
+        .t-digit-group.is-animating .t-digit[data-stagger="2"] {
+          animation-delay: calc(var(--digit-stagger) * 2);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .t-digit-group .t-digit { animation: none !important; }
+        }
+      `}</style>
+
       <Header />
       <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
         <Link href="/storefront" className="btn btn-sm" style={{ marginBottom: 24, display: 'inline-flex' }}>
@@ -169,9 +242,7 @@ export default function ArtworkPage() {
                   </span>
                 ) : null}
                 {isSoldOut && (
-                  <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
-                    Sold out
-                  </span>
+                  <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>Sold out</span>
                 )}
                 {isLowStock && !isSoldOut && (
                   <span style={{ background: '#FAEEDA', color: '#633806', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
@@ -287,10 +358,19 @@ export default function ArtworkPage() {
                   <span>+{formatMVR(paperAddOn)}</span>
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
-                <span>Print price</span>
-                <span>{formatMVR(prices.artworkLineItem)}</span>
+
+              {/* Print price — animated, qty-aware */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 500 }}>
+                  {qty > 1 ? 'Print price ×' + qty : 'Print price'}
+                </span>
+                <AnimatedMVR amount={lineTotal} size={16} />
               </div>
+              {qty > 1 && (
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, textAlign: 'right' }}>
+                  {formatMVR(prices.artworkLineItem)} each
+                </p>
+              )}
 
               {/* Paper type line */}
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -319,7 +399,6 @@ export default function ArtworkPage() {
                     All {editionSize} prints have been sold. Leave your email and we'll notify you if more become available.
                   </p>
                 </div>
-
                 {waitlistDone ? (
                   <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 18 }}>✓</span>
@@ -350,13 +429,34 @@ export default function ArtworkPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+
+                {/* Qty stepper */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Quantity</span>
+                  <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                    <button
+                      onClick={() => setQty(q => Math.max(1, q - 1))}
+                      disabled={qty <= 1}
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty <= 1 ? 'default' : 'pointer', fontSize: 18, color: qty <= 1 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty <= 1 ? 0.35 : 1 }}
+                    >−</button>
+                    <span style={{ minWidth: 36, textAlign: 'center', fontSize: 14, fontWeight: 500, borderLeft: '0.5px solid var(--color-border)', borderRight: '0.5px solid var(--color-border)', padding: '6px 0', lineHeight: '24px' }}>
+                      {qty}
+                    </span>
+                    <button
+                      onClick={() => setQty(q => Math.min(maxQty, q + 1))}
+                      disabled={qty >= maxQty}
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty >= maxQty ? 'default' : 'pointer', fontSize: 18, color: qty >= maxQty ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty >= maxQty ? 0.35 : 1 }}
+                    >+</button>
+                  </div>
+                </div>
+
                 <button
                   className="btn btn-primary btn-full"
                   onClick={alreadyInCart ? undefined : addToCart}
                   style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}}
                   disabled={alreadyInCart}
                 >
-                  {alreadyInCart ? 'Added to cart ✓' : 'Add to cart'}
+                  {alreadyInCart ? 'Added to cart ✓' : qty > 1 ? 'Add ' + qty + ' to cart' : 'Add to cart'}
                 </button>
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>Checkout</button>
