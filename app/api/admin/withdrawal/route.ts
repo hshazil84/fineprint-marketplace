@@ -1,31 +1,30 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const supabase = createRouteHandlerClient({ cookies })
+  const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Verify admin
-  const { data: profile } = await supabase
+  const { data: adminProfile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', user.id)
     .single()
-  if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { artistId, action } = await req.json() // action: 'approve' | 'reject'
+  if (adminProfile?.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { artistId, action } = await req.json()
 
   if (action === 'approve') {
-    // Fetch artist for farewell email
     const { data: artist } = await supabase
       .from('profiles')
       .select('full_name, email, artist_code')
       .eq('id', artistId)
       .single()
 
-    // Soft deactivate
     await supabase
       .from('profiles')
       .update({
@@ -34,13 +33,11 @@ export async function POST(req: Request) {
       })
       .eq('id', artistId)
 
-    // Hide all listings
     await supabase
       .from('artworks')
       .update({ is_active: false })
       .eq('artist_id', artistId)
 
-    // Farewell email to artist
     await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -64,7 +61,6 @@ export async function POST(req: Request) {
   }
 
   if (action === 'reject') {
-    // Revert back to active
     await supabase
       .from('profiles')
       .update({ account_status: 'active' })
