@@ -8,7 +8,6 @@ export function createClient() {
 }
 
 export function createRouteClient() {
-  // lazy import to avoid breaking client components
   const { cookies } = require('next/headers')
   const cookieStore = cookies()
   return createServerClient(url, key, {
@@ -28,6 +27,13 @@ export function createRouteClient() {
 export function createAdminClient() {
   const { createClient: c } = require('@supabase/supabase-js')
   return c(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false }
+  })
+}
+
+export function createAnonClient() {
+  const { createClient: c } = require('@supabase/supabase-js')
+  return c(url, key, {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 }
