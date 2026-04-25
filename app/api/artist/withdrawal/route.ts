@@ -3,10 +3,11 @@ import { createAdminClient } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  // Get user from session cookie
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const supabase = createRouteClient()
+    const { data: { user }, error } = await supabase.auth.getUser()
+    console.log('user:', user?.id, 'error:', error)
+    if (!user) return NextResponse.json({ error: 'Unauthorized', detail: error?.message }, { status: 401 })
 
   // Use admin client for DB operations
   const admin = createAdminClient()
