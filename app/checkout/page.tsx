@@ -26,6 +26,36 @@ function AnimatedMVR({ amount, size = 15 }: { amount: number; size?: number }) {
   )
 }
 
+// ── Animated expand/collapse panel ───────────────────────────────────────
+function SlidePanel({ open, children }: { open: boolean; children: React.ReactNode }) {
+  const [mounted, setMounted]     = useState(open)
+  const [visible, setVisible]     = useState(open)
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)))
+    } else {
+      setVisible(false)
+      const t = setTimeout(() => setMounted(false), 300)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  if (!mounted) return null
+
+  return (
+    <div style={{
+      overflow:   'hidden',
+      maxHeight:  visible ? 600 : 0,
+      opacity:    visible ? 1 : 0,
+      transition: 'max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
+    }}>
+      {children}
+    </div>
+  )
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, clear, setQty } = useCart()
@@ -35,15 +65,16 @@ export default function CheckoutPage() {
   const [slipFile, setSlipFile]             = useState<File | null>(null)
   const [slipPreview, setSlipPreview]       = useState<string | null>(null)
   const [submitting, setSubmitting]         = useState(false)
+  const [submitted, setSubmitted]           = useState(false)
   const [newsletterOptIn, setNewsletterOptIn] = useState(false)
   const [copied, setCopied]                 = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
-    if (items.length === 0) router.push('/storefront')
-  }, [items])
+    if (items.length === 0 && !submitted) router.push('/storefront')
+  }, [items, submitted])
 
-  if (items.length === 0) return null
+  if (items.length === 0 && !submitted) return null
 
   const itemPrices  = items.map(item =>
     calculatePrices(item.artistPrice, item.offerPct || 0, item.offerLabel, deliveryMethod, item.printSize)
@@ -121,6 +152,7 @@ export default function CheckoutPage() {
           previewUrl: item.previewUrl,
         })),
       }))
+      setSubmitted(true)
       clear()
       router.push('/order-confirmed')
     } catch (err: any) {
@@ -131,16 +163,17 @@ export default function CheckoutPage() {
   }
 
   const optionStyle = (active: boolean) => ({
-    border: active ? '1.5px solid rgba(0,0,0,0.7)' : '0.5px solid var(--color-border)',
+    border:     active ? '1.5px solid rgba(0,0,0,0.7)' : '0.5px solid var(--color-border)',
     borderRadius: 12, padding: 14, cursor: 'pointer', marginBottom: 10,
-    background: active ? 'var(--color-surface)' : 'var(--color-bg)',
-    transition: 'all 0.15s',
+    background:  active ? 'var(--color-surface)' : 'var(--color-bg)',
+    transition:  'border-color 0.2s, background 0.2s',
   })
 
   const radioStyle = (active: boolean) => ({
     width: 16, height: 16, borderRadius: '50%',
-    border: active ? '5px solid rgba(0,0,0,0.7)' : '1.5px solid var(--color-border)',
-    flexShrink: 0, transition: 'all 0.15s',
+    border:     active ? '5px solid rgba(0,0,0,0.7)' : '1.5px solid var(--color-border)',
+    flexShrink: 0,
+    transition: 'border 0.2s',
   })
 
   return (
@@ -187,18 +220,10 @@ export default function CheckoutPage() {
           --c-shadow-inset-bottom: rgba(172,160,255,.5);
           --c-radial-inner: #6D58FF;
           --c-radial-outer: #362A89;
-          position: relative;
-          cursor: pointer;
-          border: none;
-          display: block;
-          width: 100%;
-          border-radius: 12px;
-          padding: 0;
-          margin-top: 4px;
-          font-family: inherit;
-          font-weight: 500;
-          font-size: 14px;
-          letter-spacing: .01em;
+          position: relative; cursor: pointer; border: none;
+          display: block; width: 100%; border-radius: 12px;
+          padding: 0; margin-top: 4px; font-family: inherit;
+          font-weight: 500; font-size: 14px; letter-spacing: .01em;
           color: #fff;
           background: radial-gradient(circle, var(--c-radial-inner), var(--c-radial-outer) 80%);
           box-shadow: 0 0 24px var(--c-shadow);
@@ -207,36 +232,19 @@ export default function CheckoutPage() {
         .fp-swipe-btn:disabled { opacity: 0.6; cursor: default; pointer-events: none; }
         .fp-swipe-btn:active:not(:disabled) { transform: scale(0.99); }
         .fp-swipe-btn::before {
-          content: '';
-          pointer-events: none;
-          position: absolute;
-          z-index: 3;
-          inset: 0;
-          border-radius: 12px;
+          content: ''; pointer-events: none; position: absolute;
+          z-index: 3; inset: 0; border-radius: 12px;
           box-shadow: inset 0 4px 12px var(--c-shadow-inset-top), inset 0 -4px 6px var(--c-shadow-inset-bottom);
         }
         .fp-swipe-btn .sw-wrapper {
           -webkit-mask-image: -webkit-radial-gradient(white, black);
-          overflow: hidden;
-          border-radius: 12px;
-          padding: 13px 20px;
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          overflow: hidden; border-radius: 12px; padding: 13px 20px;
+          position: relative; display: flex; align-items: center; justify-content: center;
         }
-        .fp-swipe-btn .sw-text {
-          position: relative;
-          z-index: 1;
-          pointer-events: none;
-        }
+        .fp-swipe-btn .sw-text { position: relative; z-index: 1; pointer-events: none; }
         .fp-swipe-btn .sw-circle {
-          position: absolute;
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          filter: blur(var(--blur, 8px));
-          background: var(--bg, transparent);
+          position: absolute; width: 40px; height: 40px; border-radius: 50%;
+          filter: blur(var(--blur, 8px)); background: var(--bg, transparent);
           transform: translate(var(--x,0), var(--y,0)) translateZ(0);
           animation: var(--anim, none) var(--duration) linear infinite var(--delay, 0s);
         }
@@ -245,20 +253,18 @@ export default function CheckoutPage() {
         .fp-swipe-btn .sw-circle.c5,.fp-swipe-btn .sw-circle.c6 { --bg:var(--c-color-3); --blur:16px; }
         .fp-swipe-btn .sw-circle.c2,.fp-swipe-btn .sw-circle.c7,.fp-swipe-btn .sw-circle.c8,
         .fp-swipe-btn .sw-circle.c11,.fp-swipe-btn .sw-circle.c12 { --bg:var(--c-color-1); --blur:12px; }
-
-        .fp-swipe-btn .sw-circle.c1  { --x:0;   --y:-40px; --anim:sw-c1;  }
-        .fp-swipe-btn .sw-circle.c2  { --x:92px;--y:8px;   --anim:sw-c2;  }
-        .fp-swipe-btn .sw-circle.c3  { --x:-12px;--y:-12px;--anim:sw-c3;  }
-        .fp-swipe-btn .sw-circle.c4  { --x:80px;--y:-12px; --anim:sw-c4;  }
-        .fp-swipe-btn .sw-circle.c5  { --x:12px;--y:-4px;  --anim:sw-c5;  }
-        .fp-swipe-btn .sw-circle.c6  { --x:56px;--y:16px;  --anim:sw-c6;  }
-        .fp-swipe-btn .sw-circle.c7  { --x:8px; --y:28px;  --anim:sw-c7;  }
-        .fp-swipe-btn .sw-circle.c8  { --x:28px;--y:-4px;  --anim:sw-c8;  }
-        .fp-swipe-btn .sw-circle.c9  { --x:20px;--y:-12px; --anim:sw-c9;  }
-        .fp-swipe-btn .sw-circle.c10 { --x:64px;--y:16px;  --anim:sw-c10; }
-        .fp-swipe-btn .sw-circle.c11 { --x:4px; --y:4px;   --anim:sw-c11; }
-        .fp-swipe-btn .sw-circle.c12 { --x:52px;--y:4px;   --anim:sw-c12; --blur:14px; }
-
+        .fp-swipe-btn .sw-circle.c1  { --x:0;    --y:-40px; --anim:sw-c1;  }
+        .fp-swipe-btn .sw-circle.c2  { --x:92px; --y:8px;   --anim:sw-c2;  }
+        .fp-swipe-btn .sw-circle.c3  { --x:-12px;--y:-12px; --anim:sw-c3;  }
+        .fp-swipe-btn .sw-circle.c4  { --x:80px; --y:-12px; --anim:sw-c4;  }
+        .fp-swipe-btn .sw-circle.c5  { --x:12px; --y:-4px;  --anim:sw-c5;  }
+        .fp-swipe-btn .sw-circle.c6  { --x:56px; --y:16px;  --anim:sw-c6;  }
+        .fp-swipe-btn .sw-circle.c7  { --x:8px;  --y:28px;  --anim:sw-c7;  }
+        .fp-swipe-btn .sw-circle.c8  { --x:28px; --y:-4px;  --anim:sw-c8;  }
+        .fp-swipe-btn .sw-circle.c9  { --x:20px; --y:-12px; --anim:sw-c9;  }
+        .fp-swipe-btn .sw-circle.c10 { --x:64px; --y:16px;  --anim:sw-c10; }
+        .fp-swipe-btn .sw-circle.c11 { --x:4px;  --y:4px;   --anim:sw-c11; }
+        .fp-swipe-btn .sw-circle.c12 { --x:52px; --y:4px;   --anim:sw-c12; --blur:14px; }
         @keyframes sw-c1  { 33%{transform:translate(0px,16px) translateZ(0)}   66%{transform:translate(12px,64px) translateZ(0)} }
         @keyframes sw-c2  { 33%{transform:translate(80px,-10px) translateZ(0)} 66%{transform:translate(72px,-48px) translateZ(0)} }
         @keyframes sw-c3  { 33%{transform:translate(20px,12px) translateZ(0)}  66%{transform:translate(12px,4px) translateZ(0)} }
@@ -271,8 +277,27 @@ export default function CheckoutPage() {
         @keyframes sw-c10 { 33%{transform:translate(68px,20px) translateZ(0)}  66%{transform:translate(100px,28px) translateZ(0)} }
         @keyframes sw-c11 { 33%{transform:translate(4px,4px) translateZ(0)}    66%{transform:translate(68px,20px) translateZ(0)} }
         @keyframes sw-c12 { 33%{transform:translate(56px,0px) translateZ(0)}   66%{transform:translate(60px,-32px) translateZ(0)} }
-
         @media(prefers-reduced-motion:reduce){ .fp-swipe-btn .sw-circle { animation:none!important; } }
+
+        /* ── Submit button crossfade ── */
+        .fp-btn-wrap { position: relative; margin-top: 4px; }
+        .fp-btn-inner {
+          transition: opacity 0.25s ease, transform 0.25s ease;
+        }
+        .fp-btn-inner.exiting {
+          opacity: 0;
+          transform: translateY(-4px);
+          pointer-events: none;
+          position: absolute;
+          inset: 0;
+        }
+        .fp-btn-inner.entering {
+          animation: btn-fade-in 0.3s ease both;
+        }
+        @keyframes btn-fade-in {
+          0%   { opacity: 0; transform: translateY(6px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
 
       <Header />
@@ -323,8 +348,10 @@ export default function CheckoutPage() {
                   </div>
                 ))}
               </div>
-              {deliveryMethod === 'delivery' ? (
-                <>
+
+              {/* Delivery fields — slide in/out */}
+              <SlidePanel open={deliveryMethod === 'delivery'}>
+                <div style={{ paddingTop: 4 }}>
                   <div className="form-group">
                     <label className="form-label">Island</label>
                     <input className="form-input" placeholder="e.g. Hulhumale" value={form.island} onChange={e => setForm({ ...form, island: e.target.value })} />
@@ -337,8 +364,11 @@ export default function CheckoutPage() {
                     <label className="form-label">Notes (optional)</label>
                     <textarea className="form-input" placeholder="Apartment, landmark, or special instructions..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                   </div>
-                </>
-              ) : (
+                </div>
+              </SlidePanel>
+
+              {/* Pickup info — slide in/out */}
+              <SlidePanel open={deliveryMethod === 'pickup'}>
                 <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px' }}>
                   <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>FinePrint Studio — Male</p>
                   {[
@@ -351,7 +381,7 @@ export default function CheckoutPage() {
                     </div>
                   ))}
                 </div>
-              )}
+              </SlidePanel>
             </div>
           </div>
 
@@ -407,11 +437,11 @@ export default function CheckoutPage() {
                   <span>Subtotal</span><span>{formatMVR(subtotal)}</span>
                 </div>
                 {deliveryMethod === 'delivery' ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4, transition: 'opacity 0.2s' }}>
                     <span>Handling and delivery</span><span>{formatMVR(100)}</span>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1D9E75', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1D9E75', marginBottom: 4, transition: 'opacity 0.2s' }}>
                     <span>Pickup</span><span>Free</span>
                   </div>
                 )}
@@ -431,8 +461,9 @@ export default function CheckoutPage() {
                   <div style={radioStyle(paymentMethod === 'bank_transfer')} />
                   <p style={{ fontSize: 13, fontWeight: 500 }}>Bank transfer — BML</p>
                 </div>
-                {paymentMethod === 'bank_transfer' && (
-                  <div style={{ paddingLeft: 24, marginTop: 12 }}>
+                {/* BML details — slide in */}
+                <SlidePanel open={paymentMethod === 'bank_transfer'}>
+                  <div style={{ paddingLeft: 24, paddingTop: 12 }}>
                     <div style={{ background: 'var(--color-bg)', border: '0.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
                       {[
                         ['Bank',           'Bank of Maldives (BML)'],
@@ -462,7 +493,7 @@ export default function CheckoutPage() {
                     <input type="file" id="slip-input" accept="image/*,.pdf" style={{ display: 'none' }} onChange={handleSlip} />
                     {slipPreview && <img src={slipPreview} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, marginTop: 10, pointerEvents: 'none' }} />}
                   </div>
-                )}
+                </SlidePanel>
               </div>
 
               <div onClick={() => setPaymentMethod('swipe')} style={optionStyle(paymentMethod === 'swipe')}>
@@ -473,51 +504,54 @@ export default function CheckoutPage() {
                     <img src="/swipe-logo.svg" alt="Swipe" style={{ height: 35, width: 'auto', display: 'block' }} />
                   </div>
                 </div>
-                {paymentMethod === 'swipe' && (
-                  <div style={{ paddingLeft: 24, marginTop: 12 }}>
+                {/* Swipe details — slide in */}
+                <SlidePanel open={paymentMethod === 'swipe'}>
+                  <div style={{ paddingLeft: 24, paddingTop: 12 }}>
                     <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '12px 14px' }}>
                       <p style={{ fontSize: 13, color: '#0F6E56', lineHeight: 1.7 }}>
                         Open your Swipe app and send <strong>{formatMVR(totalPaid)}</strong> then tap Submit order below.
                       </p>
                     </div>
                   </div>
-                )}
+                </SlidePanel>
               </div>
 
-              {/* ── Submit button — switches style based on payment method ── */}
-              {paymentMethod === 'swipe' ? (
-                <button
-                  className="fp-swipe-btn"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                >
-                  <div className="sw-wrapper">
-                    {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                      <div key={n} className={`sw-circle c${n}`} />
-                    ))}
-                    <span className="sw-text">
-                      {submitting ? 'Submitting...' : 'I have paid via Swipe — Submit order'}
-                    </span>
+              {/* ── Submit button — fades between BML and Swipe ── */}
+              <div className="fp-btn-wrap">
+                {paymentMethod === 'swipe' ? (
+                  <div className="fp-btn-inner entering">
+                    <button className="fp-swipe-btn" onClick={handleSubmit} disabled={submitting}>
+                      <div className="sw-wrapper">
+                        {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
+                          <div key={n} className={`sw-circle c${n}`} />
+                        ))}
+                        <span className="sw-text">
+                          {submitting ? 'Submitting...' : 'I have paid via Swipe — Submit order'}
+                        </span>
+                      </div>
+                    </button>
                   </div>
-                </button>
-              ) : (
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="fp-shine-btn"
-                  style={{
-                    width: '100%', padding: '13px 20px', borderRadius: 12,
-                    border: 'none', background: 'linear-gradient(to right, #1a1a1a, #2d2d2d)',
-                    color: '#fff', fontSize: 14, fontWeight: 500,
-                    cursor: submitting ? 'default' : 'pointer',
-                    opacity: submitting ? 0.6 : 1,
-                    position: 'relative', overflow: 'hidden',
-                    fontFamily: 'inherit', letterSpacing: '0.01em', marginTop: 4,
-                  }}
-                >
-                  {submitting ? 'Submitting...' : 'Submit order'}
-                </button>
-              )}
+                ) : (
+                  <div className="fp-btn-inner entering">
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className="fp-shine-btn"
+                      style={{
+                        width: '100%', padding: '13px 20px', borderRadius: 12,
+                        border: 'none', background: 'linear-gradient(to right, #1a1a1a, #2d2d2d)',
+                        color: '#fff', fontSize: 14, fontWeight: 500,
+                        cursor: submitting ? 'default' : 'pointer',
+                        opacity: submitting ? 0.6 : 1,
+                        position: 'relative', overflow: 'hidden',
+                        fontFamily: 'inherit', letterSpacing: '0.01em',
+                      }}
+                    >
+                      {submitting ? 'Submitting...' : 'Submit order'}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12, textAlign: 'center', lineHeight: 1.6 }}>
                 By submitting you agree to our <a href="/terms" style={{ color: '#1D9E75' }}>Terms and Conditions</a>
