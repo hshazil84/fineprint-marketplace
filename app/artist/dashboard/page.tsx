@@ -26,15 +26,15 @@ function Divider() {
 
 export default function ArtistDashboard() {
   const router = useRouter()
-  const [tab, setTab]                       = useState('listings')
-  const [profile, setProfile]               = useState<any>(null)
-  const [artworks, setArtworks]             = useState<any[]>([])
-  const [orders, setOrders]                 = useState<any[]>([])
-  const [payouts, setPayouts]               = useState<any[]>([])
-  const [loading, setLoading]               = useState(true)
-  const [selectedOrder, setSelectedOrder]   = useState<any>(null)
-  const [selectedPayout, setSelectedPayout] = useState<any>(null)
-  const [editingArtwork, setEditingArtwork] = useState<any>(null)
+  const [tab, setTab]                         = useState('listings')
+  const [profile, setProfile]                 = useState<any>(null)
+  const [artworks, setArtworks]               = useState<any[]>([])
+  const [orders, setOrders]                   = useState<any[]>([])
+  const [payouts, setPayouts]                 = useState<any[]>([])
+  const [loading, setLoading]                 = useState(true)
+  const [selectedOrder, setSelectedOrder]     = useState<any>(null)
+  const [selectedPayout, setSelectedPayout]   = useState<any>(null)
+  const [editingArtwork, setEditingArtwork]   = useState<any>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
   const supabase = createClient()
 
@@ -45,6 +45,7 @@ export default function ArtistDashboard() {
     if (!user) { router.push('/auth/login'); return }
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     if (!prof || prof.role !== 'artist') { router.push('/storefront'); return }
+    if (!prof.onboarding_complete) { router.push('/artist/onboarding'); return }
     setProfile(prof)
     await Promise.all([fetchArtworks(user.id), fetchOrders(user.id), fetchPayouts(user.id)])
     setLoading(false)
@@ -208,7 +209,6 @@ export default function ArtistDashboard() {
           ))}
         </div>
 
-        {/* ── LISTINGS TAB ── */}
         {tab === 'listings' && (
           <ArtistListingsTab
             artworks={artworks}
@@ -225,7 +225,6 @@ export default function ArtistDashboard() {
         {tab === 'offers'  && <OffersTab artworks={artworks} onRefresh={() => init()} />}
         {tab === 'upload'  && <UploadTab profile={profile} nextSeq={artworks.length + 1} onSuccess={() => { setTab('listings'); init() }} />}
 
-        {/* ── ORDERS TAB ── */}
         {tab === 'orders' && (
           <ArtistOrdersTab
             activeOrders={activeOrders}
@@ -278,9 +277,7 @@ function ArtistListingsTab({ artworks, editingArtwork, deleteConfirmId, setEditi
           onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, fontSize: 13 }}
         />
-        {search && (
-          <button className="btn btn-sm" onClick={() => setSearch('')}>Clear ×</button>
-        )}
+        {search && <button className="btn btn-sm" onClick={() => setSearch('')}>Clear ×</button>}
       </div>
 
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -482,18 +479,18 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     paintingBy:  artwork.painting_by || '',
     sizes:       artwork.sizes       || ['A4', 'A3'],
   })
-  const [paperType, setPaperType]               = useState<string>(artwork.paper_type || DEFAULT_PAPER)
-  const [isLimited, setIsLimited]               = useState<boolean>(!!artwork.edition_size)
-  const [editionSize, setEditionSize]           = useState<string>(String(artwork.edition_size || '50'))
-  const [previewFile, setPreviewFile]           = useState<File | null>(null)
-  const [previewThumb, setPreviewThumb]         = useState<string | null>(artwork.preview_url || null)
-  const [hiresFile, setHiresFile]               = useState<File | null>(null)
-  const [existingGallery, setExistingGallery]   = useState<any[]>([])
+  const [paperType, setPaperType]                 = useState<string>(artwork.paper_type || DEFAULT_PAPER)
+  const [isLimited, setIsLimited]                 = useState<boolean>(!!artwork.edition_size)
+  const [editionSize, setEditionSize]             = useState<string>(String(artwork.edition_size || '50'))
+  const [previewFile, setPreviewFile]             = useState<File | null>(null)
+  const [previewThumb, setPreviewThumb]           = useState<string | null>(artwork.preview_url || null)
+  const [hiresFile, setHiresFile]                 = useState<File | null>(null)
+  const [existingGallery, setExistingGallery]     = useState<any[]>([])
   const [deletedGalleryIds, setDeletedGalleryIds] = useState<number[]>([])
-  const [galleryFiles, setGalleryFiles]         = useState<(File | null)[]>([null, null, null])
-  const [galleryThumbs, setGalleryThumbs]       = useState<(string | null)[]>([null, null, null])
-  const [activeThumb, setActiveThumb]           = useState<'main' | number>('main')
-  const [saving, setSaving]                     = useState(false)
+  const [galleryFiles, setGalleryFiles]           = useState<(File | null)[]>([null, null, null])
+  const [galleryThumbs, setGalleryThumbs]         = useState<(string | null)[]>([null, null, null])
+  const [activeThumb, setActiveThumb]             = useState<'main' | number>('main')
+  const [saving, setSaving]                       = useState(false)
   const supabase = createClient()
 
   const papersByCategory = getPapersByCategory()
@@ -634,7 +631,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
       <div style={{ maxWidth: 520 }}>
 
-        {/* ── IMAGES ── */}
         <div className="form-group">
           <label className="form-label">Images</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px', gap: 10, marginBottom: 6 }}>
@@ -696,7 +692,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Tap main to replace · red × removes on save · + to add</p>
         </div>
 
-        {/* Hi-res */}
         <div className="form-group">
           <label className="form-label">Hi-res print file</label>
           <div style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -725,7 +720,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
-        {/* Details */}
         <div className="form-group">
           <label className="form-label">Title</label>
           <input className="form-input" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
@@ -762,7 +756,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
-        {/* Paper type */}
         <div style={{ marginBottom: 6 }}>
           <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>Paper type</p>
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>All prints use Hahnemühle archival papers. Upgrade for a premium feel.</p>
@@ -811,7 +804,6 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
-        {/* Limited edition */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
