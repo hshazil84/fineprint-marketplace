@@ -7,17 +7,46 @@ import { useCart } from '@/lib/cart'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 
+// ── Animated MVR number ───────────────────────────────────────────────────
+function AnimatedMVR({ amount, size = 15 }: { amount: number; size?: number }) {
+  const [animKey, setAnimKey] = useState(0)
+
+  useEffect(() => {
+    setAnimKey(k => k + 1)
+  }, [amount])
+
+  const digits = String(amount.toLocaleString())
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, fontSize: size, fontWeight: 500 }}>
+      <span>MVR </span>
+      <span key={animKey} className="t-digit-group is-animating">
+        {digits.split('').map((char, i) => (
+          <span
+            key={i}
+            className="t-digit"
+            {...(i >= 2 && i < 4 ? { 'data-stagger': '1' } : {})}
+            {...(i >= 4 ? { 'data-stagger': '2' } : {})}
+          >
+            {char}
+          </span>
+        ))}
+      </span>
+    </span>
+  )
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { items, clear, setQty } = useCart()
   const [deliveryMethod, setDeliveryMethod] = useState<'delivery' | 'pickup'>('delivery')
-  const [paymentMethod, setPaymentMethod] = useState<'bank_transfer' | 'swipe'>('bank_transfer')
-  const [form, setForm] = useState({ name: '', email: '', phone: '', island: '', atoll: '', notes: '' })
-  const [slipFile, setSlipFile] = useState<File | null>(null)
-  const [slipPreview, setSlipPreview] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
+  const [paymentMethod, setPaymentMethod]   = useState<'bank_transfer' | 'swipe'>('bank_transfer')
+  const [form, setForm]                     = useState({ name: '', email: '', phone: '', island: '', atoll: '', notes: '' })
+  const [slipFile, setSlipFile]             = useState<File | null>(null)
+  const [slipPreview, setSlipPreview]       = useState<string | null>(null)
+  const [submitting, setSubmitting]         = useState(false)
   const [newsletterOptIn, setNewsletterOptIn] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied]                 = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -26,7 +55,7 @@ export default function CheckoutPage() {
 
   if (items.length === 0) return null
 
-  const itemPrices = items.map(item =>
+  const itemPrices  = items.map(item =>
     calculatePrices(item.artistPrice, item.offerPct || 0, item.offerLabel, deliveryMethod, item.printSize)
   )
   const subtotal    = itemPrices.reduce((s, p, i) => s + p.artworkLineItem * items[i].quantity, 0)
@@ -160,6 +189,45 @@ export default function CheckoutPage() {
 
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
+
+      {/* ── Animation CSS ── */}
+      <style>{`
+        :root {
+          --digit-dur: 500ms;
+          --digit-distance: 8px;
+          --digit-stagger: 70ms;
+          --digit-blur: 2px;
+          --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+          --digit-dir-x: 0;
+          --digit-dir-y: 1;
+        }
+        @keyframes t-digit-pop-in {
+          0% {
+            transform: translate(
+              calc(var(--digit-distance) * var(--digit-dir-x)),
+              calc(var(--digit-distance) * var(--digit-dir-y))
+            );
+            opacity: 0;
+            filter: blur(var(--digit-blur));
+          }
+          100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+        }
+        .t-digit-group { display: inline-flex; align-items: baseline; }
+        .t-digit { display: inline-block; will-change: transform, opacity, filter; }
+        .t-digit-group.is-animating .t-digit {
+          animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+        }
+        .t-digit-group.is-animating .t-digit[data-stagger="1"] {
+          animation-delay: var(--digit-stagger);
+        }
+        .t-digit-group.is-animating .t-digit[data-stagger="2"] {
+          animation-delay: calc(var(--digit-stagger) * 2);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .t-digit-group .t-digit { animation: none !important; }
+        }
+      `}</style>
+
       <Header />
       <div className="container" style={{ paddingTop: 40, paddingBottom: 60 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', marginBottom: 4 }}>Complete your order</h1>
@@ -269,9 +337,7 @@ export default function CheckoutPage() {
                       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1 }}>by {item.artistName}</p>
                       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 1, marginBottom: 8 }}>{sizeLabel}</p>
 
-                      {/* Qty controls + price */}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-
                         {/* − qty + */}
                         <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
                           <button
@@ -328,8 +394,10 @@ export default function CheckoutPage() {
                     <span>Pickup</span><span>Free</span>
                   </div>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 500, borderTop: '0.5px solid var(--color-border)', marginTop: 8, paddingTop: 10 }}>
-                  <span>Total</span><span>{formatMVR(totalPaid)}</span>
+                {/* ── Animated total ── */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--color-border)', marginTop: 8, paddingTop: 10 }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>Total</span>
+                  <AnimatedMVR amount={totalPaid} size={15} />
                 </div>
               </div>
             </div>
