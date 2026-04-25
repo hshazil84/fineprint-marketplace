@@ -80,7 +80,7 @@ export default function SignupPage() {
     }
 
     toast.success('Account created!')
-    if (form.role === 'artist') router.push('/artist/dashboard')
+    if (form.role === 'artist') router.push('/artist/onboarding')
     else router.push('/storefront')
   }
 
