@@ -63,7 +63,7 @@ function Typewriter({ text, delay = 0, speed = 45 }: { text: string; delay?: num
 }
 
 // ── Zigzag bottom ─────────────────────────────────────────────────────────
-function ZigzagBottom({ color = '#f0ebe0' }: { color?: string }) {
+function ZigzagBottom({ color = '#f5f5f2' }: { color?: string }) {
   const w = 400, h = 14, size = 12
   const pts: string[] = []
   let x = 0, top = true
@@ -271,7 +271,7 @@ function Receipt({ data }: { data: any }) {
 
             {/* ── Top tear line ── */}
             <div style={{
-              background: '#f0ebe0',
+              background: '#f5f5f2',
               padding:    '10px 24px 0',
               display:    'flex',
               alignItems: 'center',
@@ -291,7 +291,7 @@ function Receipt({ data }: { data: any }) {
             {/* ── Body ── */}
             <div className="receipt-body-wrap">
               <div style={{
-                background:  '#f0ebe0',
+                background:  '#f5f5f2',
                 padding:     '8px 24px 16px',
                 fontFamily:  '"Courier New", Courier, monospace',
                 fontSize:    11,
@@ -398,7 +398,7 @@ function Receipt({ data }: { data: any }) {
             </div>
 
             {/* Bottom zigzag */}
-            <ZigzagBottom color="#f0ebe0" />
+            <ZigzagBottom color="#f5f5f2" />
 
           </div>
         </div>
