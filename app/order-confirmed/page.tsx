@@ -227,8 +227,24 @@ function Receipt({ data }: { data: any }) {
             {/* Scanning line overlay while printing */}
             {printing && !done && <div className="scan-line" />}
 
-            {/* Top zigzag */}
-            <ZigzagEdge color="#f5f0e8" />
+            {/* Top tear line */}
+            <div style={{
+              background: '#f5f0e8',
+              padding: '10px 24px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}>
+              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
+              <span style={{
+                fontSize: 8,
+                color: '#b0a99e',
+                letterSpacing: '0.08em',
+                fontFamily: '"Courier New", Courier, monospace',
+                flexShrink: 0,
+              }}>✂ TEAR HERE</span>
+              <div style={{ flex: 1, borderTop: '1.5px dashed #c4bfb6' }} />
+            </div>
 
             {/* Body */}
             <div style={{
