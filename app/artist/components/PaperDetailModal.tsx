@@ -1,12 +1,12 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
-import { formatMVR } from '@/lib/pricing'
 import { BarcodeImage } from '@/app/admin/components/BarcodeImage'
+import { BEST_FOR_LABELS } from '@/lib/usePapers'
 
 const STOCK_SIZE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  in_stock:     { label: '',               color: '#0F6E56', bg: '#E1F5EE' },
-  low_stock:    { label: ' · Low stock',   color: '#633806', bg: '#FAEEDA' },
-  backorder:    { label: ' · Backorder',   color: '#185FA5', bg: '#E6F1FB' },
+  in_stock:     { label: '',                color: '#0F6E56', bg: '#E1F5EE' },
+  low_stock:    { label: ' · Low stock',    color: '#633806', bg: '#FAEEDA' },
+  backorder:    { label: ' · Backorder',    color: '#185FA5', bg: '#E6F1FB' },
   out_of_stock: { label: ' · Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
 }
 
@@ -25,6 +25,7 @@ interface PaperDetailProps {
     barcode:             string | null
     images:              string[]
     datasheet_url:       string | null
+    best_for:            string[]
   }
   onClose: () => void
 }
@@ -36,43 +37,38 @@ function getSizeStatus(qty: number, threshold: number): string {
 }
 
 export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
-  const overlayRef               = useRef<HTMLDivElement>(null)
+  const overlayRef                = useRef<HTMLDivElement>(null)
   const [activeImg, setActiveImg] = useState(0)
-  const touchStartX              = useRef<number | null>(null)
+  const touchStartX               = useRef<number | null>(null)
+
+  const images     = paper.images || []
+  const hasPremium = (paper.addOn['A4'] || 0) > 0 || (paper.addOn['A3'] || 0) > 0
+  const bestFor    = paper.best_for || []
 
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape')     onClose()
       if (e.key === 'ArrowRight') setActiveImg(i => Math.min(i + 1, images.length - 1))
       if (e.key === 'ArrowLeft')  setActiveImg(i => Math.max(i - 1, 0))
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  }, [onClose, images.length])
 
-  const hasPremium = (paper.addOn['A4'] || 0) > 0 || (paper.addOn['A3'] || 0) > 0
-  const images     = paper.images || []
+  // Always show A4 + A3, show A2 only if has stock or add-on
+  const offeredSizes = [
+    { label: 'A4', qty: paper.stock_qty_a4 },
+    { label: 'A3', qty: paper.stock_qty_a3 },
+    { label: 'A2', qty: paper.stock_qty_a2 },
+  ].filter(({ label, qty }) => {
+    if (label === 'A4' || label === 'A3') return true
+    return qty > 0 || (paper.addOn['A2'] || 0) > 0
+  })
 
-  // Only show sizes that are actually offered
-  // A size is offered if its add_on exists in the addOn record (including 0 = free)
-  // BUT we must check if the paper actually supports that size
-  // We use: show size if stock_qty > 0 OR add_on key is explicitly set
-  const allSizes = [
-    { label: 'A4', qty: paper.stock_qty_a4, addOn: paper.addOn['A4'] },
-    { label: 'A3', qty: paper.stock_qty_a3, addOn: paper.addOn['A3'] },
-    { label: 'A2', qty: paper.stock_qty_a2, addOn: paper.addOn['A2'] },
-  ]
-
-  // Show size only if it has stock OR if it has a non-zero add-on defined
-  // For standard papers, A4 and A3 have add_on = 0 but still have stock
-  // A2 with qty=0 and add_on=0 means not offered
-  const offeredSizes = allSizes.filter(s => s.qty > 0 || (s.addOn !== undefined && s.addOn > 0))
-
-  const addOns = [
-    { label: 'A4', value: paper.addOn['A4'] || 0 },
-    { label: 'A3', value: paper.addOn['A3'] || 0 },
-    { label: 'A2', value: paper.addOn['A2'] || 0 },
-  ].filter((_, i) => offeredSizes.some(s => s.label === ['A4', 'A3', 'A2'][i]))
+  const addOns = offeredSizes.map(({ label }) => ({
+    label,
+    value: paper.addOn[label] || 0,
+  }))
 
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX
@@ -96,52 +92,56 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
 
         {/* Image carousel */}
         <div
-          style={{ position: 'relative', height: 200, background: 'var(--color-background-secondary)', flexShrink: 0, overflow: 'hidden', cursor: images.length > 1 ? 'grab' : 'default' }}
+          style={{ position: 'relative', height: 200, background: 'var(--color-background-secondary)', flexShrink: 0, overflow: 'hidden' }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
           {images.length > 0 ? (
-            <>
-              <img
-                src={images[activeImg]}
-                alt={paper.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity 0.2s' }}
-              />
-              {/* Prev / Next arrows */}
-              {images.length > 1 && activeImg > 0 && (
-                <button
-                  onClick={() => setActiveImg(i => i - 1)}
-                  style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >‹</button>
-              )}
-              {images.length > 1 && activeImg < images.length - 1 && (
-                <button
-                  onClick={() => setActiveImg(i => i + 1)}
-                  style={{ position: 'absolute', right: 44, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >›</button>
-              )}
-              {/* Dots */}
-              {images.length > 1 && (
-                <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
-                  {images.map((_, i) => (
-                    <div
-                      key={i}
-                      onClick={() => setActiveImg(i)}
-                      style={{ width: 6, height: 6, borderRadius: '50%', background: i === activeImg ? '#fff' : 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'background 0.2s' }}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+            <img
+              src={images[activeImg]}
+              alt={paper.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'opacity 0.2s' }}
+            />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>
               No images yet
             </div>
           )}
+
+          {/* Close */}
           <button
             onClick={onClose}
-            style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+            style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, zIndex: 2 }}
           >×</button>
+
+          {/* Prev */}
+          {images.length > 1 && activeImg > 0 && (
+            <button
+              onClick={() => setActiveImg(i => i - 1)}
+              style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+            >‹</button>
+          )}
+
+          {/* Next */}
+          {images.length > 1 && activeImg < images.length - 1 && (
+            <button
+              onClick={() => setActiveImg(i => i + 1)}
+              style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
+            >›</button>
+          )}
+
+          {/* Dots */}
+          {images.length > 1 && (
+            <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
+              {images.map((_, i) => (
+                <div
+                  key={i}
+                  onClick={() => setActiveImg(i)}
+                  style={{ width: 6, height: 6, borderRadius: '50%', background: i === activeImg ? '#fff' : 'rgba(255,255,255,0.5)', cursor: 'pointer', transition: 'background 0.2s' }}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -160,11 +160,23 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
               </span>
             </div>
             {paper.weight_gsm && (
-              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
-                {paper.weight_gsm} gsm
-              </p>
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>{paper.weight_gsm} gsm</p>
             )}
           </div>
+
+          {/* Best for tags */}
+          {bestFor.length > 0 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+              {bestFor.map(key => (
+                <span
+                  key={key}
+                  style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#E6F1FB', color: '#185FA5', fontWeight: 500 }}
+                >
+                  ✓ {BEST_FOR_LABELS[key] || key}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Description */}
           {paper.description && (
@@ -173,50 +185,46 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
             </p>
           )}
 
-          {/* Available sizes + stock */}
-          {offeredSizes.length > 0 && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14 }}>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Available sizes
-              </p>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {offeredSizes.map(({ label, qty }) => {
-                  const status = getSizeStatus(qty, paper.stock_low_threshold)
-                  const config = STOCK_SIZE_CONFIG[status]
-                  return (
-                    <div
-                      key={label}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: config.bg, borderRadius: 8, padding: '6px 12px' }}
-                    >
-                      <div style={{ width: 6, height: 6, borderRadius: '50%', background: config.color, flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, fontWeight: 500, color: config.color }}>
-                        {label}{config.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
+          {/* Available sizes */}
+          <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Available sizes
+            </p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {offeredSizes.map(({ label, qty }) => {
+                const status = getSizeStatus(qty, paper.stock_low_threshold)
+                const config = STOCK_SIZE_CONFIG[status]
+                return (
+                  <div
+                    key={label}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: config.bg, borderRadius: 8, padding: '6px 12px' }}
+                  >
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: config.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: config.color }}>
+                      {label}{config.label}
+                    </span>
+                  </div>
+                )
+              })}
             </div>
-          )}
+          </div>
 
           {/* Price add-ons */}
-          {addOns.length > 0 && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14 }}>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Price add-ons (MVR)
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {addOns.map(({ label, value }) => (
-                  <div key={label} style={{ flex: 1, textAlign: 'center', background: 'var(--color-background-secondary)', borderRadius: 8, padding: 8 }}>
-                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>{label}</p>
-                    <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>
-                      {value > 0 ? '+' + value : 'Free'}
-                    </p>
-                  </div>
-                ))}
-              </div>
+          <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Price add-ons (MVR)
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {addOns.map(({ label, value }) => (
+                <div key={label} style={{ flex: 1, textAlign: 'center', background: 'var(--color-background-secondary)', borderRadius: 8, padding: 8 }}>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>{label}</p>
+                  <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>
+                    {value > 0 ? '+' + value : 'Free'}
+                  </p>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Barcode */}
           {paper.barcode && (
