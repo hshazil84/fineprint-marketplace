@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
-import { formatMVR, getFromPrice } from '@/lib/pricing'
+import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
+import { usePapers } from '@/lib/usePapers'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 import Footer from '@/app/components/Footer'
@@ -18,6 +19,7 @@ interface Artwork {
   offer_pct:     number | null
   category:      string | null
   painting_by:   string | null
+  paper_type:    string | null
   artist_id:     string
   created_at:    string
   edition_size:  number | null
@@ -58,23 +60,32 @@ function StarIcon() {
   )
 }
 
+// Edition badge — top-left, stacked under discount badge
 function EditionBadge({ artwork, small = false }: { artwork: Artwork; small?: boolean }) {
   const remaining = artwork.edition_size ? artwork.edition_size - (artwork.editions_sold || 0) : null
   if (remaining === null) return null
+  const fs = small ? 9 : 10
+  const pad = small ? '2px 7px' : '2px 8px'
   if (remaining === 0) return (
-    <div style={{ position: 'absolute', bottom: small ? 6 : 8, left: small ? 6 : 8, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: small ? 9 : 10, padding: '2px 7px', borderRadius: 20, pointerEvents: 'none' }}>
+    <span style={{ background: '#2C2C2A', color: '#F1EFE8', fontSize: fs, padding: pad, borderRadius: 20, fontWeight: 500, pointerEvents: 'none' }}>
       Sold out
-    </div>
+    </span>
   )
   if (remaining <= 10) return (
-    <div style={{ position: 'absolute', bottom: small ? 6 : 8, left: small ? 6 : 8, background: '#FAEEDA', color: '#633806', fontSize: small ? 9 : 10, padding: '2px 7px', borderRadius: 20, pointerEvents: 'none', border: '0.5px solid #EF9F27' }}>
+    <span style={{ background: '#FAEEDA', color: '#633806', fontSize: fs, padding: pad, borderRadius: 20, fontWeight: 500, pointerEvents: 'none', border: '0.5px solid #EF9F27' }}>
       {remaining} left
-    </div>
+    </span>
   )
-  return null
+  return (
+    <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: fs, padding: pad, borderRadius: 20, pointerEvents: 'none' }}>
+      Limited
+    </span>
+  )
 }
 
 export default function StorefrontPage() {
+  const { getPaperAddOn } = usePapers()
+
   const [artworks, setArtworks]         = useState<Artwork[]>([])
   const [artists, setArtists]           = useState<Artist[]>([])
   const [orderCounts, setOrderCounts]   = useState<Record<number, number>>({})
@@ -93,7 +104,7 @@ export default function StorefrontPage() {
     const [artRes, artistRes, orderRes] = await Promise.all([
       supabase
         .from('artworks')
-        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, artist_id, created_at, edition_size, editions_sold, profiles:artist_id(full_name, artist_code, avatar_url, display_name, shop_status)')
+        .select('id, sku, title, price, preview_url, sizes, offer_label, offer_pct, category, painting_by, paper_type, artist_id, created_at, edition_size, editions_sold, profiles:artist_id(full_name, artist_code, avatar_url, display_name, shop_status)')
         .eq('status', 'approved')
         .order('created_at', { ascending: false }),
       supabase
@@ -129,6 +140,17 @@ export default function StorefrontPage() {
     setLoading(false)
   }
 
+  function getFromPrice(artwork: Artwork): number {
+    const sizes     = artwork.sizes || ['A4']
+    const paperType = artwork.paper_type || ''
+    const discounted = artwork.price - Math.round(artwork.price * (artwork.offer_pct || 0) / 100)
+    return discounted + Math.min(...sizes.map(s => {
+      const base  = PRINTING_FEES[s] || PRINTING_FEES['A4']
+      const addOn = getPaperAddOn(paperType, s)
+      return base + addOn
+    }))
+  }
+
   const recentSix = artworks.slice(0, 6)
 
   const filtered = useMemo(() => {
@@ -145,23 +167,11 @@ export default function StorefrontPage() {
   const sorted = useMemo(() => {
     const arr = [...filtered]
     switch (sort) {
-      case 'price_asc':
-        return arr.sort((a, b) => {
-          const pa = getFromPrice(a.price, a.sizes || ['A4'], a.offer_pct || 0)
-          const pb = getFromPrice(b.price, b.sizes || ['A4'], b.offer_pct || 0)
-          return pa - pb
-        })
-      case 'price_desc':
-        return arr.sort((a, b) => {
-          const pa = getFromPrice(a.price, a.sizes || ['A4'], a.offer_pct || 0)
-          const pb = getFromPrice(b.price, b.sizes || ['A4'], b.offer_pct || 0)
-          return pb - pa
-        })
-      case 'popular':
-        return arr.sort((a, b) => (orderCounts[b.id] || 0) - (orderCounts[a.id] || 0))
+      case 'price_asc':  return arr.sort((a, b) => getFromPrice(a) - getFromPrice(b))
+      case 'price_desc': return arr.sort((a, b) => getFromPrice(b) - getFromPrice(a))
+      case 'popular':    return arr.sort((a, b) => (orderCounts[b.id] || 0) - (orderCounts[a.id] || 0))
       case 'newest':
-      default:
-        return arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      default:           return arr.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
   }, [filtered, sort, orderCounts])
 
@@ -254,14 +264,14 @@ export default function StorefrontPage() {
                 </div>
                 <div className="fp-desktop-only" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 14 }}>
                   {recentSix.map((artwork, i) => (
-                    <ArtworkCard43 key={artwork.id} artwork={artwork} isNew={i < 2} isTopSeller={topSellerIds.has(artwork.id)} />
+                    <ArtworkCard43 key={artwork.id} artwork={artwork} isNew={i < 2} isTopSeller={topSellerIds.has(artwork.id)} getFromPrice={getFromPrice} />
                   ))}
                 </div>
                 <div className="fp-mobile-only" style={{ display: 'none' }}>
                   <div className="mobile-swipe" style={{ display: 'flex', gap: 12, overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' as any, scrollbarWidth: 'none' }}>
                     {recentSix.map(artwork => (
                       <div key={artwork.id} style={{ flex: '0 0 calc(100vw - 48px)', scrollSnapAlign: 'start' }}>
-                        <ArtworkCard43 artwork={artwork} isNew={false} isTopSeller={topSellerIds.has(artwork.id)} />
+                        <ArtworkCard43 artwork={artwork} isNew={false} isTopSeller={topSellerIds.has(artwork.id)} getFromPrice={getFromPrice} />
                       </div>
                     ))}
                   </div>
@@ -301,12 +311,12 @@ export default function StorefrontPage() {
               <>
                 <div className="fp-desktop-grid" style={{ gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: 12 }}>
                   {paginated.map(artwork => (
-                    <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
+                    <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} getFromPrice={getFromPrice} />
                   ))}
                 </div>
                 <div className="fp-mobile-grid" style={{ display: 'none', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10 }}>
                   {paginated.map(artwork => (
-                    <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} />
+                    <ArtworkCard11 key={artwork.id} artwork={artwork} isTopSeller={topSellerIds.has(artwork.id)} getFromPrice={getFromPrice} />
                   ))}
                 </div>
                 {totalPages > 1 && <Pagination page={page} totalPages={totalPages} onPage={handlePage} />}
@@ -361,10 +371,10 @@ function Pagination({ page, totalPages, onPage }: { page: number; totalPages: nu
   )
 }
 
-function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNew: boolean; isTopSeller: boolean }) {
+function ArtworkCard43({ artwork, isNew, isTopSeller, getFromPrice }: { artwork: Artwork; isNew: boolean; isTopSeller: boolean; getFromPrice: (a: Artwork) => number }) {
   const [loaded, setLoaded] = useState(false)
-  const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
-  const name = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
+  const fromPrice = getFromPrice(artwork)
+  const name      = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
 
   return (
     <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
@@ -380,11 +390,18 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
               onLoad={() => setLoaded(true)}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }} />
           )}
-          {artwork.offer_pct && (
-            <div style={{ position: 'absolute', top: 8, left: 8, background: '#E24B4A', color: '#FCEBEB', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
-              {artwork.offer_pct}% off
-            </div>
-          )}
+
+          {/* Top-left: discount + edition stacked */}
+          <div style={{ position: 'absolute', top: 8, left: 8, display: 'flex', flexDirection: 'column', gap: 4, pointerEvents: 'none' }}>
+            {artwork.offer_pct && (
+              <span style={{ background: '#E24B4A', color: '#FCEBEB', fontSize: 10, padding: '2px 8px', borderRadius: 20 }}>
+                {artwork.offer_pct}% off
+              </span>
+            )}
+            <EditionBadge artwork={artwork} />
+          </div>
+
+          {/* Top-right: top seller / new */}
           {isTopSeller && (
             <div style={{ position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 3, background: '#1a1a1a', color: '#fff', fontSize: 10, padding: '3px 8px', borderRadius: 20, pointerEvents: 'none' }}>
               <StarIcon />Top seller
@@ -393,12 +410,13 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
           {isNew && !isTopSeller && (
             <div style={{ position: 'absolute', top: 8, right: 8, background: '#1D9E75', color: '#E1F5EE', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>New</div>
           )}
+
+          {/* Bottom-left: category — no overlap now */}
           {artwork.category && (
             <div style={{ position: 'absolute', bottom: 8, left: 8, background: 'rgba(255,255,255,0.88)', color: '#2C2C2A', fontSize: 10, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>
               {artwork.category}
             </div>
           )}
-          <EditionBadge artwork={artwork} />
         </div>
         <div style={{ padding: '12px 14px 14px' }}>
           <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 2, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
@@ -416,10 +434,10 @@ function ArtworkCard43({ artwork, isNew, isTopSeller }: { artwork: Artwork; isNe
   )
 }
 
-function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller: boolean }) {
+function ArtworkCard11({ artwork, isTopSeller, getFromPrice }: { artwork: Artwork; isTopSeller: boolean; getFromPrice: (a: Artwork) => number }) {
   const [loaded, setLoaded] = useState(false)
-  const fromPrice = getFromPrice(artwork.price, artwork.sizes || ['A4'], artwork.offer_pct || 0)
-  const name = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
+  const fromPrice = getFromPrice(artwork)
+  const name      = artwork.profiles?.display_name || artwork.profiles?.full_name || ''
 
   return (
     <Link href={'/artwork/' + artwork.id} style={{ textDecoration: 'none' }}>
@@ -435,17 +453,23 @@ function ArtworkCard11({ artwork, isTopSeller }: { artwork: Artwork; isTopSeller
               onLoad={() => setLoaded(true)}
               style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none', userSelect: 'none', opacity: loaded ? 1 : 0, transition: 'opacity 0.3s' }} />
           )}
-          {artwork.offer_pct && (
-            <div style={{ position: 'absolute', top: 6, left: 6, background: '#E24B4A', color: '#FCEBEB', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
-              -{artwork.offer_pct}%
-            </div>
-          )}
+
+          {/* Top-left: discount + edition stacked */}
+          <div style={{ position: 'absolute', top: 6, left: 6, display: 'flex', flexDirection: 'column', gap: 3, pointerEvents: 'none' }}>
+            {artwork.offer_pct && (
+              <span style={{ background: '#E24B4A', color: '#FCEBEB', fontSize: 9, padding: '2px 6px', borderRadius: 20 }}>
+                -{artwork.offer_pct}%
+              </span>
+            )}
+            <EditionBadge artwork={artwork} small />
+          </div>
+
+          {/* Top-right: top seller */}
           {isTopSeller && (
             <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', alignItems: 'center', gap: 2, background: '#1a1a1a', color: '#fff', fontSize: 9, padding: '2px 6px', borderRadius: 20, pointerEvents: 'none' }}>
               <StarIcon />Top
             </div>
           )}
-          <EditionBadge artwork={artwork} small />
         </div>
         <div style={{ padding: '9px 10px 10px' }}>
           <p style={{ fontSize: 12, fontWeight: 500, marginBottom: 1, color: 'var(--color-text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artwork.title}</p>
