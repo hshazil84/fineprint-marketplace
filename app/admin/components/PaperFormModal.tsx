@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
+import { BarcodeImage } from './BarcodeImage'
 import toast from 'react-hot-toast'
 
 export interface Paper {
@@ -52,11 +53,11 @@ function slugify(name: string) {
     .replace(/^-|-$/g, '')
 }
 
-const STOCK_STATUS_OPTIONS = [
-  { value: 'in_stock',    label: 'In stock',     color: '#0F6E56', bg: '#E1F5EE' },
-  { value: 'low_stock',   label: 'Low stock',    color: '#633806', bg: '#FAEEDA' },
-  { value: 'backorder',   label: 'Backorder',    color: '#185FA5', bg: '#E6F1FB' },
-  { value: 'out_of_stock',label: 'Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
+export const STOCK_STATUS_OPTIONS = [
+  { value: 'in_stock',     label: 'In stock',     color: '#0F6E56', bg: '#E1F5EE' },
+  { value: 'low_stock',    label: 'Low stock',    color: '#633806', bg: '#FAEEDA' },
+  { value: 'backorder',    label: 'Backorder',    color: '#185FA5', bg: '#E6F1FB' },
+  { value: 'out_of_stock', label: 'Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
 ]
 
 export function PaperFormModal({ paper, onClose, onSaved }: {
@@ -82,7 +83,7 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
   }
 
   async function uploadImage(file: File) {
-    if (!form.paper_id) { toast.error('Name is required before uploading'); return }
+    if (!form.name) { toast.error('Enter a name first'); return }
     setUploading(true)
     try {
       const ext  = file.name.split('.').pop()
@@ -100,7 +101,7 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
   }
 
   async function uploadDatasheet(file: File) {
-    if (!form.paper_id) { toast.error('Name is required before uploading'); return }
+    if (!form.name) { toast.error('Enter a name first'); return }
     setUploading(true)
     try {
       const path = `${form.paper_id}/datasheet.pdf`
@@ -125,24 +126,24 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
     setSaving(true)
     try {
       const payload = {
-        paper_id:           form.paper_id,
-        name:               form.name,
-        category:           form.category,
-        weight_gsm:         form.weight_gsm,
-        description:        form.description,
-        barcode:            form.barcode,
-        add_on_a4:          form.add_on_a4 || 0,
-        add_on_a3:          form.add_on_a3 || 0,
-        add_on_a2:          form.add_on_a2 || 0,
-        stock_status:       form.stock_status,
-        stock_qty:          form.stock_qty || 0,
+        paper_id:            form.paper_id,
+        name:                form.name,
+        category:            form.category,
+        weight_gsm:          form.weight_gsm,
+        description:         form.description,
+        barcode:             form.barcode,
+        add_on_a4:           form.add_on_a4 || 0,
+        add_on_a3:           form.add_on_a3 || 0,
+        add_on_a2:           form.add_on_a2 || 0,
+        stock_status:        form.stock_status,
+        stock_qty:           form.stock_qty || 0,
         stock_low_threshold: form.stock_low_threshold || 10,
-        wastage_pct:        form.wastage_pct || 10,
-        stock_note:         form.stock_note,
-        sort_order:         form.sort_order || 0,
-        images:             form.images || [],
-        datasheet_url:      form.datasheet_url,
-        updated_at:         new Date().toISOString(),
+        wastage_pct:         form.wastage_pct || 10,
+        stock_note:          form.stock_note,
+        sort_order:          form.sort_order || 0,
+        images:              form.images || [],
+        datasheet_url:       form.datasheet_url,
+        updated_at:          new Date().toISOString(),
       }
 
       if (paper) {
@@ -169,6 +170,7 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'var(--color-background-primary)', borderRadius: 12, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
 
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{paper ? 'Edit paper' : 'Add paper'}</p>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
@@ -233,18 +235,25 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
 
           {/* Barcode */}
           <div className="form-group">
-            <label className="form-label">Barcode</label>
+            <label className="form-label">Barcode (EAN)</label>
             <input
               className="form-input"
               value={form.barcode || ''}
               onChange={e => set('barcode', e.target.value)}
-              placeholder="e.g. 4012386"
+              placeholder="e.g. 4012386141881"
             />
+            {form.barcode && (
+              <div style={{ marginTop: 10 }}>
+                <BarcodeImage value={form.barcode} width={160} />
+              </div>
+            )}
           </div>
 
           {/* Price addons */}
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Price add-ons (MVR)</p>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Price add-ons (MVR)
+            </p>
             <div className="grid-3">
               {[['add_on_a4', 'A4'], ['add_on_a3', 'A3'], ['add_on_a2', 'A2']].map(([field, label]) => (
                 <div key={field} className="form-group">
@@ -260,9 +269,11 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
             </div>
           </div>
 
-          {/* Stock */}
+          {/* Stock management */}
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Stock management</p>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Stock management
+            </p>
             <div className="grid-2" style={{ marginBottom: 10 }}>
               <div className="form-group">
                 <label className="form-label">Stock status</label>
@@ -360,7 +371,9 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
 
           {/* Datasheet */}
           <div>
-            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Datasheet (PDF)</p>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Datasheet (PDF)
+            </p>
             {form.datasheet_url ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <a href={form.datasheet_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#0F6E56' }}>
@@ -388,7 +401,7 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
           <button onClick={onClose} className="btn btn-sm" style={{ flex: 1 }}>Cancel</button>
           <button onClick={handleSave} disabled={saving || uploading} className="btn btn-primary" style={{ flex: 2 }}>
-            {saving ? 'Saving...' : paper ? 'Save changes' : 'Add paper'}
+            {saving ? 'Saving...' : uploading ? 'Uploading...' : paper ? 'Save changes' : 'Add paper'}
           </button>
         </div>
 
