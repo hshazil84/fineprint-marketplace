@@ -2,25 +2,16 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export interface PaperOption {
-  id:          number
-  paper_id:    string
-  name:        string
-  category:    string  // display category: Economic, Photography, Fine Art, Industry Standard
-  description: string
-  addOn:       Record<string, number>
-  in_stock:    boolean
+  id:           number
+  paper_id:     string
+  name:         string
+  category:     'Standard' | 'Premium'
+  description:  string
+  addOn:        Record<string, number>
+  in_stock:     boolean
   stock_status: string
-  images:      string[]
+  images:       string[]
   datasheet_url: string | null
-}
-
-function detectCategory(name: string): string {
-  const n = name.toLowerCase()
-  if (n.includes('luster') || n.includes('matt fibre') || n.includes('glossy')) return 'Economic'
-  if (n.includes('baryta') || n.includes('fineart baryta') || n.includes('photo rag baryta')) return 'Photography'
-  if (n.includes('william turner') || n.includes('albrecht') || n.includes('watercolour') || n.includes('dürer')) return 'Fine Art'
-  if (n.includes('photo rag') || n.includes('museum')) return 'Industry Standard'
-  return 'Fine Art'
 }
 
 export function usePapers() {
@@ -38,12 +29,12 @@ export function usePapers() {
           id:           p.id,
           paper_id:     p.paper_id,
           name:         p.name,
-          category:     detectCategory(p.name),
+          category:     (p.add_on_a4 > 0 || p.add_on_a3 > 0) ? 'Premium' : 'Standard',
           description:  p.description || '',
           addOn: {
-            A4:    p.add_on_a4 || 0,
-            A3:    p.add_on_a3 || 0,
-            A2:    p.add_on_a2 || 0,
+            A4:      p.add_on_a4 || 0,
+            A3:      p.add_on_a3 || 0,
+            A2:      p.add_on_a2 || 0,
             '12x16': 0,
           },
           in_stock:     p.stock_status !== 'out_of_stock',
@@ -71,8 +62,8 @@ export function usePapers() {
   }
 
   function getDefaultPaper(): string {
-    const first = papers.find(p => p.stock_status === 'in_stock')
-    return first?.name || 'Photo Luster'
+    const first = papers.find(p => p.stock_status === 'in_stock' && p.category === 'Standard')
+    return first?.name || ''
   }
 
   return { papers, loading, getPapersByCategory, getPaperAddOn, getDefaultPaper }
