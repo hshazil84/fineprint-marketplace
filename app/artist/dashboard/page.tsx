@@ -2,10 +2,12 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { formatMVR, PRINTING_FEES, PAPER_OPTIONS, getPapersByCategory, getPaperAddOn, DEFAULT_PAPER } from '@/lib/pricing'
+import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
+import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
 import { usePagination, PAGE_SIZES } from '@/lib/pagination'
 import { Pagination } from '@/app/components/Pagination'
+import { PaperDetailModal } from '@/app/artist/components/PaperDetailModal'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 import { InvoiceModal } from '@/app/artist/components/InvoiceModal'
@@ -254,7 +256,7 @@ export default function ArtistDashboard() {
   )
 }
 
-// ── Artist listings tab with pagination ───────────────────────────────────
+// ── Artist listings tab ───────────────────────────────────────────────────
 function ArtistListingsTab({ artworks, editingArtwork, deleteConfirmId, setEditingArtwork, setDeleteConfirmId, onToggleHide, onDelete, onSaveEdit }: any) {
   const [search, setSearch] = useState('')
 
@@ -304,7 +306,7 @@ function ArtistListingsTab({ artworks, editingArtwork, deleteConfirmId, setEditi
                     <span className={'badge badge-' + a.status}>{a.status}</span>
                     {a.category && <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{a.category}</span>}
                     {a.offer_label && <span className="offer-tag">{a.offer_label} {a.offer_pct}% off</span>}
-                    {a.paper_type && a.paper_type !== DEFAULT_PAPER && (
+                    {a.paper_type && (
                       <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 7px', borderRadius: 20 }}>{a.paper_type}</span>
                     )}
                     {a.edition_size && (
@@ -361,7 +363,7 @@ function ArtistListingsTab({ artworks, editingArtwork, deleteConfirmId, setEditi
   )
 }
 
-// ── Artist orders tab with pagination ─────────────────────────────────────
+// ── Artist orders tab ─────────────────────────────────────────────────────
 function ArtistOrdersTab({ activeOrders, rejectedOrders, onViewInvoice }: any) {
   const [search, setSearch] = useState('')
 
@@ -466,11 +468,15 @@ function ArtistOrdersTab({ activeOrders, rejectedOrders, onViewInvoice }: any) {
   )
 }
 
+// ── Edit artwork form ─────────────────────────────────────────────────────
 function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: (updates: any) => void; onCancel: () => void }) {
   const CATEGORIES = [
     'Photography', 'Fine Art', 'Abstract', 'Illustration',
     'Digital Art', 'Mixed Media', 'Watercolour', 'Charcoal & Sketch',
   ]
+
+  const { papers, loading: papersLoading, getPapersByCategory, getPaperAddOn, getDefaultPaper } = usePapers()
+
   const [form, setForm] = useState({
     title:       artwork.title       || '',
     description: artwork.description || '',
@@ -479,7 +485,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     paintingBy:  artwork.painting_by || '',
     sizes:       artwork.sizes       || ['A4', 'A3'],
   })
-  const [paperType, setPaperType]                 = useState<string>(artwork.paper_type || DEFAULT_PAPER)
+  const [paperType, setPaperType]                 = useState<string>(artwork.paper_type || '')
   const [isLimited, setIsLimited]                 = useState<boolean>(!!artwork.edition_size)
   const [editionSize, setEditionSize]             = useState<string>(String(artwork.edition_size || '50'))
   const [previewFile, setPreviewFile]             = useState<File | null>(null)
@@ -491,10 +497,13 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
   const [galleryThumbs, setGalleryThumbs]         = useState<(string | null)[]>([null, null, null])
   const [activeThumb, setActiveThumb]             = useState<'main' | number>('main')
   const [saving, setSaving]                       = useState(false)
+  const [detailPaper, setDetailPaper]             = useState<any>(null)
   const supabase = createClient()
 
-  const papersByCategory = getPapersByCategory()
-  const selectedPaper    = PAPER_OPTIONS.find(p => p.name === paperType)
+  const effectivePaperType = paperType || getDefaultPaper(form.category)
+  const papersByCategory   = getPapersByCategory()
+  const selectedPaper      = papers.find(p => p.name === effectivePaperType)
+  const bestForKey         = CATEGORY_TO_BEST_FOR[form.category]
 
   useEffect(() => {
     async function loadGallery() {
@@ -507,6 +516,11 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
     }
     loadGallery()
   }, [artwork.id])
+
+  function handleCategoryChange(category: string) {
+    setForm(f => ({ ...f, category }))
+    setPaperType('')
+  }
 
   const visibleGallery = existingGallery.filter(g => !deletedGalleryIds.includes(g.id))
 
@@ -566,7 +580,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
         category:     form.category,
         painting_by:  form.paintingBy || null,
         sizes:        form.sizes,
-        paper_type:   paperType,
+        paper_type:   effectivePaperType,
         edition_size: isLimited ? parseInt(editionSize) || null : null,
       }
 
@@ -631,6 +645,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
       <p style={{ fontSize: 13, fontWeight: 500, padding: '12px 0 10px' }}>Edit listing</p>
       <div style={{ maxWidth: 520 }}>
 
+        {/* Images */}
         <div className="form-group">
           <label className="form-label">Images</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 88px', gap: 10, marginBottom: 6 }}>
@@ -692,6 +707,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Tap main to replace · red × removes on save · + to add</p>
         </div>
 
+        {/* Hi-res */}
         <div className="form-group">
           <label className="form-label">Hi-res print file</label>
           <div style={{ border: '0.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -730,7 +746,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
         </div>
         <div className="form-group">
           <label className="form-label">Category</label>
-          <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+          <select className="form-input" value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
@@ -756,44 +772,80 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
+        {/* Paper type */}
         <div style={{ marginBottom: 6 }}>
           <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>Paper type</p>
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 12 }}>All prints use Hahnemühle archival papers. Upgrade for a premium feel.</p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          {Object.entries(papersByCategory).map(([category, papers]) => (
-            <div key={category}>
-              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {papers.map(paper => {
-                  const isSelected = paperType === paper.name
-                  const addOnA4    = paper.addOn['A4'] || 0
-                  const addOnA3    = paper.addOn['A3'] || 0
-                  const hasPremium = addOnA4 > 0 || addOnA3 > 0
-                  return (
-                    <div
-                      key={paper.name}
-                      onClick={() => setPaperType(paper.name)}
-                      style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 12px', border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 10, cursor: 'pointer', background: isSelected ? 'var(--color-surface)' : 'transparent', transition: 'all 0.15s' }}
-                    >
-                      <div style={{ width: 16, height: 16, borderRadius: '50%', border: isSelected ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0, marginTop: 2, transition: 'all 0.15s' }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
-                          {!hasPremium
-                            ? <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>
-                            : <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>+{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3</span>
-                          }
+
+        {papersLoading ? (
+          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>Loading papers...</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
+            {Object.entries(papersByCategory).map(([category, categoryPapers]) => (
+              <div key={category}>
+                <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {(categoryPapers as any[]).map(paper => {
+                    const isSelected    = effectivePaperType === paper.name
+                    const addOnA4       = paper.addOn['A4'] || 0
+                    const addOnA3       = paper.addOn['A3'] || 0
+                    const hasPremium    = addOnA4 > 0 || addOnA3 > 0
+                    const isOutOfStock  = !paper.in_stock
+                    const isRecommended = bestForKey && paper.best_for?.includes(bestForKey)
+                    return (
+                      <div
+                        key={paper.name}
+                        onClick={() => !isOutOfStock && setPaperType(paper.name)}
+                        style={{
+                          display: 'flex', alignItems: 'flex-start', gap: 12,
+                          padding: '10px 12px',
+                          border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                          borderRadius: 10,
+                          cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                          background: isSelected ? 'var(--color-surface)' : 'transparent',
+                          opacity: isOutOfStock ? 0.45 : 1,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', border: isSelected ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0, marginTop: 2, transition: 'all 0.15s' }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
+                            {isRecommended && !isOutOfStock && (
+                              <span style={{ fontSize: 10, background: '#185FA5', color: '#fff', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>✓ Recommended</span>
+                            )}
+                            {isOutOfStock && (
+                              <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Out of stock</span>
+                            )}
+                            {paper.stock_status === 'backorder' && (
+                              <span style={{ fontSize: 10, background: '#E6F1FB', color: '#185FA5', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Backorder</span>
+                            )}
+                            {!hasPremium && !isOutOfStock && (
+                              <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>
+                            )}
+                            {hasPremium && !isOutOfStock && (
+                              <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
+                                +{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            onClick={e => { e.stopPropagation(); setDetailPaper(paper) }}
+                            style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', textDecoration: 'underline', display: 'block' }}
+                          >
+                            View details
+                          </button>
                         </div>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3, lineHeight: 1.5 }}>{paper.description}</p>
                       </div>
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
+
         {selectedPaper && (selectedPaper.addOn['A4'] > 0 || selectedPaper.addOn['A3'] > 0) && (
           <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 14px', marginBottom: 16 }}>
             <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
@@ -804,6 +856,7 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
 
         <Divider />
 
+        {/* Limited edition */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <div>
@@ -844,6 +897,14 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
           <button className="btn btn-sm" style={{ fontSize: 12 }} onClick={onCancel} disabled={saving}>Cancel</button>
         </div>
       </div>
+
+      {/* Paper detail modal */}
+      {detailPaper && (
+        <PaperDetailModal
+          paper={detailPaper}
+          onClose={() => setDetailPaper(null)}
+        />
+      )}
     </div>
   )
 }
