@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES, getPaperAddOn, getPaperOption, DEFAULT_PAPER } from '@/lib/pricing'
+import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES } from '@/lib/pricing'
+import { usePapers } from '@/lib/usePapers'
 import { useCart } from '@/lib/cart'
 import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 import toast from 'react-hot-toast'
@@ -36,6 +37,8 @@ function AnimatedMVR({ amount, size = 16 }: { amount: number; size?: number }) {
 export default function ArtworkPage() {
   const { id }   = useParams()
   const router   = useRouter()
+  const { papers, getDefaultPaper, getPaperAddOn } = usePapers()
+
   const [artwork, setArtwork]               = useState<any>(null)
   const [artist, setArtist]                 = useState<any>(null)
   const [related, setRelated]               = useState<any[]>([])
@@ -51,8 +54,6 @@ export default function ArtworkPage() {
   const supabase = createClient()
 
   useEffect(() => { fetchArtwork() }, [id])
-
-  // Reset qty when size changes
   useEffect(() => { setQty(1) }, [selectedSize])
 
   async function fetchArtwork() {
@@ -113,16 +114,16 @@ export default function ArtworkPage() {
     </div>
   )
 
-  const paperType     = artwork.paper_type || DEFAULT_PAPER
-  const paperOption   = getPaperOption(paperType)
+  const paperType     = artwork.paper_type || getDefaultPaper()
+  const paperOption   = papers.find(p => p.name === paperType)
   const paperAddOn    = getPaperAddOn(paperType, selectedSize)
+  const isPremium     = paperOption ? (paperOption.addOn['A4'] > 0 || paperOption.addOn['A3'] > 0) : false
   const availableSizes = artwork.sizes || SIZES
   const prices        = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType)
   const lineTotal     = prices.artworkLineItem * qty
   const orderSKU      = buildOrderSKU(artwork.sku, selectedSize)
   const alreadyInCart = has(artwork.id, selectedSize)
 
-  // Edition logic
   const editionSize  = artwork.edition_size
   const editionsSold = artwork.editions_sold || 0
   const remaining    = editionSize ? editionSize - editionsSold : null
@@ -179,7 +180,6 @@ export default function ArtworkPage() {
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
 
-      {/* ── Animation CSS ── */}
       <style>{`
         :root {
           --digit-dur: 500ms;
@@ -234,7 +234,6 @@ export default function ArtworkPage() {
               )}
               <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
 
-              {/* Badges */}
               <div style={{ position: 'absolute', top: 14, left: 14, display: 'flex', gap: 6, zIndex: 20, pointerEvents: 'none', flexWrap: 'wrap' }}>
                 {artwork.offer_pct ? (
                   <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
@@ -285,7 +284,6 @@ export default function ArtworkPage() {
               by {artist?.display_name || artist?.full_name}
             </button>
 
-            {/* Edition status */}
             {isLimited && (
               <div style={{ marginBottom: 12 }}>
                 {isSoldOut ? (
@@ -359,7 +357,6 @@ export default function ArtworkPage() {
                 </div>
               )}
 
-              {/* Print price — animated, qty-aware */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
                 <span style={{ fontSize: 16, fontWeight: 500 }}>
                   {qty > 1 ? 'Print price ×' + qty : 'Print price'}
@@ -372,13 +369,28 @@ export default function ArtworkPage() {
                 </p>
               )}
 
-              {/* Paper type line */}
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Paper type line with tier badge */}
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11 }}>🖨</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
                   Printed on <strong>Hahnemühle {paperType}</strong>
-                  {paperOption && <span style={{ color: 'var(--color-text-hint)' }}> · {paperOption.description}</span>}
                 </span>
+                {/* Tier badge */}
+                <span style={{
+                  fontSize: 9,
+                  fontWeight: 500,
+                  padding: '1px 7px',
+                  borderRadius: 20,
+                  background: isPremium ? '#2C2C2A' : '#D3D1C7',
+                  color:      isPremium ? '#F1EFE8' : '#444441',
+                }}>
+                  {isPremium ? 'Premium' : 'Standard'}
+                </span>
+                {paperOption?.description && (
+                  <span style={{ fontSize: 11, color: 'var(--color-text-hint)', display: 'block', width: '100%', marginTop: 2 }}>
+                    {paperOption.description}
+                  </span>
+                )}
               </div>
 
               <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
@@ -390,7 +402,6 @@ export default function ArtworkPage() {
               {orderSKU}
             </span>
 
-            {/* CTA — sold out vs normal */}
             {isSoldOut ? (
               <div style={{ marginTop: 16 }}>
                 <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 12, padding: '16px 18px', marginBottom: 12 }}>
@@ -429,8 +440,6 @@ export default function ArtworkPage() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
-
-                {/* Qty stepper */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Quantity</span>
                   <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
