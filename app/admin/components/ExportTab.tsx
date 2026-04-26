@@ -6,15 +6,15 @@ import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
 import toast from 'react-hot-toast'
 
 export function ExportTab() {
-  const [artists, setArtists] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [artists, setArtists]           = useState<any[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [preview, setPreview]           = useState<any[]>([])
   const today     = new Date().toISOString().split('T')[0]
   const yearStart = new Date().getFullYear() + '-01-01'
   const [from, setFrom]     = useState(yearStart)
   const [to, setTo]         = useState(today)
   const [artist, setArtist] = useState('all')
-  const [preview, setPreview] = useState<any[]>([])
-  const [previewLoading, setPreviewLoading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => { fetchArtists() }, [])
@@ -39,10 +39,6 @@ export function ExportTab() {
       .gte('created_at', from)
       .lte('created_at', to + 'T23:59:59')
       .order('created_at', { ascending: false })
-
-    if (artist !== 'all') {
-      query = query.eq('artworks.profiles.artist_code', artist)
-    }
 
     const { data } = await query
     setPreview((data || []).filter((o: any) => {
@@ -78,22 +74,19 @@ export function ExportTab() {
     })
   }
 
-  const gross = preview.reduce((s, o) => s + (o.original_price || 0), 0)
-  const comm  = preview.reduce((s, o) => s + (o.fp_commission || 0), 0)
-  const earnings = preview.reduce((s, o) => s + (o.artist_earnings || 0), 0)
+  const gross    = preview.reduce((s, o) => s + (o.original_price || 0), 0)
+  const comm     = preview.reduce((s, o) => s + (o.fp_commission || 0), 0)
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading...</div>
 
   return (
     <div style={{ maxWidth: 640 }}>
 
-      {/* Filters */}
       <div className="card" style={{ marginBottom: 20 }}>
         <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>Export sales report</p>
         <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 16 }}>
           Filter by artist and date range, then download the full CSV.
         </p>
-
         <div className="grid-2" style={{ marginBottom: 12 }}>
           <div className="form-group">
             <label className="form-label">Artist</label>
@@ -114,7 +107,6 @@ export function ExportTab() {
             </select>
           </div>
         </div>
-
         <div className="grid-2" style={{ marginBottom: 20 }}>
           <div className="form-group">
             <label className="form-label">From</label>
@@ -125,13 +117,11 @@ export function ExportTab() {
             <input type="date" className="form-input" value={to} onChange={e => setTo(e.target.value)} />
           </div>
         </div>
-
         <button className="btn btn-primary btn-full" onClick={handleExport}>
           Download CSV
         </button>
       </div>
 
-      {/* Preview stats */}
       <div className="grid-3" style={{ marginBottom: 16 }}>
         {[
           ['Orders',     preview.length],
@@ -145,7 +135,6 @@ export function ExportTab() {
         ))}
       </div>
 
-      {/* Preview table */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '12px 20px', borderBottom: '0.5px solid var(--color-border)', background: 'rgba(0,0,0,0.02)' }}>
           <p style={{ fontSize: 13, fontWeight: 500 }}>
