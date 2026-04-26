@@ -1,8 +1,9 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import toast from 'react-hot-toast'
+import { BarcodeImage } from './BarcodeImage'
 import { Paper } from './PaperFormModal'
+import toast from 'react-hot-toast'
 
 const STOCK_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   in_stock:     { label: 'In stock',     color: '#0F6E56', bg: '#E1F5EE' },
@@ -18,8 +19,8 @@ interface RestockModalProps {
 }
 
 function RestockModal({ paper, onClose, onRestocked }: RestockModalProps) {
-  const [qty, setQty]     = useState(0)
-  const [notes, setNotes] = useState('')
+  const [qty, setQty]       = useState(0)
+  const [notes, setNotes]   = useState('')
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
@@ -29,7 +30,6 @@ function RestockModal({ paper, onClose, onRestocked }: RestockModalProps) {
     try {
       const newQty = paper.stock_qty + qty
 
-      // Derive new stock status
       let newStatus = paper.stock_status
       if (newQty > paper.stock_low_threshold) newStatus = 'in_stock'
       else if (newQty > 0) newStatus = 'low_stock'
@@ -37,19 +37,19 @@ function RestockModal({ paper, onClose, onRestocked }: RestockModalProps) {
       await supabase
         .from('papers')
         .update({
-          stock_qty: newQty,
+          stock_qty:    newQty,
           stock_status: newStatus,
-          updated_at: new Date().toISOString(),
+          updated_at:   new Date().toISOString(),
         })
         .eq('id', paper.id)
 
       await supabase
         .from('paper_stock_movements')
         .insert({
-          paper_id:  paper.paper_id,
+          paper_id:   paper.paper_id,
           change_qty: qty,
-          reason:    'restock',
-          notes:     notes || null,
+          reason:     'restock',
+          notes:      notes || null,
         })
 
       toast.success(`Restocked ${qty} sheets — new total: ${newQty}`)
@@ -97,7 +97,7 @@ function RestockModal({ paper, onClose, onRestocked }: RestockModalProps) {
             className="form-input"
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            placeholder="e.g. Supplier delivery March 2026"
+            placeholder="e.g. Supplier delivery April 2026"
           />
         </div>
 
@@ -143,10 +143,10 @@ function StockHistoryModal({ paper, onClose }: StockHistoryModalProps) {
   })
 
   const reasonLabel: Record<string, string> = {
-    order_approved:   'Order deduction',
+    order_approved:    'Order deduction',
     manual_adjustment: 'Manual adjustment',
-    restock:          'Restock',
-    wastage:          'Wastage write-off',
+    restock:           'Restock',
+    wastage:           'Wastage write-off',
   }
 
   return (
@@ -172,12 +172,7 @@ function StockHistoryModal({ paper, onClose }: StockHistoryModalProps) {
                     {new Date(m.created_at).toLocaleDateString()} {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
-                <span style={{
-                  fontSize: 14,
-                  fontWeight: 500,
-                  color: m.change_qty > 0 ? '#0F6E56' : '#A32D2D',
-                  flexShrink: 0,
-                }}>
+                <span style={{ fontSize: 14, fontWeight: 500, color: m.change_qty > 0 ? '#0F6E56' : '#A32D2D', flexShrink: 0 }}>
                   {m.change_qty > 0 ? '+' : ''}{m.change_qty}
                 </span>
               </div>
@@ -195,9 +190,9 @@ export function PaperRow({ paper, onEdit, onDelete, onRefresh }: {
   onDelete: (paper: Paper) => void
   onRefresh: () => void
 }) {
-  const [showRestock, setShowRestock]       = useState(false)
-  const [showHistory, setShowHistory]       = useState(false)
-  const [deleting, setDeleting]             = useState(false)
+  const [showRestock, setShowRestock] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showBarcode, setShowBarcode] = useState(false)
 
   const statusConfig = STOCK_STATUS_CONFIG[paper.stock_status] || STOCK_STATUS_CONFIG.in_stock
   const effectiveQty = Math.floor(paper.stock_qty * (1 - (paper.wastage_pct || 10) / 100))
@@ -206,90 +201,106 @@ export function PaperRow({ paper, onEdit, onDelete, onRefresh }: {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
 
-        {/* Image */}
-        {paper.images?.[0] ? (
-          <img
-            src={paper.images[0]}
-            alt={paper.name}
-            style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '0.5px solid var(--color-border)' }}
-          />
-        ) : (
-          <div style={{ width: 52, height: 52, borderRadius: 8, background: 'var(--color-background-secondary)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '0.5px solid var(--color-border)' }}>
-            📄
-          </div>
-        )}
+          {/* Image */}
+          {paper.images?.[0] ? (
+            <img
+              src={paper.images[0]}
+              alt={paper.name}
+              style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '0.5px solid var(--color-border)' }}
+            />
+          ) : (
+            <div style={{ width: 52, height: 52, borderRadius: 8, background: 'var(--color-background-secondary)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '0.5px solid var(--color-border)' }}>
+              📄
+            </div>
+          )}
 
-        {/* Info */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-            <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{paper.name}</p>
-            <span style={{
-              fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500,
-              background: paper.category === 'premium' ? '#2C2C2A' : '#D3D1C7',
-              color: paper.category === 'premium' ? '#F1EFE8' : '#444441',
-            }}>
-              {paper.category === 'premium' ? 'Premium' : 'Standard'}
-            </span>
-            <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: statusConfig.bg, color: statusConfig.color }}>
-              {statusConfig.label}
-            </span>
-            {paper.datasheet_url && (
-              <a href={paper.datasheet_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: '#0F6E56', textDecoration: 'none' }}>
-                PDF
-              </a>
+          {/* Info */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
+              <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{paper.name}</p>
+              <span style={{
+                fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500,
+                background: paper.category === 'premium' ? '#2C2C2A' : '#D3D1C7',
+                color: paper.category === 'premium' ? '#F1EFE8' : '#444441',
+              }}>
+                {paper.category === 'premium' ? 'Premium' : 'Standard'}
+              </span>
+              <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: statusConfig.bg, color: statusConfig.color }}>
+                {statusConfig.label}
+              </span>
+              {paper.datasheet_url && (
+                <a href={paper.datasheet_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: '#0F6E56', textDecoration: 'none' }}>
+                  PDF
+                </a>
+              )}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>
+              {paper.weight_gsm ? paper.weight_gsm + ' gsm · ' : ''}
+              {paper.paper_id}
+              {paper.barcode ? ' · ' + paper.barcode : ''}
+            </p>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
+                A4 +{paper.add_on_a4} · A3 +{paper.add_on_a3} · A2 +{paper.add_on_a2} MVR
+              </p>
+              <p style={{ fontSize: 11, margin: 0, color: isOut ? '#A32D2D' : isLow ? '#633806' : 'var(--color-text-muted)', fontWeight: isLow || isOut ? 500 : 400 }}>
+                {paper.stock_qty} sheets · {effectiveQty} effective
+              </p>
+              <button
+                onClick={() => setShowHistory(true)}
+                style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+              >
+                History
+              </button>
+              {paper.barcode && (
+                <button
+                  onClick={() => setShowBarcode(b => !b)}
+                  style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                >
+                  {showBarcode ? 'Hide barcode' : 'Show barcode'}
+                </button>
+              )}
+            </div>
+            {paper.stock_note && (
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '3px 0 0', fontStyle: 'italic' }}>{paper.stock_note}</p>
             )}
           </div>
-          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>
-            {paper.weight_gsm ? paper.weight_gsm + ' gsm · ' : ''}
-            {paper.paper_id}
-            {paper.barcode ? ' · ' + paper.barcode : ''}
-          </p>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
-              A4 +{paper.add_on_a4} · A3 +{paper.add_on_a3} · A2 +{paper.add_on_a2} MVR
-            </p>
-            <p style={{ fontSize: 11, margin: 0, color: isOut ? '#A32D2D' : isLow ? '#633806' : 'var(--color-text-muted)', fontWeight: isLow || isOut ? 500 : 400 }}>
-              {paper.stock_qty} sheets · {effectiveQty} effective
-            </p>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <button
-              onClick={() => setShowHistory(true)}
-              style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+              className="btn btn-sm"
+              style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', border: 'none' }}
+              onClick={() => setShowRestock(true)}
             >
-              History
+              + Restock
+            </button>
+            <button
+              className="btn btn-sm"
+              style={{ fontSize: 11 }}
+              onClick={() => onEdit(paper)}
+            >
+              Edit
+            </button>
+            <button
+              className="btn btn-sm btn-danger"
+              style={{ fontSize: 11 }}
+              onClick={() => onDelete(paper)}
+            >
+              Delete
             </button>
           </div>
-          {paper.stock_note && (
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '3px 0 0', fontStyle: 'italic' }}>{paper.stock_note}</p>
-          )}
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button
-            className="btn btn-sm"
-            style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', border: 'none' }}
-            onClick={() => setShowRestock(true)}
-          >
-            + Restock
-          </button>
-          <button
-            className="btn btn-sm"
-            style={{ fontSize: 11 }}
-            onClick={() => onEdit(paper)}
-          >
-            Edit
-          </button>
-          <button
-            className="btn btn-sm btn-danger"
-            style={{ fontSize: 11 }}
-            onClick={() => onDelete(paper)}
-            disabled={deleting}
-          >
-            Delete
-          </button>
-        </div>
+        {/* Barcode — shown on toggle */}
+        {showBarcode && paper.barcode && (
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '0.5px solid var(--color-border)' }}>
+            <BarcodeImage value={paper.barcode} width={160} />
+          </div>
+        )}
       </div>
 
       {showRestock && (
