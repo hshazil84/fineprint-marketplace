@@ -16,7 +16,9 @@ export interface Paper {
   add_on_a3: number
   add_on_a2: number
   stock_status: string
-  stock_qty: number
+  stock_qty_a4: number
+  stock_qty_a3: number
+  stock_qty_a2: number
   stock_low_threshold: number
   wastage_pct: number
   stock_note: string | null
@@ -26,23 +28,25 @@ export interface Paper {
 }
 
 export const EMPTY_PAPER: Omit<Paper, 'id'> = {
-  paper_id: '',
-  name: '',
-  category: 'standard',
-  weight_gsm: null,
-  description: null,
-  barcode: null,
-  add_on_a4: 0,
-  add_on_a3: 0,
-  add_on_a2: 0,
-  stock_status: 'in_stock',
-  stock_qty: 0,
+  paper_id:            '',
+  name:                '',
+  category:            'standard',
+  weight_gsm:          null,
+  description:         null,
+  barcode:             null,
+  add_on_a4:           0,
+  add_on_a3:           0,
+  add_on_a2:           0,
+  stock_status:        'in_stock',
+  stock_qty_a4:        0,
+  stock_qty_a3:        0,
+  stock_qty_a2:        0,
   stock_low_threshold: 10,
-  wastage_pct: 10,
-  stock_note: null,
-  sort_order: 0,
-  images: [],
-  datasheet_url: null,
+  wastage_pct:         10,
+  stock_note:          null,
+  sort_order:          0,
+  images:              [],
+  datasheet_url:       null,
 }
 
 function slugify(name: string) {
@@ -136,7 +140,9 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
         add_on_a3:           form.add_on_a3 || 0,
         add_on_a2:           form.add_on_a2 || 0,
         stock_status:        form.stock_status,
-        stock_qty:           form.stock_qty || 0,
+        stock_qty_a4:        form.stock_qty_a4 || 0,
+        stock_qty_a3:        form.stock_qty_a3 || 0,
+        stock_qty_a2:        form.stock_qty_a2 || 0,
         stock_low_threshold: form.stock_low_threshold || 10,
         wastage_pct:         form.wastage_pct || 10,
         stock_note:          form.stock_note,
@@ -164,13 +170,14 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
     }
   }
 
-  const effectiveQty = Math.floor(form.stock_qty * (1 - (form.wastage_pct || 0) / 100))
+  const effectiveA4 = Math.floor(form.stock_qty_a4 * (1 - (form.wastage_pct || 0) / 100))
+  const effectiveA3 = Math.floor(form.stock_qty_a3 * (1 - (form.wastage_pct || 0) / 100))
+  const effectiveA2 = Math.floor(form.stock_qty_a2 * (1 - (form.wastage_pct || 0) / 100))
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
       <div style={{ background: 'var(--color-background-primary)', borderRadius: 12, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
 
-        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{paper ? 'Edit paper' : 'Add paper'}</p>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
@@ -274,25 +281,40 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
             <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               Stock management
             </p>
-            <div className="grid-2" style={{ marginBottom: 10 }}>
-              <div className="form-group">
-                <label className="form-label">Stock status</label>
-                <select className="form-input" value={form.stock_status} onChange={e => set('stock_status', e.target.value)}>
-                  {STOCK_STATUS_OPTIONS.map(o => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Qty in stock (sheets)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={form.stock_qty || 0}
-                  onChange={e => set('stock_qty', parseInt(e.target.value) || 0)}
-                />
-              </div>
+
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Stock status</label>
+              <select className="form-input" value={form.stock_status} onChange={e => set('stock_status', e.target.value)}>
+                {STOCK_STATUS_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
+
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+              Qty in stock per size (sheets):
+            </p>
+            <div className="grid-3" style={{ marginBottom: 10 }}>
+              {([
+                ['stock_qty_a4', 'A4', effectiveA4],
+                ['stock_qty_a3', 'A3', effectiveA3],
+                ['stock_qty_a2', 'A2', effectiveA2],
+              ] as [string, string, number][]).map(([field, label, effective]) => (
+                <div key={field} className="form-group">
+                  <label className="form-label">{label}</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={(form as any)[field] || 0}
+                    onChange={e => set(field, parseInt(e.target.value) || 0)}
+                  />
+                  <p style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 3 }}>
+                    Effective: {effective}
+                  </p>
+                </div>
+              ))}
+            </div>
+
             <div className="grid-2" style={{ marginBottom: 10 }}>
               <div className="form-group">
                 <label className="form-label">Low stock threshold (sheets)</label>
@@ -313,16 +335,14 @@ export function PaperFormModal({ paper, onClose, onSaved }: {
                 />
               </div>
             </div>
-            <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: 'var(--color-text-muted)' }}>
-              Effective stock after {form.wastage_pct || 10}% wastage buffer: <strong>{effectiveQty} sheets</strong>
-            </div>
-            <div className="form-group" style={{ marginTop: 10 }}>
+
+            <div className="form-group">
               <label className="form-label">Stock note</label>
               <input
                 className="form-input"
                 value={form.stock_note || ''}
                 onChange={e => set('stock_note', e.target.value)}
-                placeholder="e.g. Next restock expected March"
+                placeholder="e.g. Next restock expected May"
               />
             </div>
           </div>
