@@ -4,11 +4,11 @@ import { sendInvoiceEmail } from '@/lib/invoice'
 import { PRINTING_FEES } from '@/lib/pricing'
 
 // Sheets used per print size
-const SHEETS_PER_SIZE: Record<string, number> = {
-  A4:    1,
-  A3:    1,
-  A2:    2,
-  '12x16': 2,
+const SHEETS_PER_SIZE: Record<string, string> = {
+  'A4':    'stock_qty_a4',
+  'A3':    'stock_qty_a3',
+  'A2':    'stock_qty_a2',
+  '12x16': 'stock_qty_a2', // uses A2 sheets
 }
 
 export async function POST(req: NextRequest) {
@@ -80,61 +80,74 @@ export async function POST(req: NextRequest) {
             .eq('id', artwork.id)
         }
 
-        // ── Auto stock deduction ──
-        // Group sheets needed per paper_type
-        const paperDeductions: Record<string, number> = {}
+        // ── Auto stock deduction per size ──
+        // Group by paper_type + print_size
+        const deductions: Record<string, Record<string, number>> = {}
+        // deductions[paperName][sizeField] = sheetsToDeduct
+
         for (const item of orderItems) {
-          const paperType = item.artworks?.paper_type
-          if (!paperType) continue
-          const sheets = SHEETS_PER_SIZE[item.print_size] || 1
-          paperDeductions[paperType] = (paperDeductions[paperType] || 0) + sheets
+          const paperName = item.artworks?.paper_type
+          const sizeField = SHEETS_PER_SIZE[item.print_size]
+          if (!paperName || !sizeField) continue
+
+          if (!deductions[paperName]) deductions[paperName] = {}
+          deductions[paperName][sizeField] = (deductions[paperName][sizeField] || 0) + 1
         }
 
-        for (const [paperName, sheetsUsed] of Object.entries(paperDeductions)) {
-          // Find paper by name
+        for (const [paperName, sizeDeductions] of Object.entries(deductions)) {
           const { data: paper } = await supabase
             .from('papers')
-            .select('id, paper_id, stock_qty, stock_low_threshold, stock_status, wastage_pct')
+            .select('id, paper_id, stock_qty_a4, stock_qty_a3, stock_qty_a2, stock_low_threshold, stock_status, wastage_pct')
             .eq('name', paperName)
             .single()
 
           if (!paper) continue
 
-          // Apply wastage buffer — deduct extra % on top
           const wastageMultiplier = 1 + (paper.wastage_pct || 10) / 100
-          const totalDeduction    = Math.ceil(sheetsUsed * wastageMultiplier)
-          const newQty            = Math.max(0, paper.stock_qty - totalDeduction)
+          const updates: Record<string, number> = {}
+          const movements: any[] = []
 
-          // Derive new stock status
-          let newStatus = paper.stock_status
-          if (newQty === 0) {
-            newStatus = 'out_of_stock'
-          } else if (newQty <= paper.stock_low_threshold) {
-            newStatus = 'low_stock'
-          } else {
-            newStatus = 'in_stock'
-          }
+          let newA4 = paper.stock_qty_a4
+          let newA3 = paper.stock_qty_a3
+          let newA2 = paper.stock_qty_a2
 
-          // Update paper stock
-          await supabase
-            .from('papers')
-            .update({
-              stock_qty:    newQty,
-              stock_status: newStatus,
-              updated_at:   new Date().toISOString(),
-            })
-            .eq('id', paper.id)
+          for (const [sizeField, sheets] of Object.entries(sizeDeductions)) {
+            const totalDeduction = Math.ceil(sheets * wastageMultiplier)
+            const printSize      = sizeField === 'stock_qty_a4' ? 'A4' : sizeField === 'stock_qty_a3' ? 'A3' : 'A2'
+            const currentQty     = (paper as any)[sizeField] as number
+            const newQty         = Math.max(0, currentQty - totalDeduction)
 
-          // Log stock movement
-          await supabase
-            .from('paper_stock_movements')
-            .insert({
+            updates[sizeField] = newQty
+
+            if (sizeField === 'stock_qty_a4') newA4 = newQty
+            if (sizeField === 'stock_qty_a3') newA3 = newQty
+            if (sizeField === 'stock_qty_a2') newA2 = newQty
+
+            movements.push({
               paper_id:   paper.paper_id,
               change_qty: -totalDeduction,
               reason:     'order_approved',
               order_id:   order.id,
-              notes:      `Order ${invoiceNumber} — ${sheetsUsed} sheet(s) + ${paper.wastage_pct}% wastage buffer`,
+              print_size: printSize,
+              notes:      `Order ${invoiceNumber} — ${sheets} sheet(s) + ${paper.wastage_pct}% wastage buffer`,
             })
+          }
+
+          // Derive new stock status from minimum qty across all sizes
+          const minQty = Math.min(newA4, newA3, newA2)
+          let newStatus = paper.stock_status
+          if (minQty === 0) newStatus = 'out_of_stock'
+          else if (minQty <= paper.stock_low_threshold) newStatus = 'low_stock'
+          else newStatus = 'in_stock'
+
+          await supabase
+            .from('papers')
+            .update({ ...updates, stock_status: newStatus, updated_at: new Date().toISOString() })
+            .eq('id', paper.id)
+
+          if (movements.length > 0) {
+            await supabase.from('paper_stock_movements').insert(movements)
+          }
         }
 
       } else {
@@ -169,30 +182,35 @@ export async function POST(req: NextRequest) {
 
         // Stock deduction for legacy order
         if (artwork?.paper_type) {
+          const sizeField = SHEETS_PER_SIZE[order.print_size]
           const { data: paper } = await supabase
             .from('papers')
-            .select('id, paper_id, stock_qty, stock_low_threshold, stock_status, wastage_pct')
+            .select('id, paper_id, stock_qty_a4, stock_qty_a3, stock_qty_a2, stock_low_threshold, stock_status, wastage_pct')
             .eq('name', artwork.paper_type)
             .single()
 
-          if (paper) {
-            const sheets            = SHEETS_PER_SIZE[order.print_size] || 1
+          if (paper && sizeField) {
             const wastageMultiplier = 1 + (paper.wastage_pct || 10) / 100
-            const totalDeduction    = Math.ceil(sheets * wastageMultiplier)
-            const newQty            = Math.max(0, paper.stock_qty - totalDeduction)
+            const totalDeduction    = Math.ceil(1 * wastageMultiplier)
+            const currentQty        = (paper as any)[sizeField] as number
+            const newQty            = Math.max(0, currentQty - totalDeduction)
 
+            let newA4 = paper.stock_qty_a4
+            let newA3 = paper.stock_qty_a3
+            let newA2 = paper.stock_qty_a2
+            if (sizeField === 'stock_qty_a4') newA4 = newQty
+            if (sizeField === 'stock_qty_a3') newA3 = newQty
+            if (sizeField === 'stock_qty_a2') newA2 = newQty
+
+            const minQty = Math.min(newA4, newA3, newA2)
             let newStatus = paper.stock_status
-            if (newQty === 0) newStatus = 'out_of_stock'
-            else if (newQty <= paper.stock_low_threshold) newStatus = 'low_stock'
+            if (minQty === 0) newStatus = 'out_of_stock'
+            else if (minQty <= paper.stock_low_threshold) newStatus = 'low_stock'
             else newStatus = 'in_stock'
 
             await supabase
               .from('papers')
-              .update({
-                stock_qty:    newQty,
-                stock_status: newStatus,
-                updated_at:   new Date().toISOString(),
-              })
+              .update({ [sizeField]: newQty, stock_status: newStatus, updated_at: new Date().toISOString() })
               .eq('id', paper.id)
 
             await supabase
@@ -202,7 +220,8 @@ export async function POST(req: NextRequest) {
                 change_qty: -totalDeduction,
                 reason:     'order_approved',
                 order_id:   order.id,
-                notes:      `Order ${invoiceNumber} — ${sheets} sheet(s) + ${paper.wastage_pct}% wastage buffer`,
+                print_size: order.print_size,
+                notes:      `Order ${invoiceNumber} — 1 sheet + ${paper.wastage_pct}% wastage buffer`,
               })
           }
         }
