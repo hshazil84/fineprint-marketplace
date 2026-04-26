@@ -1,7 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import { formatMVR, PRINTING_FEES, PAPER_OPTIONS, getPapersByCategory, getPaperAddOn, DEFAULT_PAPER } from '@/lib/pricing'
+import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
+import { usePapers } from '@/lib/usePapers'
 import toast from 'react-hot-toast'
 
 const PLATFORM_FEE = 5
@@ -28,8 +29,6 @@ async function validateHiRes(file: File, sizes: string[]): Promise<string | null
   })
 }
 
-// ── Small helper components ──────────────────────────────────────────────────
-
 function SectionLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div style={{ marginBottom: 8 }}>
@@ -43,9 +42,9 @@ function Divider() {
   return <div style={{ height: '0.5px', background: 'var(--color-border)', margin: '24px 0' }} />
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
-
 export function UploadTab({ profile, nextSeq, onSuccess }: any) {
+  const { papers, loading: papersLoading, getPapersByCategory, getPaperAddOn, getDefaultPaper } = usePapers()
+
   const [form, setForm] = useState({
     title:       '',
     description: '',
@@ -54,7 +53,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     paintingBy:  '',
   })
   const [selectedSizes, setSelectedSizes]   = useState<string[]>(['A4', 'A3'])
-  const [paperType, setPaperType]           = useState<string>(DEFAULT_PAPER)
+  const [paperType, setPaperType]           = useState<string>('')
   const [isLimited, setIsLimited]           = useState(false)
   const [editionSize, setEditionSize]       = useState<string>('50')
   const [hiresFile, setHiresFile]           = useState<File | null>(null)
@@ -65,12 +64,15 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [activeThumb, setActiveThumb]       = useState<number>(0)
   const [uploading, setUploading]           = useState(false)
 
+  // Set default paper once papers load
+  const effectivePaperType = paperType || getDefaultPaper()
+
   const nextSku        = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
   const price          = parseInt(form.price) || 0
   const platformFeeAmt = Math.round(price * PLATFORM_FEE / 100)
   const artistEarns    = price - platformFeeAmt
   const papersByCategory = getPapersByCategory()
-  const selectedPaper  = PAPER_OPTIONS.find(p => p.name === paperType)
+  const selectedPaper  = papers.find(p => p.name === effectivePaperType)
 
   function toggleSize(size: string) {
     setSelectedSizes(prev =>
@@ -159,7 +161,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         status:       'pending',
         category:     form.category,
         painting_by:  form.paintingBy || null,
-        paper_type:   paperType,
+        paper_type:   effectivePaperType,
         edition_size: isLimited ? parseInt(editionSize) : null,
         editions_sold: 0,
       }).select().single()
@@ -235,9 +237,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       {/* Preview images */}
       <SectionLabel hint="Shown to buyers — add your watermark before uploading.">Preview image</SectionLabel>
 
-      {/* Big image + 3 stacked thumbnails */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 6 }}>
-        {/* Big left */}
         <div
           onClick={() => !bigImage && document.getElementById('preview-input')?.click()}
           style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: bigImage ? 'default' : 'pointer' }}
@@ -245,7 +245,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
           {bigImage ? (
             <>
               <img src={bigImage} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-              {/* Main capsule + × */}
               {activeThumb === 0 && (
                 <>
                   <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 20, pointerEvents: 'none' }}>Main</div>
@@ -266,7 +265,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
           )}
         </div>
 
-        {/* 3 stacked right */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[0, 1, 2].map(i => {
             const thumb    = galleryThumbs[i]
@@ -358,61 +356,70 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         Paper type
       </SectionLabel>
 
-      {/* Default notice */}
       <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
           🖨 By default, all FinePrint Studio prints are produced on <strong>Hahnemühle museum-grade archival papers</strong> at no extra cost. If you have a specific preference for your artwork, select below.
         </p>
       </div>
 
-      {/* Paper selector — grouped */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
-        {Object.entries(papersByCategory).map(([category, papers]) => (
-          <div key={category}>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {papers.map(paper => {
-                const isSelected   = paperType === paper.name
-                const addOnA4      = paper.addOn['A4'] || 0
-                const addOnA3      = paper.addOn['A3'] || 0
-                const hasPremium   = addOnA4 > 0 || addOnA3 > 0
-                return (
-                  <div
-                    key={paper.name}
-                    onClick={() => setPaperType(paper.name)}
-                    style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '12px 14px',
-                      border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      background: isSelected ? 'var(--color-surface)' : 'transparent',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    {/* Radio */}
-                    <div style={{ width: 16, height: 16, borderRadius: '50%', border: isSelected ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0, marginTop: 2, transition: 'all 0.15s' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
-                        {!hasPremium && (
-                          <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>
-                        )}
-                        {hasPremium && (
-                          <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
-                            +{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3
-                          </span>
-                        )}
+      {papersLoading ? (
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 24 }}>Loading papers...</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 24 }}>
+          {Object.entries(papersByCategory).map(([category, categoryPapers]) => (
+            <div key={category}>
+              <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {categoryPapers.map(paper => {
+                  const isSelected = effectivePaperType === paper.name
+                  const addOnA4    = paper.addOn['A4'] || 0
+                  const addOnA3    = paper.addOn['A3'] || 0
+                  const hasPremium = addOnA4 > 0 || addOnA3 > 0
+                  const isOutOfStock = !paper.in_stock
+                  return (
+                    <div
+                      key={paper.name}
+                      onClick={() => !isOutOfStock && setPaperType(paper.name)}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 12,
+                        padding: '12px 14px',
+                        border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                        borderRadius: 10,
+                        cursor: isOutOfStock ? 'not-allowed' : 'pointer',
+                        background: isSelected ? 'var(--color-surface)' : 'transparent',
+                        opacity: isOutOfStock ? 0.45 : 1,
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <div style={{ width: 16, height: 16, borderRadius: '50%', border: isSelected ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0, marginTop: 2, transition: 'all 0.15s' }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
+                          {isOutOfStock && (
+                            <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Out of stock</span>
+                          )}
+                          {paper.stock_status === 'backorder' && (
+                            <span style={{ fontSize: 10, background: '#E6F1FB', color: '#185FA5', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Backorder</span>
+                          )}
+                          {!hasPremium && !isOutOfStock && (
+                            <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>
+                          )}
+                          {hasPremium && !isOutOfStock && (
+                            <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
+                              +{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3, lineHeight: 1.5 }}>{paper.description}</p>
                       </div>
-                      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3, lineHeight: 1.5 }}>{paper.description}</p>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Paper add-on notice */}
       {selectedPaper && (selectedPaper.addOn['A4'] > 0 || selectedPaper.addOn['A3'] > 0) && (
@@ -438,9 +445,9 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         <div style={{ background: 'var(--color-surface)', borderRadius: 10, padding: '14px 16px', marginBottom: 24 }}>
           <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: 10 }}>Price breakdown</p>
           {selectedSizes.map(size => {
-            const addOn    = getPaperAddOn(paperType, size)
-            const baseFee  = PRINTING_FEES[size] || 200
-            const total    = price + baseFee + addOn + 100
+            const addOn   = getPaperAddOn(effectivePaperType, size)
+            const baseFee = PRINTING_FEES[size] || 200
+            const total   = price + baseFee + addOn + 100
             return (
               <div key={size} style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
@@ -451,7 +458,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                 </div>
                 {addOn > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#633806', marginBottom: 2 }}>
-                    <span>{size} — Paper upgrade ({paperType})</span><span>+{formatMVR(addOn)}</span>
+                    <span>{size} — Paper upgrade ({effectivePaperType})</span><span>+{formatMVR(addOn)}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
@@ -478,24 +485,11 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             <p style={{ fontSize: 13, fontWeight: 500 }}>Limited edition</p>
             <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Cap how many prints can be sold. Creates scarcity and value.</p>
           </div>
-          {/* Toggle */}
           <div
             onClick={() => setIsLimited(v => !v)}
-            style={{
-              width: 44, height: 26, borderRadius: 13,
-              background: isLimited ? '#1a1a1a' : 'var(--color-border)',
-              cursor: 'pointer', position: 'relative',
-              transition: 'background 0.2s', flexShrink: 0,
-            }}
+            style={{ width: 44, height: 26, borderRadius: 13, background: isLimited ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
           >
-            <div style={{
-              position: 'absolute', top: 3,
-              left: isLimited ? 21 : 3,
-              width: 20, height: 20, borderRadius: '50%',
-              background: '#fff',
-              transition: 'left 0.2s',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-            }} />
+            <div style={{ position: 'absolute', top: 3, left: isLimited ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
           </div>
         </div>
 
@@ -506,15 +500,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
               How many prints total? Once this number of orders is approved, the artwork shows as sold out.
             </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <input
-                className="form-input"
-                type="number"
-                min="1"
-                max="999"
-                value={editionSize}
-                onChange={e => setEditionSize(e.target.value)}
-                style={{ maxWidth: 100 }}
-              />
+              <input className="form-input" type="number" min="1" max="999" value={editionSize} onChange={e => setEditionSize(e.target.value)} style={{ maxWidth: 100 }} />
               <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>prints</span>
             </div>
             <div style={{ marginTop: 12, padding: '10px 0 0', borderTop: '0.5px solid var(--color-border)' }}>
