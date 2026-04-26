@@ -25,7 +25,7 @@ export default function Footer() {
             </p>
             {/* Hahnemühle Certified Studio badge */}
             <Image
-              src="/images/hahnemuhle-certified.png"
+              src="/hahnemuhle-certified.png"
               alt="Hahnemühle Certified Studio — Gold"
               width={120}
               height={40}
@@ -55,7 +55,7 @@ export default function Footer() {
         {/* Bottom line */}
         <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
           <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-            © {new Date().getFullYear()} FinePrint Studio. All rights reserved. Registered business, Maldives.
+            © {new Date().getFullYear()} FinePrint Studio. All rights reserved. Maldives.
           </p>
           <p className="footer-hint" style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
             Hahnemühle certified · Prints fulfilled from Malé
