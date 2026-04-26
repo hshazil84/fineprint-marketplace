@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import { usePapers } from '@/lib/usePapers'
+import { PaperDetailModal } from './PaperDetailModal'
 import toast from 'react-hot-toast'
 
 const PLATFORM_FEE = 5
@@ -52,27 +53,26 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     category:    'Photography',
     paintingBy:  '',
   })
-  const [selectedSizes, setSelectedSizes]   = useState<string[]>(['A4', 'A3'])
-  const [paperType, setPaperType]           = useState<string>('')
-  const [isLimited, setIsLimited]           = useState(false)
-  const [editionSize, setEditionSize]       = useState<string>('50')
-  const [hiresFile, setHiresFile]           = useState<File | null>(null)
-  const [previewFile, setPreviewFile]       = useState<File | null>(null)
-  const [previewThumb, setPreviewThumb]     = useState<string | null>(null)
-  const [galleryFiles, setGalleryFiles]     = useState<(File | null)[]>([null, null, null])
-  const [galleryThumbs, setGalleryThumbs]   = useState<(string | null)[]>([null, null, null])
-  const [activeThumb, setActiveThumb]       = useState<number>(0)
-  const [uploading, setUploading]           = useState(false)
+  const [selectedSizes, setSelectedSizes] = useState<string[]>(['A4', 'A3'])
+  const [paperType, setPaperType]         = useState<string>('')
+  const [isLimited, setIsLimited]         = useState(false)
+  const [editionSize, setEditionSize]     = useState<string>('50')
+  const [hiresFile, setHiresFile]         = useState<File | null>(null)
+  const [previewFile, setPreviewFile]     = useState<File | null>(null)
+  const [previewThumb, setPreviewThumb]   = useState<string | null>(null)
+  const [galleryFiles, setGalleryFiles]   = useState<(File | null)[]>([null, null, null])
+  const [galleryThumbs, setGalleryThumbs] = useState<(string | null)[]>([null, null, null])
+  const [activeThumb, setActiveThumb]     = useState<number>(0)
+  const [uploading, setUploading]         = useState(false)
+  const [detailPaper, setDetailPaper]     = useState<any>(null)
 
-  // Set default paper once papers load
   const effectivePaperType = paperType || getDefaultPaper()
-
-  const nextSku        = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
-  const price          = parseInt(form.price) || 0
-  const platformFeeAmt = Math.round(price * PLATFORM_FEE / 100)
-  const artistEarns    = price - platformFeeAmt
-  const papersByCategory = getPapersByCategory()
-  const selectedPaper  = papers.find(p => p.name === effectivePaperType)
+  const nextSku            = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
+  const price              = parseInt(form.price) || 0
+  const platformFeeAmt     = Math.round(price * PLATFORM_FEE / 100)
+  const artistEarns        = price - platformFeeAmt
+  const papersByCategory   = getPapersByCategory()
+  const selectedPaper      = papers.find(p => p.name === effectivePaperType)
 
   function toggleSize(size: string) {
     setSelectedSizes(prev =>
@@ -103,7 +103,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   }
 
   function clearGallerySlot(index: number) {
-    const newFiles = [...galleryFiles]; newFiles[index] = null; setGalleryFiles(newFiles)
+    const newFiles  = [...galleryFiles];  newFiles[index]  = null; setGalleryFiles(newFiles)
     const newThumbs = [...galleryThumbs]; newThumbs[index] = null; setGalleryThumbs(newThumbs)
     if (activeThumb === index + 1) setActiveThumb(0)
   }
@@ -151,18 +151,18 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       toast.loading('Saving listing...', { id: 'upload' })
       const { data: artwork, error: dbError } = await supabase.from('artworks').insert({
         sku,
-        artist_id:    user.id,
-        title:        form.title,
-        description:  form.description,
+        artist_id:     user.id,
+        title:         form.title,
+        description:   form.description,
         price,
-        hires_path:   hiresPath,
-        preview_url:  urlData.publicUrl,
-        sizes:        selectedSizes,
-        status:       'pending',
-        category:     form.category,
-        painting_by:  form.paintingBy || null,
-        paper_type:   effectivePaperType,
-        edition_size: isLimited ? parseInt(editionSize) : null,
+        hires_path:    hiresPath,
+        preview_url:   urlData.publicUrl,
+        sizes:         selectedSizes,
+        status:        'pending',
+        category:      form.category,
+        painting_by:   form.paintingBy || null,
+        paper_type:    effectivePaperType,
+        edition_size:  isLimited ? parseInt(editionSize) : null,
         editions_sold: 0,
       }).select().single()
       if (dbError) throw dbError
@@ -203,7 +203,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         Upload your hi-res print file and a watermarked preview for buyers.
       </p>
 
-      {/* ── FILES ─────────────────────────────────────────────── */}
+      {/* ── HI-RES FILE ───────────────────────────────────────── */}
       <SectionLabel hint="Private — only used for printing. Never shown to buyers.">Hi-res print file</SectionLabel>
       <div style={{ marginBottom: 4 }}>
         <div
@@ -217,14 +217,18 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             </p>
             {hiresFile && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{(hiresFile.size / 1024 / 1024).toFixed(1)} MB</p>}
           </div>
-          {hiresFile ? (
-            <button onClick={e => { e.stopPropagation(); setHiresFile(null); (document.getElementById('hires-input') as HTMLInputElement).value = '' }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}>×</button>
-          ) : null}
+          {hiresFile && (
+            <button
+              onClick={e => { e.stopPropagation(); setHiresFile(null); (document.getElementById('hires-input') as HTMLInputElement).value = '' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 4px', lineHeight: 1 }}
+            >×</button>
+          )}
         </div>
         {hiresFile && (
-          <button onClick={() => document.getElementById('hires-input')?.click()}
-            style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}>
+          <button
+            onClick={() => document.getElementById('hires-input')?.click()}
+            style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
+          >
             Change file
           </button>
         )}
@@ -234,9 +238,8 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </p>
       <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
 
-      {/* Preview images */}
+      {/* ── PREVIEW IMAGES ────────────────────────────────────── */}
       <SectionLabel hint="Shown to buyers — add your watermark before uploading.">Preview image</SectionLabel>
-
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 6 }}>
         <div
           onClick={() => !bigImage && document.getElementById('preview-input')?.click()}
@@ -264,7 +267,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             </div>
           )}
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[0, 1, 2].map(i => {
             const thumb    = galleryThumbs[i]
@@ -355,7 +357,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <SectionLabel hint="All prints are produced on Hahnemühle archival papers. The standard paper is included — upgrade for a premium feel.">
         Paper type
       </SectionLabel>
-
       <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
           🖨 By default, all FinePrint Studio prints are produced on <strong>Hahnemühle museum-grade archival papers</strong> at no extra cost. If you have a specific preference for your artwork, select below.
@@ -370,11 +371,11 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             <div key={category}>
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {categoryPapers.map(paper => {
-                  const isSelected = effectivePaperType === paper.name
-                  const addOnA4    = paper.addOn['A4'] || 0
-                  const addOnA3    = paper.addOn['A3'] || 0
-                  const hasPremium = addOnA4 > 0 || addOnA3 > 0
+                {(categoryPapers as any[]).map(paper => {
+                  const isSelected   = effectivePaperType === paper.name
+                  const addOnA4      = paper.addOn['A4'] || 0
+                  const addOnA3      = paper.addOn['A3'] || 0
+                  const hasPremium   = addOnA4 > 0 || addOnA3 > 0
                   const isOutOfStock = !paper.in_stock
                   return (
                     <div
@@ -410,7 +411,12 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                             </span>
                           )}
                         </div>
-                        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 3, lineHeight: 1.5 }}>{paper.description}</p>
+                        <button
+                          onClick={e => { e.stopPropagation(); setDetailPaper(paper) }}
+                          style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', textDecoration: 'underline', display: 'block' }}
+                        >
+                          View details
+                        </button>
                       </div>
                     </div>
                   )
@@ -421,7 +427,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         </div>
       )}
 
-      {/* Paper add-on notice */}
       {selectedPaper && (selectedPaper.addOn['A4'] > 0 || selectedPaper.addOn['A3'] > 0) && (
         <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 14px', marginBottom: 24 }}>
           <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
@@ -492,7 +497,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             <div style={{ position: 'absolute', top: 3, left: isLimited ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
           </div>
         </div>
-
         {isLimited && (
           <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginTop: 10 }}>
             <label className="form-label" style={{ marginBottom: 6 }}>Edition size</label>
@@ -521,6 +525,14 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <button className="btn btn-primary btn-full" onClick={handleUpload} disabled={uploading}>
         {uploading ? 'Uploading...' : 'Submit for review'}
       </button>
+
+      {/* Paper detail modal */}
+      {detailPaper && (
+        <PaperDetailModal
+          paper={detailPaper}
+          onClose={() => setDetailPaper(null)}
+        />
+      )}
     </div>
   )
 }
