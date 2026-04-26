@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
-import { usePapers } from '@/lib/usePapers'
+import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
 import { PaperDetailModal } from './PaperDetailModal'
 import toast from 'react-hot-toast'
 
@@ -66,7 +66,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [uploading, setUploading]         = useState(false)
   const [detailPaper, setDetailPaper]     = useState<any>(null)
 
-  const effectivePaperType = paperType || getDefaultPaper()
+  const effectivePaperType = paperType || getDefaultPaper(form.category)
   const nextSku            = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
   const price              = parseInt(form.price) || 0
   const platformFeeAmt     = Math.round(price * PLATFORM_FEE / 100)
@@ -74,10 +74,19 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const papersByCategory   = getPapersByCategory()
   const selectedPaper      = papers.find(p => p.name === effectivePaperType)
 
+  // Get best_for key for current artwork category
+  const bestForKey = CATEGORY_TO_BEST_FOR[form.category]
+
   function toggleSize(size: string) {
     setSelectedSizes(prev =>
       prev.includes(size) ? prev.filter(s => s !== size) : [...prev, size]
     )
+  }
+
+  // When category changes, reset paper selection so default recalculates
+  function handleCategoryChange(category: string) {
+    setForm(f => ({ ...f, category }))
+    setPaperType('')
   }
 
   function handlePreviewSelect(file: File | null) {
@@ -313,7 +322,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </div>
       <div className="form-group">
         <label className="form-label">Category</label>
-        <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
+        <select className="form-input" value={form.category} onChange={e => handleCategoryChange(e.target.value)}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
@@ -377,6 +386,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                   const addOnA3      = paper.addOn['A3'] || 0
                   const hasPremium   = addOnA4 > 0 || addOnA3 > 0
                   const isOutOfStock = !paper.in_stock
+                  const isRecommended = bestForKey && paper.best_for?.includes(bestForKey)
                   return (
                     <div
                       key={paper.name}
@@ -396,6 +406,12 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
+                          {/* Recommended badge */}
+                          {isRecommended && !isOutOfStock && (
+                            <span style={{ fontSize: 10, background: '#185FA5', color: '#fff', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
+                              ✓ Recommended
+                            </span>
+                          )}
                           {isOutOfStock && (
                             <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Out of stock</span>
                           )}
