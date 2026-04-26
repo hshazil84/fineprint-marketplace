@@ -18,6 +18,28 @@ export interface PaperOption {
   barcode:             string | null
   images:              string[]
   datasheet_url:       string | null
+  best_for:            string[]
+}
+
+// Map artwork categories to best_for keys
+export const CATEGORY_TO_BEST_FOR: Record<string, string> = {
+  'Photography':       'photography',
+  'Digital Art':       'digital_art',
+  'Fine Art':          'fine_art',
+  'Abstract':          'fine_art',
+  'Watercolour':       'watercolour',
+  'Illustration':      'illustration',
+  'Mixed Media':       'fine_art',
+  'Charcoal & Sketch': 'charcoal',
+}
+
+export const BEST_FOR_LABELS: Record<string, string> = {
+  photography:  'Photography',
+  digital_art:  'Digital Art',
+  fine_art:     'Fine Art',
+  watercolour:  'Watercolour',
+  illustration: 'Illustration',
+  charcoal:     'Charcoal & Sketch',
 }
 
 export function usePapers() {
@@ -53,6 +75,7 @@ export function usePapers() {
           barcode:             p.barcode || null,
           images:              p.images || [],
           datasheet_url:       p.datasheet_url || null,
+          best_for:            p.best_for || [],
         }))
         setPapers(mapped)
         setLoading(false)
@@ -73,10 +96,35 @@ export function usePapers() {
     return paper.addOn[size] ?? 0
   }
 
-  function getDefaultPaper(): string {
-    const first = papers.find(p => p.stock_status === 'in_stock' && p.category === 'Standard')
-    return first?.name || ''
+  function getDefaultPaper(artworkCategory?: string): string {
+    if (artworkCategory && papers.length > 0) {
+      const bestForKey = CATEGORY_TO_BEST_FOR[artworkCategory]
+      if (bestForKey) {
+        const match = papers.find(p =>
+          p.in_stock &&
+          p.best_for.includes(bestForKey) &&
+          p.category === 'Standard'
+        )
+        if (match) return match.name
+      }
+    }
+    // fallback to first in-stock standard paper
+    const fallback = papers.find(p => p.in_stock && p.category === 'Standard')
+    return fallback?.name || ''
   }
 
-  return { papers, loading, getPapersByCategory, getPaperAddOn, getDefaultPaper }
+  function getRecommendedPaper(artworkCategory: string): PaperOption | null {
+    const bestForKey = CATEGORY_TO_BEST_FOR[artworkCategory]
+    if (!bestForKey) return null
+    return papers.find(p => p.in_stock && p.best_for.includes(bestForKey)) || null
+  }
+
+  return {
+    papers,
+    loading,
+    getPapersByCategory,
+    getPaperAddOn,
+    getDefaultPaper,
+    getRecommendedPaper,
+  }
 }
