@@ -1,24 +1,30 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { PaperOption } from '@/lib/usePapers'
 import { formatMVR } from '@/lib/pricing'
 import { BarcodeImage } from '@/app/admin/components/BarcodeImage'
 
 const STOCK_SIZE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  in_stock:     { label: '',            color: '#0F6E56', bg: '#E1F5EE' },
-  low_stock:    { label: '· Low stock', color: '#633806', bg: '#FAEEDA' },
-  backorder:    { label: '· Backorder', color: '#185FA5', bg: '#E6F1FB' },
-  out_of_stock: { label: '· Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
+  in_stock:     { label: '',               color: '#0F6E56', bg: '#E1F5EE' },
+  low_stock:    { label: ' · Low stock',   color: '#633806', bg: '#FAEEDA' },
+  backorder:    { label: ' · Backorder',   color: '#185FA5', bg: '#E6F1FB' },
+  out_of_stock: { label: ' · Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
 }
 
-interface Props {
-  paper: PaperOption & {
-    stock_qty_a4:    number
-    stock_qty_a3:    number
-    stock_qty_a2:    number
+interface PaperDetailProps {
+  paper: {
+    name:                string
+    category:            string
+    description:         string
+    addOn:               Record<string, number>
+    stock_status:        string
+    stock_qty_a4:        number
+    stock_qty_a3:        number
+    stock_qty_a2:        number
     stock_low_threshold: number
-    barcode:         string | null
-    weight_gsm:      number | null
+    weight_gsm:          number | null
+    barcode:             string | null
+    images:              string[]
+    datasheet_url:       string | null
   }
   onClose: () => void
 }
@@ -29,11 +35,7 @@ function getSizeStatus(qty: number, threshold: number): string {
   return 'in_stock'
 }
 
-export function PaperDetailModal({ paper, onClose }: Props) {
-  const [activeImage, setActiveImage] = (typeof window !== 'undefined')
-    ? [0, () => {}]
-    : [0, () => {}]
-
+export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
   const overlayRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -43,6 +45,9 @@ export function PaperDetailModal({ paper, onClose }: Props) {
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
+
+  const hasPremium = (paper.addOn['A4'] || 0) > 0 || (paper.addOn['A3'] || 0) > 0
+  const images     = paper.images || []
 
   const sizes = [
     { label: 'A4', qty: paper.stock_qty_a4 },
@@ -56,40 +61,32 @@ export function PaperDetailModal({ paper, onClose }: Props) {
     { label: 'A2', value: paper.addOn['A2'] || 0 },
   ]
 
-  const hasPremium = addOns.some(a => a.value > 0)
-  const images     = paper.images || []
-
   return (
     <div
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
       style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
     >
-      <div style={{ background: 'var(--color-background-primary)', borderRadius: 16, width: '100%', maxWidth: 420, maxHeight: '90vh', overflowY: 'auto', overflow: 'hidden' }}>
+      <div style={{ background: 'var(--color-background-primary)', borderRadius: 16, width: '100%', maxWidth: 420, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Image carousel */}
-        <div style={{ position: 'relative', height: 200, background: 'var(--color-background-secondary)', overflow: 'hidden' }}>
+        {/* Image */}
+        <div style={{ position: 'relative', height: 200, background: 'var(--color-background-secondary)', flexShrink: 0 }}>
           {images.length > 0 ? (
-            <>
-              <img
-                src={images[0]}
-                alt={paper.name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
-              {images.length > 1 && (
-                <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
-                  {images.map((_, i) => (
-                    <div
-                      key={i}
-                      style={{ width: 6, height: 6, borderRadius: '50%', background: i === 0 ? '#fff' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+            <img
+              src={images[0]}
+              alt={paper.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
           ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>
               No images yet
+            </div>
+          )}
+          {images.length > 1 && (
+            <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6 }}>
+              {images.map((_, i) => (
+                <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: i === 0 ? '#fff' : 'rgba(255,255,255,0.5)' }} />
+              ))}
             </div>
           )}
           <button
@@ -100,7 +97,8 @@ export function PaperDetailModal({ paper, onClose }: Props) {
           </button>
         </div>
 
-        <div style={{ padding: 16, overflowY: 'auto', maxHeight: 'calc(90vh - 200px)' }}>
+        {/* Content */}
+        <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
 
           {/* Header */}
           <div style={{ marginBottom: 14 }}>
@@ -109,7 +107,7 @@ export function PaperDetailModal({ paper, onClose }: Props) {
               <span style={{
                 fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500,
                 background: hasPremium ? '#2C2C2A' : '#D3D1C7',
-                color: hasPremium ? '#F1EFE8' : '#444441',
+                color:      hasPremium ? '#F1EFE8' : '#444441',
               }}>
                 {hasPremium ? 'Premium' : 'Standard'}
               </span>
@@ -159,10 +157,10 @@ export function PaperDetailModal({ paper, onClose }: Props) {
             </p>
             <div style={{ display: 'flex', gap: 8 }}>
               {addOns.map(({ label, value }) => (
-                <div key={label} style={{ flex: 1, textAlign: 'center', background: 'var(--color-background-secondary)', borderRadius: 8, padding: '8px' }}>
+                <div key={label} style={{ flex: 1, textAlign: 'center', background: 'var(--color-background-secondary)', borderRadius: 8, padding: 8 }}>
                   <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>{label}</p>
                   <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>
-                    {value > 0 ? '+' + formatMVR(value).replace('MVR ', '') : 'Free'}
+                    {value > 0 ? '+' + value : 'Free'}
                   </p>
                 </div>
               ))}
@@ -182,7 +180,7 @@ export function PaperDetailModal({ paper, onClose }: Props) {
 
           {/* Datasheet */}
           {paper.datasheet_url && (
-            
+            <a
               href={paper.datasheet_url}
               target="_blank"
               rel="noopener noreferrer"
