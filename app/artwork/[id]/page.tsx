@@ -10,7 +10,6 @@ import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 
-// ── Animated MVR ─────────────────────────────────────────────────────────
 function AnimatedMVR({ amount, size = 16 }: { amount: number; size?: number }) {
   const [animKey, setAnimKey] = useState(0)
   useEffect(() => { setAnimKey(k => k + 1) }, [amount])
@@ -39,16 +38,16 @@ export default function ArtworkPage() {
   const router   = useRouter()
   const { papers, getDefaultPaper, getPaperAddOn } = usePapers()
 
-  const [artwork, setArtwork]               = useState<any>(null)
-  const [artist, setArtist]                 = useState<any>(null)
-  const [related, setRelated]               = useState<any[]>([])
-  const [galleryImages, setGalleryImages]   = useState<any[]>([])
-  const [activeImage, setActiveImage]       = useState<string | null>(null)
-  const [selectedSize, setSelectedSize]     = useState('A4')
-  const [qty, setQty]                       = useState(1)
+  const [artwork, setArtwork]                 = useState<any>(null)
+  const [artist, setArtist]                   = useState<any>(null)
+  const [related, setRelated]                 = useState<any[]>([])
+  const [galleryImages, setGalleryImages]     = useState<any[]>([])
+  const [activeImage, setActiveImage]         = useState<string | null>(null)
+  const [selectedSize, setSelectedSize]       = useState('A4')
+  const [qty, setQty]                         = useState(1)
   const [showArtistModal, setShowArtistModal] = useState(false)
-  const [waitlistEmail, setWaitlistEmail]   = useState('')
-  const [waitlistDone, setWaitlistDone]     = useState(false)
+  const [waitlistEmail, setWaitlistEmail]     = useState('')
+  const [waitlistDone, setWaitlistDone]       = useState(false)
   const [waitlistLoading, setWaitlistLoading] = useState(false)
   const { add, has } = useCart()
   const supabase = createClient()
@@ -114,15 +113,15 @@ export default function ArtworkPage() {
     </div>
   )
 
-  const paperType     = artwork.paper_type || getDefaultPaper()
-  const paperOption   = papers.find(p => p.name === paperType)
-  const paperAddOn    = getPaperAddOn(paperType, selectedSize)
-  const isPremium     = paperOption ? (paperOption.addOn['A4'] > 0 || paperOption.addOn['A3'] > 0) : false
+  const paperType      = artwork.paper_type || getDefaultPaper(artwork.category)
+  const paperOption    = papers.find(p => p.name === paperType)
+  const paperAddOn     = getPaperAddOn(paperType, selectedSize)
+  const isPremium      = paperOption ? (paperOption.addOn['A4'] > 0 || paperOption.addOn['A3'] > 0) : false
   const availableSizes = artwork.sizes || SIZES
-  const prices        = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType)
-  const lineTotal     = prices.artworkLineItem * qty
-  const orderSKU      = buildOrderSKU(artwork.sku, selectedSize)
-  const alreadyInCart = has(artwork.id, selectedSize)
+  const prices         = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType)
+  const lineTotal      = prices.artworkLineItem * qty
+  const orderSKU       = buildOrderSKU(artwork.sku, selectedSize)
+  const alreadyInCart  = has(artwork.id, selectedSize)
 
   const editionSize  = artwork.edition_size
   const editionsSold = artwork.editions_sold || 0
@@ -179,42 +178,22 @@ export default function ArtworkPage() {
 
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
-
       <style>{`
         :root {
-          --digit-dur: 500ms;
-          --digit-distance: 8px;
-          --digit-stagger: 70ms;
-          --digit-blur: 2px;
-          --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
-          --digit-dir-x: 0;
-          --digit-dir-y: 1;
+          --digit-dur: 500ms; --digit-distance: 8px; --digit-stagger: 70ms;
+          --digit-blur: 2px; --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+          --digit-dir-x: 0; --digit-dir-y: 1;
         }
         @keyframes t-digit-pop-in {
-          0% {
-            transform: translate(
-              calc(var(--digit-distance) * var(--digit-dir-x)),
-              calc(var(--digit-distance) * var(--digit-dir-y))
-            );
-            opacity: 0;
-            filter: blur(var(--digit-blur));
-          }
-          100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+          0% { transform: translate(calc(var(--digit-distance)*var(--digit-dir-x)),calc(var(--digit-distance)*var(--digit-dir-y))); opacity:0; filter:blur(var(--digit-blur)); }
+          100% { transform:translate(0,0); opacity:1; filter:blur(0); }
         }
-        .t-digit-group { display: inline-flex; align-items: baseline; }
-        .t-digit { display: inline-block; will-change: transform, opacity, filter; }
-        .t-digit-group.is-animating .t-digit {
-          animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
-        }
-        .t-digit-group.is-animating .t-digit[data-stagger="1"] {
-          animation-delay: var(--digit-stagger);
-        }
-        .t-digit-group.is-animating .t-digit[data-stagger="2"] {
-          animation-delay: calc(var(--digit-stagger) * 2);
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .t-digit-group .t-digit { animation: none !important; }
-        }
+        .t-digit-group { display:inline-flex; align-items:baseline; }
+        .t-digit { display:inline-block; will-change:transform,opacity,filter; }
+        .t-digit-group.is-animating .t-digit { animation:t-digit-pop-in var(--digit-dur) var(--digit-ease) both; }
+        .t-digit-group.is-animating .t-digit[data-stagger="1"] { animation-delay:var(--digit-stagger); }
+        .t-digit-group.is-animating .t-digit[data-stagger="2"] { animation-delay:calc(var(--digit-stagger)*2); }
+        @media(prefers-reduced-motion:reduce){.t-digit-group .t-digit{animation:none!important;}}
       `}</style>
 
       <Header />
@@ -224,7 +203,7 @@ export default function ArtworkPage() {
         </Link>
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
 
-          {/* LEFT — image + gallery */}
+          {/* LEFT */}
           <div>
             <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative', marginBottom: galleryImages.length > 0 ? 10 : 0 }}>
               {activeImage ? (
@@ -233,35 +212,17 @@ export default function ArtworkPage() {
                 <div style={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-hint)', fontSize: 13 }}>No preview available</div>
               )}
               <div style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }} onContextMenu={e => e.preventDefault()} />
-
               <div style={{ position: 'absolute', top: 14, left: 14, display: 'flex', gap: 6, zIndex: 20, pointerEvents: 'none', flexWrap: 'wrap' }}>
-                {artwork.offer_pct ? (
-                  <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
-                    {artwork.offer_pct}% off
-                  </span>
-                ) : null}
-                {isSoldOut && (
-                  <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>Sold out</span>
-                )}
-                {isLowStock && !isSoldOut && (
-                  <span style={{ background: '#FAEEDA', color: '#633806', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
-                    Only {remaining} left
-                  </span>
-                )}
-                {isLimited && !isSoldOut && !isLowStock && (
-                  <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 11, fontWeight: 400, padding: '4px 10px', borderRadius: 20 }}>
-                    Limited edition
-                  </span>
-                )}
+                {artwork.offer_pct ? <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>{artwork.offer_pct}% off</span> : null}
+                {isSoldOut && <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>Sold out</span>}
+                {isLowStock && !isSoldOut && <span style={{ background: '#FAEEDA', color: '#633806', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>Only {remaining} left</span>}
+                {isLimited && !isSoldOut && !isLowStock && <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 11, fontWeight: 400, padding: '4px 10px', borderRadius: 20 }}>Limited edition</span>}
               </div>
             </div>
-
             {allThumbnails.length > 1 && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + allThumbnails.length + ', 1fr)', gap: 8 }}>
                 {allThumbnails.map((thumb, i) => (
-                  <div
-                    key={i}
-                    onClick={() => setActiveImage(thumb.url)}
+                  <div key={i} onClick={() => setActiveImage(thumb.url)}
                     style={{ aspectRatio: '4/3', borderRadius: 'var(--radius-md)', overflow: 'hidden', cursor: 'pointer', border: activeImage === thumb.url ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)', transition: 'border-color 0.15s', background: 'var(--color-surface)', position: 'relative' }}
                   >
                     <img src={thumb.url} alt={'View ' + (i + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
@@ -272,15 +233,10 @@ export default function ArtworkPage() {
             )}
           </div>
 
-          {/* RIGHT — details */}
+          {/* RIGHT */}
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>
-              {artwork.title}
-            </h1>
-            <button
-              onClick={() => setShowArtistModal(true)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, padding: 0, textDecoration: 'underline' }}
-            >
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>{artwork.title}</h1>
+            <button onClick={() => setShowArtistModal(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, padding: 0, textDecoration: 'underline' }}>
               by {artist?.display_name || artist?.full_name}
             </button>
 
@@ -305,23 +261,15 @@ export default function ArtworkPage() {
               </div>
             )}
 
-            <div style={{ marginBottom: 16 }}>
-              <span className="sku-tag">Artwork SKU: {artwork.sku}</span>
-            </div>
-            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.7, marginBottom: 20 }}>
-              {artwork.description}
-            </p>
+            <div style={{ marginBottom: 16 }}><span className="sku-tag">Artwork SKU: {artwork.sku}</span></div>
+            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.7, marginBottom: 20 }}>{artwork.description}</p>
             <div className="divider" />
 
             <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Select print size</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
               {availableSizes.map((size: string) => (
-                <button
-                  key={size}
-                  onClick={() => setSelectedSize(size)}
-                  className="btn"
-                  style={selectedSize === size ? { background: 'var(--color-text)', color: '#fff', borderColor: 'var(--color-text)' } : {}}
-                >
+                <button key={size} onClick={() => setSelectedSize(size)} className="btn"
+                  style={selectedSize === size ? { background: 'var(--color-text)', color: '#fff', borderColor: 'var(--color-text)' } : {}}>
                   {size}
                 </button>
               ))}
@@ -332,63 +280,46 @@ export default function ArtworkPage() {
               {artwork.offer_pct ? (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                    <span>Original artwork price</span>
-                    <span style={{ textDecoration: 'line-through' }}>{formatMVR(artwork.price)}</span>
+                    <span>Original artwork price</span><span style={{ textDecoration: 'line-through' }}>{formatMVR(artwork.price)}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-red)', marginBottom: 4 }}>
-                    <span>{artwork.offer_label} (-{artwork.offer_pct}%)</span>
-                    <span>- {formatMVR(prices.discountAmount)}</span>
+                    <span>{artwork.offer_label} (-{artwork.offer_pct}%)</span><span>- {formatMVR(prices.discountAmount)}</span>
                   </div>
                 </>
               ) : (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
-                  <span>Artwork price</span>
-                  <span>{formatMVR(artwork.price)}</span>
+                  <span>Artwork price</span><span>{formatMVR(artwork.price)}</span>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: paperAddOn > 0 ? 4 : 8 }}>
-                <span>{selectedSize} giclée printing</span>
-                <span>{formatMVR(prices.printingFee)}</span>
+                <span>{selectedSize} giclée printing</span><span>{formatMVR(prices.printingFee)}</span>
               </div>
               {paperAddOn > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#633806', marginBottom: 8 }}>
-                  <span>Paper upgrade · {paperType}</span>
-                  <span>+{formatMVR(paperAddOn)}</span>
+                  <span>Paper upgrade · {paperType}</span><span>+{formatMVR(paperAddOn)}</span>
                 </div>
               )}
-
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
-                <span style={{ fontSize: 16, fontWeight: 500 }}>
-                  {qty > 1 ? 'Print price ×' + qty : 'Print price'}
-                </span>
+                <span style={{ fontSize: 16, fontWeight: 500 }}>{qty > 1 ? 'Print price ×' + qty : 'Print price'}</span>
                 <AnimatedMVR amount={lineTotal} size={16} />
               </div>
               {qty > 1 && (
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, textAlign: 'right' }}>
-                  {formatMVR(prices.artworkLineItem)} each
-                </p>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, textAlign: 'right' }}>{formatMVR(prices.artworkLineItem)} each</p>
               )}
 
-              {/* Paper type line with tier badge */}
+              {/* Paper badge — clean, just name + tier */}
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11 }}>🖨</span>
                 <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>
                   Printed on <strong>Hahnemühle {paperType}</strong>
                 </span>
-                {/* Tier badge */}
-                <span style={{
-                  fontSize: 9,
-                  fontWeight: 500,
-                  padding: '1px 7px',
-                  borderRadius: 20,
-                  background: isPremium ? '#2C2C2A' : '#D3D1C7',
-                  color:      isPremium ? '#F1EFE8' : '#444441',
-                }}>
-                  {isPremium ? 'Premium' : 'Standard'}
-                </span>
-                {paperOption?.description && (
-                  <span style={{ fontSize: 11, color: 'var(--color-text-hint)', display: 'block', width: '100%', marginTop: 2 }}>
-                    {paperOption.description}
+                {paperOption && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 500, padding: '1px 7px', borderRadius: 20,
+                    background: isPremium ? '#2C2C2A' : '#D3D1C7',
+                    color:      isPremium ? '#F1EFE8' : '#444441',
+                  }}>
+                    {isPremium ? 'Premium' : 'Standard'}
                   </span>
                 )}
               </div>
@@ -398,9 +329,7 @@ export default function ArtworkPage() {
               </p>
             </div>
 
-            <span className="sku-tag" style={{ marginBottom: 20, display: 'inline-block', fontSize: 13 }}>
-              {orderSKU}
-            </span>
+            <span className="sku-tag" style={{ marginBottom: 20, display: 'inline-block', fontSize: 13 }}>{orderSKU}</span>
 
             {isSoldOut ? (
               <div style={{ marginTop: 16 }}>
@@ -420,19 +349,12 @@ export default function ArtworkPage() {
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      type="email"
-                      value={waitlistEmail}
-                      onChange={e => setWaitlistEmail(e.target.value)}
-                      placeholder="your@email.com"
+                    <input type="email" value={waitlistEmail} onChange={e => setWaitlistEmail(e.target.value)} placeholder="your@email.com"
                       onKeyDown={e => e.key === 'Enter' && joinWaitlist()}
                       style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '0.5px solid var(--color-border)', fontSize: 13, background: 'var(--color-surface)', color: 'var(--color-text)', outline: 'none' }}
                     />
-                    <button
-                      onClick={joinWaitlist}
-                      disabled={waitlistLoading}
-                      style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', flexShrink: 0, opacity: waitlistLoading ? 0.6 : 1 }}
-                    >
+                    <button onClick={joinWaitlist} disabled={waitlistLoading}
+                      style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', flexShrink: 0, opacity: waitlistLoading ? 0.6 : 1 }}>
                       {waitlistLoading ? '...' : 'Notify me'}
                     </button>
                   </div>
@@ -443,28 +365,15 @@ export default function ArtworkPage() {
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Quantity</span>
                   <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
-                    <button
-                      onClick={() => setQty(q => Math.max(1, q - 1))}
-                      disabled={qty <= 1}
-                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty <= 1 ? 'default' : 'pointer', fontSize: 18, color: qty <= 1 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty <= 1 ? 0.35 : 1 }}
-                    >−</button>
-                    <span style={{ minWidth: 36, textAlign: 'center', fontSize: 14, fontWeight: 500, borderLeft: '0.5px solid var(--color-border)', borderRight: '0.5px solid var(--color-border)', padding: '6px 0', lineHeight: '24px' }}>
-                      {qty}
-                    </span>
-                    <button
-                      onClick={() => setQty(q => Math.min(maxQty, q + 1))}
-                      disabled={qty >= maxQty}
-                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty >= maxQty ? 'default' : 'pointer', fontSize: 18, color: qty >= maxQty ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty >= maxQty ? 0.35 : 1 }}
-                    >+</button>
+                    <button onClick={() => setQty(q => Math.max(1, q - 1))} disabled={qty <= 1}
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty <= 1 ? 'default' : 'pointer', fontSize: 18, color: qty <= 1 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty <= 1 ? 0.35 : 1 }}>−</button>
+                    <span style={{ minWidth: 36, textAlign: 'center', fontSize: 14, fontWeight: 500, borderLeft: '0.5px solid var(--color-border)', borderRight: '0.5px solid var(--color-border)', padding: '6px 0', lineHeight: '24px' }}>{qty}</span>
+                    <button onClick={() => setQty(q => Math.min(maxQty, q + 1))} disabled={qty >= maxQty}
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty >= maxQty ? 'default' : 'pointer', fontSize: 18, color: qty >= maxQty ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty >= maxQty ? 0.35 : 1 }}>+</button>
                   </div>
                 </div>
-
-                <button
-                  className="btn btn-primary btn-full"
-                  onClick={alreadyInCart ? undefined : addToCart}
-                  style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}}
-                  disabled={alreadyInCart}
-                >
+                <button className="btn btn-primary btn-full" onClick={alreadyInCart ? undefined : addToCart}
+                  style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}} disabled={alreadyInCart}>
                   {alreadyInCart ? 'Added to cart ✓' : qty > 1 ? 'Add ' + qty + ' to cart' : 'Add to cart'}
                 </button>
                 <div style={{ display: 'flex', gap: 10 }}>
@@ -491,11 +400,10 @@ export default function ArtworkPage() {
                 <Link key={rel.id} href={'/artwork/' + rel.id} style={{ textDecoration: 'none' }}>
                   <div className="artwork-card">
                     <div style={{ background: 'var(--color-surface)' }}>
-                      {rel.preview_url ? (
-                        <img src={rel.preview_url} alt={rel.title} style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                      ) : (
-                        <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-text-hint)' }}>No preview</div>
-                      )}
+                      {rel.preview_url
+                        ? <img src={rel.preview_url} alt={rel.title} style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                        : <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-text-hint)' }}>No preview</div>
+                      }
                     </div>
                     <div style={{ padding: '10px 12px' }}>
                       <p style={{ fontSize: 13, fontWeight: 500 }}>{rel.title}</p>
@@ -522,8 +430,7 @@ export default function ArtworkPage() {
 function ArtistModal({ artist, onClose, artworks }: any) {
   const displayName = artist.display_name || artist.full_name
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '40px 16px', overflowY: 'auto' }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: 600, overflow: 'hidden', position: 'relative' }}>
@@ -544,11 +451,10 @@ function ArtistModal({ artist, onClose, artworks }: any) {
           {artworks.map((w: any) => (
             <Link key={w.id} href={'/artwork/' + w.id} onClick={onClose} style={{ textDecoration: 'none' }}>
               <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '0.5px solid var(--color-border)', cursor: 'pointer' }}>
-                {w.preview_url ? (
-                  <img src={w.preview_url} alt={w.title} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                ) : (
-                  <div style={{ height: 90, background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--color-text-hint)' }}>No preview</div>
-                )}
+                {w.preview_url
+                  ? <img src={w.preview_url} alt={w.title} style={{ width: '100%', height: 90, objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                  : <div style={{ height: 90, background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--color-text-hint)' }}>No preview</div>
+                }
                 <div style={{ padding: '8px 10px' }}>
                   <p style={{ fontSize: 12, fontWeight: 500 }}>{w.title}</p>
                   <span className="sku-tag" style={{ marginTop: 4, display: 'inline-block' }}>{w.sku}</span>
