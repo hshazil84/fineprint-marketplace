@@ -2,58 +2,166 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { BarcodeImage } from './BarcodeImage'
-import { Paper } from './PaperFormModal'
 import toast from 'react-hot-toast'
 
-const STOCK_STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  in_stock:     { label: 'In stock',     color: '#0F6E56', bg: '#E1F5EE' },
-  low_stock:    { label: 'Low stock',    color: '#633806', bg: '#FAEEDA' },
-  backorder:    { label: 'Backorder',    color: '#185FA5', bg: '#E6F1FB' },
-  out_of_stock: { label: 'Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
+export interface Paper {
+  id: number
+  paper_id: string
+  name: string
+  category: string
+  weight_gsm: number | null
+  description: string | null
+  barcode: string | null
+  add_on_a4: number
+  add_on_a3: number
+  add_on_a2: number
+  stock_status: string
+  stock_qty_a4: number
+  stock_qty_a3: number
+  stock_qty_a2: number
+  stock_low_threshold: number
+  wastage_pct: number
+  stock_note: string | null
+  sort_order: number
+  images: string[]
+  datasheet_url: string | null
 }
 
-interface RestockModalProps {
-  paper: Paper
+export const EMPTY_PAPER: Omit<Paper, 'id'> = {
+  paper_id:            '',
+  name:                '',
+  category:            'standard',
+  weight_gsm:          null,
+  description:         null,
+  barcode:             null,
+  add_on_a4:           0,
+  add_on_a3:           0,
+  add_on_a2:           0,
+  stock_status:        'in_stock',
+  stock_qty_a4:        0,
+  stock_qty_a3:        0,
+  stock_qty_a2:        0,
+  stock_low_threshold: 10,
+  wastage_pct:         10,
+  stock_note:          null,
+  sort_order:          0,
+  images:              [],
+  datasheet_url:       null,
+}
+
+function slugify(name: string) {
+  return name
+    .toLowerCase()
+    .replace(/[®™©]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+export const STOCK_STATUS_OPTIONS = [
+  { value: 'in_stock',     label: 'In stock',     color: '#0F6E56', bg: '#E1F5EE' },
+  { value: 'low_stock',    label: 'Low stock',    color: '#633806', bg: '#FAEEDA' },
+  { value: 'backorder',    label: 'Backorder',    color: '#185FA5', bg: '#E6F1FB' },
+  { value: 'out_of_stock', label: 'Out of stock', color: '#A32D2D', bg: '#FCEBEB' },
+]
+
+export function PaperFormModal({ paper, onClose, onSaved }: {
+  paper: Paper | null
   onClose: () => void
-  onRestocked: () => void
-}
-
-function RestockModal({ paper, onClose, onRestocked }: RestockModalProps) {
-  const [qty, setQty]       = useState(0)
-  const [notes, setNotes]   = useState('')
-  const [saving, setSaving] = useState(false)
+  onSaved: () => void
+}) {
+  const [form, setForm]           = useState<Omit<Paper, 'id'>>(paper ? { ...paper } : { ...EMPTY_PAPER })
+  const [saving, setSaving]       = useState(false)
+  const [uploading, setUploading] = useState(false)
   const supabase = createClient()
 
-  async function handleRestock() {
-    if (!qty || qty <= 0) { toast.error('Enter a valid quantity'); return }
+  function set(field: string, value: any) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  function handleNameChange(name: string) {
+    setForm(f => ({
+      ...f,
+      name,
+      paper_id: paper ? f.paper_id : slugify(name),
+    }))
+  }
+
+  async function uploadImage(file: File) {
+    if (!form.name) { toast.error('Enter a name first'); return }
+    setUploading(true)
+    try {
+      const ext  = file.name.split('.').pop()
+      const path = `${form.paper_id}/${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('papers').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('papers').getPublicUrl(path)
+      setForm(f => ({ ...f, images: [...(f.images || []), data.publicUrl] }))
+      toast.success('Image uploaded')
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function uploadDatasheet(file: File) {
+    if (!form.name) { toast.error('Enter a name first'); return }
+    setUploading(true)
+    try {
+      const path = `${form.paper_id}/datasheet.pdf`
+      const { error } = await supabase.storage.from('papers').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('papers').getPublicUrl(path)
+      setForm(f => ({ ...f, datasheet_url: data.publicUrl }))
+      toast.success('Datasheet uploaded')
+    } catch (err: any) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function removeImage(url: string) {
+    setForm(f => ({ ...f, images: f.images.filter(i => i !== url) }))
+  }
+
+  async function handleSave() {
+    if (!form.name) { toast.error('Name is required'); return }
     setSaving(true)
     try {
-      const newQty = paper.stock_qty + qty
+      const payload = {
+        paper_id:            form.paper_id,
+        name:                form.name,
+        category:            form.category,
+        weight_gsm:          form.weight_gsm,
+        description:         form.description,
+        barcode:             form.barcode,
+        add_on_a4:           form.add_on_a4 || 0,
+        add_on_a3:           form.add_on_a3 || 0,
+        add_on_a2:           form.add_on_a2 || 0,
+        stock_status:        form.stock_status,
+        stock_qty_a4:        form.stock_qty_a4 || 0,
+        stock_qty_a3:        form.stock_qty_a3 || 0,
+        stock_qty_a2:        form.stock_qty_a2 || 0,
+        stock_low_threshold: form.stock_low_threshold || 10,
+        wastage_pct:         form.wastage_pct || 10,
+        stock_note:          form.stock_note,
+        sort_order:          form.sort_order || 0,
+        images:              form.images || [],
+        datasheet_url:       form.datasheet_url,
+        updated_at:          new Date().toISOString(),
+      }
 
-      let newStatus = paper.stock_status
-      if (newQty > paper.stock_low_threshold) newStatus = 'in_stock'
-      else if (newQty > 0) newStatus = 'low_stock'
+      if (paper) {
+        const { error } = await supabase.from('papers').update(payload).eq('id', paper.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('papers').insert(payload)
+        if (error) throw error
+      }
 
-      await supabase
-        .from('papers')
-        .update({
-          stock_qty:    newQty,
-          stock_status: newStatus,
-          updated_at:   new Date().toISOString(),
-        })
-        .eq('id', paper.id)
-
-      await supabase
-        .from('paper_stock_movements')
-        .insert({
-          paper_id:   paper.paper_id,
-          change_qty: qty,
-          reason:     'restock',
-          notes:      notes || null,
-        })
-
-      toast.success(`Restocked ${qty} sheets — new total: ${newQty}`)
-      onRestocked()
+      toast.success(paper ? 'Paper updated' : 'Paper added')
+      onSaved()
       onClose()
     } catch (err: any) {
       toast.error(err.message)
@@ -62,260 +170,262 @@ function RestockModal({ paper, onClose, onRestocked }: RestockModalProps) {
     }
   }
 
+  const effectiveA4 = Math.floor(form.stock_qty_a4 * (1 - (form.wastage_pct || 0) / 100))
+  const effectiveA3 = Math.floor(form.stock_qty_a3 * (1 - (form.wastage_pct || 0) / 100))
+  const effectiveA2 = Math.floor(form.stock_qty_a2 * (1 - (form.wastage_pct || 0) / 100))
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: 'var(--color-background-primary)', borderRadius: 12, width: '100%', maxWidth: 380, padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Restock — {paper.name}</p>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: 'var(--color-background-primary)', borderRadius: 12, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{paper ? 'Edit paper' : 'Add paper'}</p>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
         </div>
 
-        <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13 }}>
-          <p style={{ margin: 0, color: 'var(--color-text-muted)' }}>
-            Current stock: <strong>{paper.stock_qty} sheets</strong>
-          </p>
-          <p style={{ margin: '4px 0 0', color: 'var(--color-text-muted)' }}>
-            Effective after {paper.wastage_pct}% wastage: <strong>{Math.floor(paper.stock_qty * (1 - paper.wastage_pct / 100))} sheets</strong>
-          </p>
-        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        <div className="form-group" style={{ marginBottom: 12 }}>
-          <label className="form-label">Sheets to add</label>
-          <input
-            className="form-input"
-            type="number"
-            min={1}
-            value={qty || ''}
-            onChange={e => setQty(parseInt(e.target.value) || 0)}
-            placeholder="e.g. 50"
-          />
-        </div>
-
-        <div className="form-group" style={{ marginBottom: 16 }}>
-          <label className="form-label">Notes (optional)</label>
-          <input
-            className="form-input"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder="e.g. Supplier delivery April 2026"
-          />
-        </div>
-
-        {qty > 0 && (
-          <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '8px 12px', marginBottom: 16, fontSize: 12, color: '#0F6E56' }}>
-            New total after restock: <strong>{paper.stock_qty + qty} sheets</strong>
-            {' '}(effective: {Math.floor((paper.stock_qty + qty) * (1 - paper.wastage_pct / 100))})
+          {/* Name + auto paper_id */}
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Name <span style={{ color: '#A32D2D' }}>*</span></label>
+              <input
+                className="form-input"
+                value={form.name}
+                onChange={e => handleNameChange(e.target.value)}
+                placeholder="e.g. Photo Rag® Baryta"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Paper ID (auto)</label>
+              <input
+                className="form-input"
+                value={form.paper_id}
+                disabled
+                style={{ opacity: 0.5, cursor: 'not-allowed' }}
+              />
+            </div>
           </div>
-        )}
 
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button onClick={onClose} className="btn btn-sm" style={{ flex: 1 }}>Cancel</button>
-          <button onClick={handleRestock} disabled={saving} className="btn btn-primary" style={{ flex: 2 }}>
-            {saving ? 'Saving...' : 'Confirm restock'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-interface StockHistoryModalProps {
-  paper: Paper
-  onClose: () => void
-}
-
-function StockHistoryModal({ paper, onClose }: StockHistoryModalProps) {
-  const [movements, setMovements] = useState<any[]>([])
-  const [loading, setLoading]     = useState(true)
-  const supabase = createClient()
-
-  useState(() => {
-    supabase
-      .from('paper_stock_movements')
-      .select('*')
-      .eq('paper_id', paper.paper_id)
-      .order('created_at', { ascending: false })
-      .limit(20)
-      .then(({ data }) => {
-        setMovements(data || [])
-        setLoading(false)
-      })
-  })
-
-  const reasonLabel: Record<string, string> = {
-    order_approved:    'Order deduction',
-    manual_adjustment: 'Manual adjustment',
-    restock:           'Restock',
-    wastage:           'Wastage write-off',
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: 'var(--color-background-primary)', borderRadius: 12, width: '100%', maxWidth: 480, maxHeight: '80vh', overflowY: 'auto', padding: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>Stock history — {paper.name}</p>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)' }}>✕</button>
-        </div>
-
-        {loading ? (
-          <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 24 }}>Loading...</p>
-        ) : movements.length === 0 ? (
-          <p style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 24 }}>No movements recorded yet.</p>
-        ) : (
-          <div style={{ border: '0.5px solid var(--color-border)', borderRadius: 8, overflow: 'hidden' }}>
-            {movements.map((m, i) => (
-              <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: i < movements.length - 1 ? '0.5px solid var(--color-border)' : 'none', gap: 12 }}>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{reasonLabel[m.reason] || m.reason}</p>
-                  {m.notes && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{m.notes}</p>}
-                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '2px 0 0' }}>
-                    {new Date(m.created_at).toLocaleDateString()} {new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <span style={{ fontSize: 14, fontWeight: 500, color: m.change_qty > 0 ? '#0F6E56' : '#A32D2D', flexShrink: 0 }}>
-                  {m.change_qty > 0 ? '+' : ''}{m.change_qty}
-                </span>
-              </div>
-            ))}
+          {/* Tier + Weight */}
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Tier</label>
+              <select className="form-input" value={form.category} onChange={e => set('category', e.target.value)}>
+                <option value="standard">Standard</option>
+                <option value="premium">Premium</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Weight (GSM)</label>
+              <input
+                className="form-input"
+                type="number"
+                value={form.weight_gsm || ''}
+                onChange={e => set('weight_gsm', parseInt(e.target.value) || null)}
+                placeholder="e.g. 315"
+              />
+            </div>
           </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
-export function PaperRow({ paper, onEdit, onDelete, onRefresh }: {
-  paper: Paper
-  onEdit: (paper: Paper) => void
-  onDelete: (paper: Paper) => void
-  onRefresh: () => void
-}) {
-  const [showRestock, setShowRestock] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
-  const [showBarcode, setShowBarcode] = useState(false)
-
-  const statusConfig = STOCK_STATUS_CONFIG[paper.stock_status] || STOCK_STATUS_CONFIG.in_stock
-  const effectiveQty = Math.floor(paper.stock_qty * (1 - (paper.wastage_pct || 10) / 100))
-  const isLow        = paper.stock_status === 'low_stock'
-  const isOut        = paper.stock_status === 'out_of_stock'
-
-  return (
-    <>
-      <div style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-
-          {/* Image */}
-          {paper.images?.[0] ? (
-            <img
-              src={paper.images[0]}
-              alt={paper.name}
-              style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, flexShrink: 0, border: '0.5px solid var(--color-border)' }}
+          {/* Description */}
+          <div className="form-group">
+            <label className="form-label">Description</label>
+            <textarea
+              className="form-input"
+              value={form.description || ''}
+              onChange={e => set('description', e.target.value)}
+              placeholder="Paper description..."
+              style={{ minHeight: 80 }}
             />
-          ) : (
-            <div style={{ width: 52, height: 52, borderRadius: 8, background: 'var(--color-background-secondary)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, border: '0.5px solid var(--color-border)' }}>
-              📄
-            </div>
-          )}
+          </div>
 
-          {/* Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-              <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{paper.name}</p>
-              <span style={{
-                fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500,
-                background: paper.category === 'premium' ? '#2C2C2A' : '#D3D1C7',
-                color: paper.category === 'premium' ? '#F1EFE8' : '#444441',
-              }}>
-                {paper.category === 'premium' ? 'Premium' : 'Standard'}
-              </span>
-              <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 20, fontWeight: 500, background: statusConfig.bg, color: statusConfig.color }}>
-                {statusConfig.label}
-              </span>
-              {paper.datasheet_url && (
-                <a href={paper.datasheet_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 10, color: '#0F6E56', textDecoration: 'none' }}>
-                  PDF
-                </a>
-              )}
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>
-              {paper.weight_gsm ? paper.weight_gsm + ' gsm · ' : ''}
-              {paper.paper_id}
-              {paper.barcode ? ' · ' + paper.barcode : ''}
-            </p>
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>
-                A4 +{paper.add_on_a4} · A3 +{paper.add_on_a3} · A2 +{paper.add_on_a2} MVR
-              </p>
-              <p style={{ fontSize: 11, margin: 0, color: isOut ? '#A32D2D' : isLow ? '#633806' : 'var(--color-text-muted)', fontWeight: isLow || isOut ? 500 : 400 }}>
-                {paper.stock_qty} sheets · {effectiveQty} effective
-              </p>
-              <button
-                onClick={() => setShowHistory(true)}
-                style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-              >
-                History
-              </button>
-              {paper.barcode && (
-                <button
-                  onClick={() => setShowBarcode(b => !b)}
-                  style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
-                >
-                  {showBarcode ? 'Hide barcode' : 'Show barcode'}
-                </button>
-              )}
-            </div>
-            {paper.stock_note && (
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '3px 0 0', fontStyle: 'italic' }}>{paper.stock_note}</p>
+          {/* Barcode */}
+          <div className="form-group">
+            <label className="form-label">Barcode (EAN)</label>
+            <input
+              className="form-input"
+              value={form.barcode || ''}
+              onChange={e => set('barcode', e.target.value)}
+              placeholder="e.g. 4012386141881"
+            />
+            {form.barcode && (
+              <div style={{ marginTop: 10 }}>
+                <BarcodeImage value={form.barcode} width={160} />
+              </div>
             )}
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <button
-              className="btn btn-sm"
-              style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', border: 'none' }}
-              onClick={() => setShowRestock(true)}
-            >
-              + Restock
-            </button>
-            <button
-              className="btn btn-sm"
-              style={{ fontSize: 11 }}
-              onClick={() => onEdit(paper)}
-            >
-              Edit
-            </button>
-            <button
-              className="btn btn-sm btn-danger"
-              style={{ fontSize: 11 }}
-              onClick={() => onDelete(paper)}
-            >
-              Delete
-            </button>
+          {/* Price addons */}
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Price add-ons (MVR)
+            </p>
+            <div className="grid-3">
+              {[['add_on_a4', 'A4'], ['add_on_a3', 'A3'], ['add_on_a2', 'A2']].map(([field, label]) => (
+                <div key={field} className="form-group">
+                  <label className="form-label">{label}</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={(form as any)[field] || 0}
+                    onChange={e => set(field, parseInt(e.target.value) || 0)}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
+
+          {/* Stock management */}
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Stock management
+            </p>
+
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label className="form-label">Stock status</label>
+              <select className="form-input" value={form.stock_status} onChange={e => set('stock_status', e.target.value)}>
+                {STOCK_STATUS_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+              Qty in stock per size (sheets):
+            </p>
+            <div className="grid-3" style={{ marginBottom: 10 }}>
+              {([
+                ['stock_qty_a4', 'A4', effectiveA4],
+                ['stock_qty_a3', 'A3', effectiveA3],
+                ['stock_qty_a2', 'A2', effectiveA2],
+              ] as [string, string, number][]).map(([field, label, effective]) => (
+                <div key={field} className="form-group">
+                  <label className="form-label">{label}</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    value={(form as any)[field] || 0}
+                    onChange={e => set(field, parseInt(e.target.value) || 0)}
+                  />
+                  <p style={{ fontSize: 10, color: 'var(--color-text-muted)', marginTop: 3 }}>
+                    Effective: {effective}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid-2" style={{ marginBottom: 10 }}>
+              <div className="form-group">
+                <label className="form-label">Low stock threshold (sheets)</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  value={form.stock_low_threshold || 10}
+                  onChange={e => set('stock_low_threshold', parseInt(e.target.value) || 10)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Wastage buffer (%)</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  value={form.wastage_pct || 10}
+                  onChange={e => set('wastage_pct', parseInt(e.target.value) || 10)}
+                />
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Stock note</label>
+              <input
+                className="form-input"
+                value={form.stock_note || ''}
+                onChange={e => set('stock_note', e.target.value)}
+                placeholder="e.g. Next restock expected May"
+              />
+            </div>
+          </div>
+
+          {/* Sort order */}
+          <div className="form-group">
+            <label className="form-label">Sort order</label>
+            <input
+              className="form-input"
+              type="number"
+              value={form.sort_order || 0}
+              onChange={e => set('sort_order', parseInt(e.target.value) || 0)}
+            />
+          </div>
+
+          {/* Images */}
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Images ({form.images?.length || 0}/3)
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              {(form.images || []).map((url, i) => (
+                <div key={i} style={{ position: 'relative' }}>
+                  <img src={url} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--color-border)' }} />
+                  <button
+                    onClick={() => removeImage(url)}
+                    style={{ position: 'absolute', top: -6, right: -6, background: '#A32D2D', color: '#fff', border: 'none', borderRadius: '50%', width: 18, height: 18, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >✕</button>
+                </div>
+              ))}
+              {(form.images?.length || 0) < 3 && (
+                <label style={{ width: 80, height: 80, border: '0.5px dashed var(--color-border)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: form.name ? 'pointer' : 'not-allowed', fontSize: 22, color: 'var(--color-text-muted)', opacity: form.name ? 1 : 0.4 }}>
+                  +
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => e.target.files?.[0] && uploadImage(e.target.files[0])}
+                    disabled={uploading || !form.name}
+                  />
+                </label>
+              )}
+            </div>
+            {!form.name && <p style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Enter a name first to enable image upload.</p>}
+          </div>
+
+          {/* Datasheet */}
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Datasheet (PDF)
+            </p>
+            {form.datasheet_url ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <a href={form.datasheet_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: '#0F6E56' }}>
+                  View datasheet
+                </a>
+                <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => set('datasheet_url', null)}>Remove</button>
+              </div>
+            ) : (
+              <label className="btn btn-sm" style={{ cursor: form.name ? 'pointer' : 'not-allowed', display: 'inline-block', opacity: form.name ? 1 : 0.4 }}>
+                Upload PDF
+                <input
+                  type="file"
+                  accept=".pdf"
+                  style={{ display: 'none' }}
+                  onChange={e => e.target.files?.[0] && uploadDatasheet(e.target.files[0])}
+                  disabled={uploading || !form.name}
+                />
+              </label>
+            )}
+          </div>
+
         </div>
 
-        {/* Barcode — shown on toggle */}
-        {showBarcode && paper.barcode && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '0.5px solid var(--color-border)' }}>
-            <BarcodeImage value={paper.barcode} width={160} />
-          </div>
-        )}
-      </div>
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+          <button onClick={onClose} className="btn btn-sm" style={{ flex: 1 }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving || uploading} className="btn btn-primary" style={{ flex: 2 }}>
+            {saving ? 'Saving...' : uploading ? 'Uploading...' : paper ? 'Save changes' : 'Add paper'}
+          </button>
+        </div>
 
-      {showRestock && (
-        <RestockModal
-          paper={paper}
-          onClose={() => setShowRestock(false)}
-          onRestocked={onRefresh}
-        />
-      )}
-      {showHistory && (
-        <StockHistoryModal
-          paper={paper}
-          onClose={() => setShowHistory(false)}
-        />
-      )}
-    </>
+      </div>
+    </div>
   )
 }
