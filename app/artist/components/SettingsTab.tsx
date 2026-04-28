@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { createClient } from '@/lib/supabase'
 import toast from 'react-hot-toast'
 import AccountStatusBanner from './AccountStatusBanner'
 
@@ -9,6 +10,7 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
   const [withdrawReason, setWithdrawReason]     = useState('')
   const [showWithdrawForm, setShowWithdrawForm] = useState(false)
   const [accountStatus, setAccountStatus]       = useState(profile?.account_status ?? 'active')
+  const supabase = createClient()
 
   const isShopClosed = profile?.shop_status === 'closed'
 
@@ -16,7 +18,15 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
     setShopClosing(true)
     try {
       const newStatus = isShopClosed ? 'open' : 'closed'
-      const res = await fetch('/api/notify/shop-status', {
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ shop_status: newStatus })
+        .eq('id', profile.id)
+
+      if (error) throw error
+
+      await fetch('/api/notify/shop-status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -25,7 +35,7 @@ export function SettingsTab({ profile, onProfileUpdate }: { profile: any, onProf
           status: newStatus,
         }),
       })
-      if (!res.ok) throw new Error('Failed to update shop status')
+
       onProfileUpdate({ shop_status: newStatus })
       toast.success(newStatus === 'closed'
         ? 'Shop closed — your artworks are hidden from the storefront'
