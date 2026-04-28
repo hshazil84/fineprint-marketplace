@@ -131,10 +131,10 @@ export default function ArtistDashboard() {
     return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
   }
 
-  const approvedOrders  = orders.filter(o => o.status === 'approved')
   const activeOrders    = orders.filter(o => o.status !== 'rejected')
   const rejectedOrders  = orders.filter(o => o.status === 'rejected')
-  const totalEarnings   = approvedOrders.reduce((s: number, o: any) => s + o.artist_earnings, 0)
+  const earnedOrders    = orders.filter(o => o.status !== 'rejected')
+  const totalEarnings   = earnedOrders.reduce((s: number, o: any) => s + (o.artist_earnings || 0), 0)
   const paidOut         = payouts.filter(p => p.status === 'paid').reduce((s: number, p: any) => s + p.amount, 0)
   const pendingEarnings = totalEarnings - paidOut
 
