@@ -2,12 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
-import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
+import { formatMVR } from '@/lib/pricing'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
-import { usePagination, PAGE_SIZES } from '@/lib/pagination'
-import { Pagination } from '@/app/components/Pagination'
-import { PaperDetailModal } from '@/app/artist/components/PaperDetailModal'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 import { InvoiceModal } from '@/app/artist/components/InvoiceModal'
@@ -21,12 +17,7 @@ import { SettingsTab } from '@/app/artist/components/SettingsTab'
 import { ArtistListingsTab } from '@/app/artist/components/ArtistListingsTab'
 import { ArtistOrdersTab } from '@/app/artist/components/ArtistOrdersTab'
 
-const PLATFORM_FEE = 5
 const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile', 'settings']
-
-function Divider() {
-  return <div style={{ height: '0.5px', background: 'var(--color-border)', margin: '20px 0' }} />
-}
 
 export default function ArtistDashboard() {
   const router = useRouter()
@@ -56,7 +47,11 @@ export default function ArtistDashboard() {
   }
 
   async function fetchArtworks(artistId: string) {
-    const { data } = await supabase.from('artworks').select('*').eq('artist_id', artistId).order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('artworks')
+      .select('*')
+      .eq('artist_id', artistId)
+      .order('created_at', { ascending: false })
     setArtworks(data || [])
   }
 
@@ -70,7 +65,11 @@ export default function ArtistDashboard() {
   }
 
   async function fetchPayouts(artistId: string) {
-    const { data } = await supabase.from('payouts').select('*').eq('artist_id', artistId).order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('payouts')
+      .select('*')
+      .eq('artist_id', artistId)
+      .order('created_at', { ascending: false })
     setPayouts(data || [])
   }
 
@@ -189,6 +188,7 @@ export default function ArtistDashboard() {
         {tab === 'listings' && (
           <ArtistListingsTab
             artworks={artworks}
+            profile={profile}
             editingArtwork={editingArtwork}
             deleteConfirmId={deleteConfirmId}
             setEditingArtwork={setEditingArtwork}
