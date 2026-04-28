@@ -5,7 +5,6 @@ import { sendReadyForPickupEmail, sendOutForDeliveryEmail } from '@/lib/invoice'
 export async function POST(req: NextRequest) {
   try {
     const { invoiceNumber, status, sendEmail } = await req.json()
-
     const supabase = createAdminClient()
 
     const { data: order, error } = await supabase
@@ -23,12 +22,12 @@ export async function POST(req: NextRequest) {
 
     if (sendEmail) {
       const emailData = {
-        buyerName:     order.buyer_name,
-        buyerEmail:    order.buyer_email,
-        invoiceNumber: order.invoice_number,
-        orderSku:      order.order_sku,
-        artworkTitle:  order.artworks.title,
-        printSize:     order.print_size,
+        buyerName:      order.buyer_name,
+        buyerEmail:     order.buyer_email,
+        invoiceNumber:  order.invoice_number,
+        orderSku:       order.order_sku,
+        artworkTitle:   order.artworks.title,
+        printSize:      order.print_size,
         deliveryMethod: order.delivery_method,
         deliveryIsland: order.delivery_island,
         deliveryAtoll:  order.delivery_atoll,
