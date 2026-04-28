@@ -118,10 +118,10 @@ function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip, 
 }
 
 export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
-  const [orders, setOrders]         = useState<any[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [orderSearch, setOrderSearch] = useState('')
-  const [orderStatus, setOrderStatus] = useState('all')
+  const [orders, setOrders]               = useState<any[]>([])
+  const [loading, setLoading]             = useState(true)
+  const [orderSearch, setOrderSearch]     = useState('')
+  const [orderStatus, setOrderStatus]     = useState('all')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [invoiceOrder, setInvoiceOrder]   = useState<any>(null)
   const supabase = createClient()
@@ -131,7 +131,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   async function fetchOrders() {
     const { data } = await supabase
       .from('orders')
-      .select('*, artworks(title, sku, artist_id, profiles:artist_id(full_name, display_name)), order_items(print_size, artwork_id)')
+      .select('*, artworks(title, sku, artist_id, paper_type, profiles:artist_id(full_name, display_name)), order_items(print_size, artwork_id, artworks(title, sku, paper_type, profiles:artist_id(full_name, display_name)))')
       .order('created_at', { ascending: false })
     setOrders(data || [])
     setLoading(false)
@@ -155,10 +155,11 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   async function handlePrintLabel(order: any) {
     try {
-      const { printLabel } = await import('@/lib/label')
+      const { printLabel, printItemLabel } = await import('@/lib/label')
+
       const items = order.order_items && order.order_items.length > 0
         ? order.order_items
-        : [{ print_size: order.print_size || 'A4' }]
+        : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
 
       const sizeCounts: Record<string, number> = {}
       items.forEach((item: any) => {
@@ -173,6 +174,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         ? 'Flat mailer + Tube'
         : hasLarge ? 'Tube' : 'Flat mailer'
 
+      // 1 — packing label
       printLabel({
         invoiceNumber:  order.invoice_number,
         orderSku:       order.order_sku,
@@ -185,8 +187,24 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         packaging,
         approvedAt:     order.approved_at || order.created_at,
       })
+
+      // N — print labels, one per item
+      items.forEach((item: any) => {
+        const artwork    = item.artworks || order.artworks
+        const artistName = artwork?.profiles?.display_name || artwork?.profiles?.full_name || ''
+        printItemLabel({
+          invoiceNumber: order.invoice_number,
+          artworkSku:    artwork?.sku    || order.order_sku,
+          artworkTitle:  artwork?.title  || 'Untitled',
+          artistName,
+          paperType:     artwork?.paper_type || order.paper_type || 'Standard',
+          printSize:     item.print_size     || order.print_size || 'A4',
+        })
+      })
+
+      toast.success('Labels generated — ' + (items.length + 1) + ' PDFs downloaded')
     } catch (err: any) {
-      toast.error('Could not generate label: ' + err.message)
+      toast.error('Could not generate labels: ' + err.message)
     }
   }
 
@@ -202,13 +220,10 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(filteredOrders, PAGE_SIZES.orders)
 
-  const pendingCount = orders.filter(o => o.status === 'pending').length
-
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading orders...</div>
 
   return (
     <div>
-      {/* Stats row */}
       <div className="grid-4" style={{ marginBottom: 24 }}>
         {[
           ['Pending',   orders.filter(o => o.status === 'pending').length],
@@ -223,7 +238,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         ))}
       </div>
 
-      {/* Search + filter */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <input
           className="form-input"
@@ -248,7 +262,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         )}
       </div>
 
-      {/* Orders list */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         {paginated.length === 0 ? (
           <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
