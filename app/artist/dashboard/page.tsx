@@ -18,6 +18,8 @@ import { ExportTab } from '@/app/artist/components/ExportTab'
 import { ProfileTab, AvatarDisplay } from '@/app/artist/components/ProfileTab'
 import { UploadTab } from '@/app/artist/components/UploadTab'
 import { SettingsTab } from '@/app/artist/components/SettingsTab'
+import { ArtistListingsTab } from '@/app/artist/components/ArtistListingsTab'
+import { ArtistOrdersTab } from '@/app/artist/components/ArtistOrdersTab'
 
 const PLATFORM_FEE = 5
 const TABS = ['listings', 'offers', 'upload', 'orders', 'payouts', 'export', 'profile', 'settings']
@@ -59,39 +61,12 @@ export default function ArtistDashboard() {
   }
 
   async function fetchOrders(artistId: string) {
-    const { data: itemRows } = await supabase
-      .from('order_items')
-      .select('*, orders(*), artworks(title, sku)')
-      .eq('artist_id', artistId)
+    const { data } = await supabase
+      .from('orders')
+      .select('*, artworks!inner(title, sku, artist_id)')
+      .eq('artworks.artist_id', artistId)
       .order('created_at', { ascending: false })
-
-    if (itemRows && itemRows.length > 0) {
-      const orderMap: Record<number, any> = {}
-      for (const item of itemRows) {
-        const orderId = item.order_id
-        if (!orderMap[orderId]) orderMap[orderId] = { ...item.orders, myItems: [], artist_earnings: 0 }
-        orderMap[orderId].myItems.push(item)
-        orderMap[orderId].artist_earnings += item.artist_earnings || 0
-      }
-      const merged = Object.values(orderMap)
-      const { data: legacyOrders } = await supabase
-        .from('orders')
-        .select('*, artworks!inner(title, sku, artist_id)')
-        .eq('artworks.artist_id', artistId)
-        .order('created_at', { ascending: false })
-      const legacyIds  = new Set(merged.map((o: any) => o.id))
-      const legacyOnly = (legacyOrders || []).filter((o: any) => !legacyIds.has(o.id))
-      setOrders([...merged, ...legacyOnly].sort((a: any, b: any) =>
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      ))
-    } else {
-      const { data } = await supabase
-        .from('orders')
-        .select('*, artworks!inner(title, sku, artist_id)')
-        .eq('artworks.artist_id', artistId)
-        .order('created_at', { ascending: false })
-      setOrders(data || [])
-    }
+    setOrders(data || [])
   }
 
   async function fetchPayouts(artistId: string) {
