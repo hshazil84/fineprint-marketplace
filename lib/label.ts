@@ -9,9 +9,18 @@ export interface LabelData {
   deliveryIsland: string
   deliveryAtoll:  string
   deliveryMethod: 'delivery' | 'pickup'
-  sizeCounts:     Record<string, number>  // e.g. { A4: 3, A3: 1 }
-  packaging:      string                  // e.g. 'Flat mailer' | 'Tube' | 'Flat mailer + Tube'
+  sizeCounts:     Record<string, number>
+  packaging:      string
   approvedAt:     string
+}
+
+export interface PrintItemLabelData {
+  invoiceNumber: string
+  artworkSku:    string
+  artworkTitle:  string
+  artistName:    string
+  paperType:     string
+  printSize:     string
 }
 
 function generateBarcode(text: string): string {
@@ -65,7 +74,6 @@ export function printLabel(data: LabelData) {
   const fw = doc.getTextWidth('fineprint')
   bold('studio', pad + fw, y + 10, 13)
 
-  // Rainbow bar
   const colors = ['#00adee', '#4fc3f7', '#fff100', '#f05a28', '#be1e2d']
   const barW   = 60
   colors.forEach((c, i) => {
@@ -73,7 +81,6 @@ export function printLabel(data: LabelData) {
     doc.rect(pad + (i * barW / colors.length), y + 14, barW / colors.length, 2, 'F')
   })
 
-  // Invoice + date top right
   const date = data.approvedAt
     ? new Date(data.approvedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -123,8 +130,7 @@ export function printLabel(data: LabelData) {
   label('ITEMS (' + totalItems + ')', pad, y)
   y += 9
 
-  // Size order: A4, A3, A2, 12x16
-  const sizeOrder = ['A4', 'A3', 'A2', '12x16']
+  const sizeOrder   = ['A4', 'A3', 'A2', '12x16']
   const sortedSizes = Object.entries(data.sizeCounts).sort((a, b) => {
     const ai = sizeOrder.indexOf(a[0])
     const bi = sizeOrder.indexOf(b[0])
@@ -159,7 +165,7 @@ export function printLabel(data: LabelData) {
 
   line(y); y += 12
 
-  // ── Barcode ───────────────────────────────────────────────────────────────
+  // ── Barcode (order SKU) ───────────────────────────────────────────────────
   try {
     const barcodeData  = data.orderSku.replace(/[^A-Za-z0-9\-]/g, '')
     const barcodeImage = generateBarcode(barcodeData)
@@ -185,4 +191,99 @@ export function printLabel(data: LabelData) {
   doc.text('hello@fineprintmv.com · fineprintmv.com · +960 999 8124', W / 2, y + 6, { align: 'center' })
 
   doc.save('FP-label-' + data.invoiceNumber + '.pdf')
+}
+
+export function printItemLabel(data: PrintItemLabelData) {
+  const doc = new jsPDF({ unit: 'pt', format: [288, 216], orientation: 'portrait' })
+  const W   = 288
+  const pad = 18
+  let   y   = pad
+
+  function line(yPos: number) {
+    doc.setDrawColor('#e0e0e0')
+    doc.setLineWidth(0.5)
+    doc.line(pad, yPos, W - pad, yPos)
+  }
+
+  function label(str: string, x: number, yPos: number) {
+    doc.setFontSize(6.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor('#888888')
+    doc.text(str, x, yPos)
+  }
+
+  function bold(str: string, x: number, yPos: number, size = 9) {
+    doc.setFontSize(size)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor('#1a1a1a')
+    doc.text(str, x, yPos)
+  }
+
+  function value(str: string, x: number, yPos: number, size = 9) {
+    doc.setFontSize(size)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor('#1a1a1a')
+    doc.text(str, x, yPos)
+  }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  bold('fineprint', pad, y + 10, 11)
+  const fw = doc.getTextWidth('fineprint')
+  bold('studio', pad + fw, y + 10, 11)
+
+  // PRINT badge top right
+  doc.setFillColor('#1a1a1a')
+  doc.roundedRect(W - pad - 36, y + 2, 36, 12, 2, 2, 'F')
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor('#ffffff')
+  doc.text('PRINT', W - pad - 18, y + 10, { align: 'center' })
+
+  y += 24
+  line(y); y += 10
+
+  // ── Artwork info ──────────────────────────────────────────────────────────
+  label('ARTWORK', pad, y)
+  y += 9
+  bold(data.artworkTitle, pad, y, 10)
+  y += 12
+  value('by ' + data.artistName, pad, y, 8)
+  y += 12
+
+  line(y); y += 10
+
+  // ── Print specs ───────────────────────────────────────────────────────────
+  const col2 = W / 2 + 4
+
+  label('SIZE', pad, y)
+  label('PAPER', col2, y)
+  y += 9
+  bold(data.printSize, pad, y, 11)
+  bold(data.paperType || 'Standard', col2, y, 9)
+  y += 14
+
+  line(y); y += 10
+
+  // ── Barcode (SKU-SIZE — unified with POS) ─────────────────────────────────
+  const barcodeData = (data.artworkSku + '-' + data.printSize).replace(/[^A-Za-z0-9\-]/g, '')
+
+  label('SKU · ' + data.invoiceNumber, pad, y)
+  y += 9
+
+  try {
+    const barcodeImage = generateBarcode(barcodeData)
+    const barcodeW     = W - pad * 2
+    const barcodeH     = 32
+    doc.addImage(barcodeImage, 'PNG', pad, y, barcodeW, barcodeH)
+    y += barcodeH + 6
+    doc.setFontSize(7)
+    doc.setFont('courier', 'normal')
+    doc.setTextColor('#555555')
+    doc.text(barcodeData, W / 2, y, { align: 'center' })
+  } catch (e) {
+    console.error('Barcode generation failed:', e)
+    bold(barcodeData, pad, y, 9)
+  }
+
+  doc.save('FP-print-' + barcodeData + '.pdf')
 }
