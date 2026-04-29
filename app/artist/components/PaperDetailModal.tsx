@@ -85,7 +85,6 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
     <>
       {/* Backdrop */}
       <div
-        ref={overlayRef}
         onClick={onClose}
         style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)' }}
       />
