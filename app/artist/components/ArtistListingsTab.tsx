@@ -18,36 +18,111 @@ function Divider() {
 // ── QR Modal ─────────────────────────────────────────────────────────────
 function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, onClose: () => void }) {
   const [downloading, setDownloading] = useState(false)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const cardRef   = useRef<HTMLDivElement>(null)
+  const [qrDataUrl, setQrDataUrl]     = useState<string | null>(null)
   const url = APP_URL + '/artwork/' + artwork.id
 
   useEffect(() => {
     async function renderQR() {
-      if (!canvasRef.current) return
       const QRCode = (await import('qrcode')).default
-      await QRCode.toCanvas(canvasRef.current, url, {
-        width: 200,
+      const dataUrl = await QRCode.toDataURL(url, {
+        width: 400,
         margin: 2,
         color: { dark: '#1a1a1a', light: '#ffffff' },
       })
+      setQrDataUrl(dataUrl)
     }
     renderQR()
   }, [url])
 
-  async function downloadPNG() {
-    if (!cardRef.current) return
+  async function downloadPDF() {
+    if (!qrDataUrl) return
     setDownloading(true)
     try {
-      const { toPng } = await import('html-to-image')
-      const dataUrl = await toPng(cardRef.current, {
-        pixelRatio: 3,
-        backgroundColor: '#ffffff',
-      })
-      const link = document.createElement('a')
-      link.download = 'fineprint-' + (artwork.sku || artwork.id) + '-qr.png'
-      link.href = dataUrl
-      link.click()
+      const { jsPDF } = await import('jspdf')
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a6' })
+      const W  = 105
+      const H  = 148
+      const cx = W / 2
+
+      // White background
+      doc.setFillColor(255, 255, 255)
+      doc.rect(0, 0, W, H, 'F')
+
+      // ── Title ─────────────────────────────────────────────
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(16)
+      doc.setTextColor(10, 10, 10)
+      const titleLines = doc.splitTextToSize(artwork.title || 'Untitled', 80)
+      const clampedLines = titleLines.slice(0, 2)
+      doc.text(clampedLines, cx, 20, { align: 'center', lineHeightFactor: 1.3 })
+      let y = 20 + clampedLines.length * 7
+
+      // ── Artist name ───────────────────────────────────────
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      doc.setTextColor(130, 130, 130)
+      doc.text(profile?.display_name || profile?.full_name || '', cx, y + 4, { align: 'center' })
+      y += 10
+
+      // ── SKU ───────────────────────────────────────────────
+      doc.setFont('courier', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(180, 178, 175)
+      doc.text(artwork.sku || '', cx, y + 2, { align: 'center' })
+      y += 7
+
+      // ── Hairline ──────────────────────────────────────────
+      doc.setDrawColor(225, 225, 225)
+      doc.setLineWidth(0.2)
+      doc.line(18, y + 2, W - 18, y + 2)
+      y += 8
+
+      // ── QR code ───────────────────────────────────────────
+      const qrSize = 56
+      doc.addImage(qrDataUrl, 'PNG', (W - qrSize) / 2, y, qrSize, qrSize)
+      y += qrSize + 6
+
+      // ── Hairline ──────────────────────────────────────────
+      doc.setDrawColor(225, 225, 225)
+      doc.line(18, y, W - 18, y)
+      y += 5
+
+      // ── Scan label ────────────────────────────────────────
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(6.5)
+      doc.setTextColor(185, 183, 180)
+      doc.text('scan to own this print', cx, y, { align: 'center' })
+      y += 6
+
+      // ── Logo ──────────────────────────────────────────────
+      try {
+        const logoImg = new Image()
+        logoImg.crossOrigin = 'anonymous'
+        await new Promise((res, rej) => {
+          logoImg.onload = res
+          logoImg.onerror = rej
+          logoImg.src = '/Asset 1fineprint_long.png'
+        })
+        const logoW = 28
+        const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
+        const canvas = document.createElement('canvas')
+        canvas.width  = logoImg.naturalWidth
+        canvas.height = logoImg.naturalHeight
+        canvas.getContext('2d')!.drawImage(logoImg, 0, 0)
+        doc.addImage(canvas.toDataURL('image/png'), 'PNG', (W - logoW) / 2, y, logoW, logoH)
+        y += logoH + 2
+      } catch {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(8)
+        doc.setTextColor(26, 26, 26)
+        doc.text('fineprintstudio', cx, y + 4, { align: 'center' })
+        y += 8
+      }
+
+      // Safety check — warn if overflowing
+      if (y > H) console.warn('QR card content exceeded A6 height:', y, '/', H)
+
+      doc.save('fineprint-' + (artwork.sku || artwork.id) + '-qr.pdf')
       toast.success('QR card downloaded!')
     } catch (err: any) {
       toast.error('Download failed: ' + err.message)
@@ -70,21 +145,24 @@ function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, on
 
         <div style={{ overflowY: 'auto', padding: 20 }}>
 
-          {/* Card — exported as PNG */}
-          <div ref={cardRef} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '0.5px solid #e8e8e8', maxWidth: 220, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-            <div style={{ padding: '24px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          {/* Modal preview */}
+          <div style={{ background: '#ffffff', borderRadius: 16, overflow: 'hidden', border: '0.5px solid #e8e8e8', maxWidth: 220, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+            <div style={{ padding: '20px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 16, fontWeight: 600, color: '#0a0a0a', margin: '0 0 4px', lineHeight: 1.3, fontFamily: 'DM Sans, sans-serif' }}>{artwork.title}</p>
-                <p style={{ fontSize: 11, color: '#888', margin: '0 0 2px', fontFamily: 'DM Sans, sans-serif' }}>{profile?.display_name || profile?.full_name}</p>
+                <p style={{ fontSize: 14, fontWeight: 600, color: '#0a0a0a', margin: '0 0 3px', lineHeight: 1.3 }}>{artwork.title}</p>
+                <p style={{ fontSize: 10, color: '#888', margin: '0 0 2px' }}>{profile?.display_name || profile?.full_name}</p>
                 <p style={{ fontSize: 9, color: '#bbb', fontFamily: 'monospace', margin: 0 }}>{artwork.sku}</p>
               </div>
               <div style={{ width: '100%', height: '0.5px', background: '#eee' }} />
               <div style={{ background: '#fff', borderRadius: 8, padding: 4, border: '0.5px solid #eee' }}>
-                <canvas ref={canvasRef} style={{ display: 'block', width: 130, height: 130 }} />
+                {qrDataUrl
+                  ? <img src={qrDataUrl} alt="QR" style={{ display: 'block', width: 120, height: 120 }} />
+                  : <div style={{ width: 120, height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ddd', fontSize: 11 }}>Loading…</div>
+                }
               </div>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 9, color: '#bbb', margin: '0 0 6px', fontFamily: 'DM Sans, sans-serif' }}>scan to own this print</p>
-                <img src="/Asset 1fineprint_long.png" alt="FinePrint Studio" style={{ height: 16, width: 'auto', opacity: 0.8 }} />
+                <p style={{ fontSize: 8, color: '#bbb', margin: '0 0 5px' }}>scan to own this print</p>
+                <img src="/Asset 1fineprint_long.png" alt="FinePrint Studio" style={{ height: 13, width: 'auto', opacity: 0.75 }} />
               </div>
             </div>
           </div>
@@ -93,56 +171,20 @@ function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, on
 
           <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '10px 14px', marginTop: 10 }}>
             <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
-              Print this card and place it next to your artwork in galleries, cafes, or hotels. Buyers scan to view and order your print.
+              Print this A6 card and place it next to your artwork in galleries, cafes, or hotels. Buyers scan to view and order your print.
             </p>
           </div>
 
           <button
-            onClick={downloadPNG}
-            disabled={downloading}
-            style={{ width: '100%', marginTop: 14, padding: '13px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.7 : 1 }}
+            onClick={downloadPDF}
+            disabled={downloading || !qrDataUrl}
+            style={{ width: '100%', marginTop: 14, padding: '13px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: (downloading || !qrDataUrl) ? 'not-allowed' : 'pointer', opacity: (downloading || !qrDataUrl) ? 0.7 : 1 }}
           >
-            {downloading ? 'Generating...' : 'Download PNG'}
+            {downloading ? 'Generating PDF...' : !qrDataUrl ? 'Loading QR...' : 'Download A6 PDF'}
           </button>
         </div>
       </div>
     </div>
-  )
-}
-
-// ── Edit Modal ────────────────────────────────────────────────────────────
-function EditModal({ artwork, onSave, onCancel }: { artwork: any; onSave: (updates: any) => void; onCancel: () => void }) {
-  return (
-    <>
-      <div onClick={onCancel} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300 }} />
-      <div style={{ position: 'fixed', zIndex: 301, background: 'var(--color-background-primary)', overflowY: 'auto', bottom: 0, left: 0, right: 0, borderRadius: '20px 20px 0 0', maxHeight: '92dvh' }} className="edit-modal-sheet">
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 20px 16px' }}>
-          <p style={{ fontSize: 15, fontWeight: 500 }}>Edit listing</p>
-          <button onClick={onCancel} style={{ background: 'var(--color-background-secondary)', border: 'none', borderRadius: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-primary)' }}>Cancel</button>
-        </div>
-        <div style={{ padding: '0 20px 40px' }}>
-          <EditArtworkForm artwork={artwork} onSave={onSave} onCancel={onCancel} />
-        </div>
-      </div>
-      <style>{`
-        @media (min-width: 640px) {
-          .edit-modal-sheet {
-            top: 50% !important;
-            left: 50% !important;
-            right: auto !important;
-            bottom: auto !important;
-            transform: translate(-50%, -50%);
-            width: 100%;
-            max-width: 560px;
-            border-radius: 16px !important;
-            max-height: 90vh !important;
-          }
-        }
-      `}</style>
-    </>
   )
 }
 
