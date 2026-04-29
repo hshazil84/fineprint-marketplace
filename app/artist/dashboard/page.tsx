@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
 import { downloadCSVFile, dateRangeFilename } from '@/lib/csvExport'
+import { getGreeting, getDailyQuote, getSpecialDay } from '@/lib/greetings'
 import toast from 'react-hot-toast'
 import Header from '@/app/components/Header'
 import { InvoiceModal } from '@/app/artist/components/InvoiceModal'
@@ -60,6 +61,7 @@ export default function ArtistDashboard() {
       .from('orders')
       .select('*, artworks!inner(title, sku, artist_id)')
       .eq('artworks.artist_id', artistId)
+      .neq('status', 'rejected')
       .order('created_at', { ascending: false })
     setOrders(data || [])
   }
@@ -105,12 +107,16 @@ export default function ArtistDashboard() {
     return <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
   }
 
+  const displayName     = profile?.display_name || profile?.full_name || 'Artist'
+  const specialDay      = getSpecialDay()
+  const { message: greetingMessage, emoji } = getGreeting(displayName)
+  const quote           = getDailyQuote(specialDay)
+
   const activeOrders    = orders.filter(o => o.status !== 'rejected')
   const rejectedOrders  = orders.filter(o => o.status === 'rejected')
-  const earnedOrders    = orders.filter(o => o.status !== 'rejected')
-  const totalEarnings   = earnedOrders.reduce((s: number, o: any) => s + (o.artist_earnings || 0), 0)
+  const totalEarnings   = orders.reduce((s: number, o: any) => s + (o.artist_earnings || 0), 0)
   const paidOut         = payouts.filter(p => p.status === 'paid').reduce((s: number, p: any) => s + p.amount, 0)
-  const pendingEarnings = totalEarnings - paidOut
+  const pendingEarnings = Math.max(0, totalEarnings - paidOut)
 
   return (
     <div style={{ backgroundColor: 'var(--color-background-primary)', minHeight: '100vh' }}>
@@ -118,9 +124,7 @@ export default function ArtistDashboard() {
         minimal={true}
         rightContent={
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>
-              {profile?.display_name || profile?.full_name}
-            </span>
+            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{displayName}</span>
             <button className="btn btn-sm" onClick={async () => { await supabase.auth.signOut(); router.push('/auth/login') }}>
               Log out
             </button>
@@ -130,11 +134,18 @@ export default function ArtistDashboard() {
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 4 }}>
-          <AvatarDisplay profile={profile} size={48} />
-          <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.5rem', marginBottom: 2 }}>Artist dashboard</h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+        {/* ── Greeting + quote ──────────────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
+          <AvatarDisplay profile={profile} size={52} />
+          <div style={{ flex: 1 }}>
+
+            {/* Greeting line */}
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', margin: '0 0 6px', lineHeight: 1.2 }}>
+              {greetingMessage} {emoji}
+            </h1>
+
+            {/* Artist code + shop status */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
               {profile?.shop_status === 'closed' ? (
                 <span style={{ fontSize: 11, background: '#FAEEDA', color: '#633806', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>Shop closed</span>
@@ -142,15 +153,41 @@ export default function ArtistDashboard() {
                 <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>Shop open</span>
               )}
             </div>
+
+            {/* Daily quote */}
+            <div style={{ borderLeft: '2.5px solid var(--color-border)', paddingLeft: 14 }}>
+              <p style={{
+                fontSize:   13,
+                color:      'var(--color-text-muted)',
+                lineHeight: 1.75,
+                margin:     '0 0 5px',
+                fontStyle:  'italic',
+                fontFamily: 'Georgia, "Times New Roman", serif',
+              }}>
+                &ldquo;{quote.text}&rdquo;
+              </p>
+              <p style={{
+                fontSize:      11,
+                color:         'var(--color-text-muted)',
+                margin:        0,
+                letterSpacing: '0.03em',
+                opacity:       0.75,
+              }}>
+                — {quote.author}
+              </p>
+            </div>
+
           </div>
         </div>
 
-        <div className="protection-banner" style={{ marginTop: 16 }}>
+        {/* ── Protection banner ─────────────────────────────────────────── */}
+        <div className="protection-banner" style={{ marginBottom: 20 }}>
           <span>🔒</span>
           <span>Your artwork is protected — buyers only see your watermarked preview. Hi-res files are stored privately for print fulfillment only.</span>
         </div>
 
-        <div className="grid-4" style={{ marginBottom: 24, marginTop: 20 }}>
+        {/* ── Stats ─────────────────────────────────────────────────────── */}
+        <div className="grid-4" style={{ marginBottom: 24 }}>
           {[
             ['Total listings',  artworks.length],
             ['Orders received', activeOrders.length],
@@ -166,12 +203,13 @@ export default function ArtistDashboard() {
               <p className="stat-label">{label}</p>
               <p className="stat-value">{value}</p>
               {label === 'Pending payout' && pendingEarnings > 0 && (
-                <p style={{ fontSize: 11, color: 'var(--color-teal)', marginTop: 4 }}>Tap to request</p>
+                <p style={{ fontSize: 11, color: 'var(--color-teal)', marginTop: 4 }}>Tap to request →</p>
               )}
             </div>
           ))}
         </div>
 
+        {/* ── Tabs ──────────────────────────────────────────────────────── */}
         <div className="tab-bar">
           {TABS.map(t => (
             <button key={t} className={'tab' + (tab === t ? ' active' : '')} onClick={() => setTab(t)}>
@@ -185,6 +223,7 @@ export default function ArtistDashboard() {
           ))}
         </div>
 
+        {/* ── Tab content ───────────────────────────────────────────────── */}
         {tab === 'listings' && (
           <ArtistListingsTab
             artworks={artworks}
@@ -224,6 +263,7 @@ export default function ArtistDashboard() {
         {tab === 'export'   && <ExportTab onExport={handleExport} orders={orders} />}
         {tab === 'profile'  && <ProfileTab profile={profile} onSave={(updated: any) => setProfile({ ...profile, ...updated })} />}
         {tab === 'settings' && <SettingsTab profile={profile} onProfileUpdate={(updates: any) => setProfile({ ...profile, ...updates })} />}
+
       </div>
 
       {selectedOrder  && <InvoiceModal order={selectedOrder} profile={profile} onClose={() => setSelectedOrder(null)} />}
