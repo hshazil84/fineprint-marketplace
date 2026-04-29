@@ -245,7 +245,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   async function moveOrder(order: any, newStatus: string) {
     if (order.status === newStatus) return
-    // Optimistic update immediately
     optimisticMove(order.id, newStatus)
 
     if (newStatus === 'approved' && order.status === 'pending') {
@@ -259,7 +258,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         toast.success('Order approved — invoice sent!')
       } else {
         toast.error(data.error)
-        fetchOrders() // revert on error
+        fetchOrders()
       }
     } else if (newStatus === 'rejected') {
       const res = await fetch('/api/orders/approve', {
@@ -292,7 +291,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   async function handlePrintLabel(order: any) {
     try {
-      const { printLabel, printItemLabel } = await import('@/lib/label')
+      const { printLabel } = await import('@/lib/label')
       const items = order.order_items && order.order_items.length > 0
         ? order.order_items
         : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
@@ -317,19 +316,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         packaging,
         approvedAt: order.approved_at || order.created_at,
       })
-      for (const item of items) {
-        const artwork    = item.artworks || order.artworks
-        const artistName = artwork?.profiles?.display_name || artwork?.profiles?.full_name || ''
-        await printItemLabel({
-          invoiceNumber: order.invoice_number,
-          artworkSku:    artwork?.sku    || order.order_sku,
-          artworkTitle:  artwork?.title  || 'Untitled',
-          artistName,
-          paperType:     artwork?.paper_type || order.paper_type || 'Standard',
-          printSize:     item.print_size     || order.print_size || 'A4',
-        })
-      }
-      toast.success('Labels generated — ' + (items.length + 1) + ' PDFs')
+      toast.success('Packing label downloaded!')
     } catch (err: any) {
       toast.error('Label error: ' + err.message)
     }
