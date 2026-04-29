@@ -55,7 +55,6 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose, images.length])
 
-  // Always show A4 + A3, show A2 only if has stock or add-on
   const offeredSizes = [
     { label: 'A4', qty: paper.stock_qty_a4 },
     { label: 'A3', qty: paper.stock_qty_a3 },
@@ -83,12 +82,36 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
   }
 
   return (
-    <div
-      ref={overlayRef}
-      onClick={e => { if (e.target === overlayRef.current) onClose() }}
-      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-    >
-      <div style={{ background: 'var(--color-background-primary)', borderRadius: 16, width: '100%', maxWidth: 420, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <>
+      {/* Backdrop */}
+      <div
+        ref={overlayRef}
+        onClick={onClose}
+        style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)' }}
+      />
+
+      {/* Sheet / Modal */}
+      <div
+        className="paper-detail-sheet"
+        style={{
+          position: 'fixed',
+          zIndex: 61,
+          background: 'var(--color-background-primary)',
+          display: 'flex',
+          flexDirection: 'column',
+          // Mobile: bottom sheet
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderRadius: '20px 20px 0 0',
+          maxHeight: '92dvh',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Drag handle — mobile only */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
+        </div>
 
         {/* Image carousel */}
         <div
@@ -145,7 +168,7 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
         </div>
 
         {/* Content */}
-        <div style={{ padding: 16, overflowY: 'auto', flex: 1 }}>
+        <div style={{ padding: '16px 20px 40px', overflowY: 'auto', flex: 1 }}>
 
           {/* Header */}
           <div style={{ marginBottom: 14 }}>
@@ -228,7 +251,7 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
 
           {/* Barcode */}
           {paper.barcode && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
                 <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>EAN</p>
                 <p style={{ fontSize: 13, fontFamily: 'var(--font-mono)', margin: 0 }}>{paper.barcode}</p>
@@ -239,7 +262,7 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
 
           {/* Datasheet */}
           {paper.datasheet_url && (
-            <a
+            
               href={paper.datasheet_url}
               target="_blank"
               rel="noopener noreferrer"
@@ -253,9 +276,24 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
               Download datasheet (PDF)
             </a>
           )}
-
         </div>
       </div>
-    </div>
+
+      <style>{`
+        @media (min-width: 640px) {
+          .paper-detail-sheet {
+            top: 50% !important;
+            left: 50% !important;
+            right: auto !important;
+            bottom: auto !important;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            max-width: 440px;
+            border-radius: 16px !important;
+            max-height: 90vh !important;
+          }
+        }
+      `}</style>
+    </>
   )
 }
