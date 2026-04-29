@@ -30,9 +30,10 @@ export function buildOrderSKU(artworkSKU: string, size: string): string {
 
 // ─── Price calculation ───────────────────────────────────────────────────────
 // Artist enters the amount they WANT TO RECEIVE.
-// We gross up to recover platform fee from buyer.
-// grossPrice = ceil(artistPrice / (1 - PLATFORM_FEE_PCT/100))
-// artistEarnings = artistPrice exactly
+// Platform fee (5%) is added ON TOP of artist price.
+// artistEarnings = artistPrice (exactly what they entered)
+// grossPrice     = artistPrice + 5% of artistPrice
+// buyer pays     = grossPrice + printingFee + paperAddOn + handlingFee
 
 export interface PriceBreakdown {
   artistPrice:     number
@@ -65,17 +66,17 @@ export function calculatePrices(
   deliveryMethod: 'delivery' | 'pickup' = 'delivery',
   printSize:      string = 'A4',
   paperType:      string = DEFAULT_PAPER,
-  paperAddOnAmt:  number = 0,   // pass from usePapers().getPaperAddOn()
+  paperAddOnAmt:  number = 0,
 ): PriceBreakdown {
-  // Gross up so artist receives exactly artistPrice after platform fee
-  const grossPrice     = Math.ceil(artistPrice / (1 - PLATFORM_FEE_PCT / 100))
-  const platformFeeAmt = grossPrice - artistPrice
+  // Platform fee added on top — artist receives exactly artistPrice
+  const platformFeeAmt = Math.round(artistPrice * PLATFORM_FEE_PCT / 100)
+  const grossPrice     = artistPrice + platformFeeAmt
   const artistEarnings = artistPrice
 
   // Apply offer discount on gross price
-  const discountAmount  = Math.round(grossPrice * offerPct / 100)
-  const discountedGross = grossPrice - discountAmount
-  const discountedEarnings = Math.round(discountedGross * (1 - PLATFORM_FEE_PCT / 100))
+  const discountAmount     = Math.round(grossPrice * offerPct / 100)
+  const discountedGross    = grossPrice - discountAmount
+  const discountedEarnings = Math.round(discountedGross * (100 - PLATFORM_FEE_PCT) / 100)
 
   const printingFee     = PRINTING_FEES[printSize] || PRINTING_FEES['A4']
   const totalPrintFee   = printingFee + paperAddOnAmt
@@ -110,24 +111,24 @@ export function calculatePrices(
 }
 
 export function getFromPrice(
-  artistPrice:   number,
-  sizes:         string[],
-  offerPct:      number = 0,
-  paperAddOnFn?: (size: string) => number,  // pass getPaperAddOn bound to paper name
+  artistPrice:    number,
+  sizes:          string[],
+  offerPct:       number = 0,
+  paperAddOnFn?:  (size: string) => number,
 ): number {
   if (!sizes || sizes.length === 0) sizes = ['A4']
-  const grossPrice      = Math.ceil(artistPrice / (1 - PLATFORM_FEE_PCT / 100))
+  const platformFeeAmt  = Math.round(artistPrice * PLATFORM_FEE_PCT / 100)
+  const grossPrice      = artistPrice + platformFeeAmt
   const discountedGross = grossPrice - Math.round(grossPrice * offerPct / 100)
   const lowestPrintFee  = Math.min(...sizes.map(s => {
-    const base   = PRINTING_FEES[s] || PRINTING_FEES['A4']
-    const addOn  = paperAddOnFn ? paperAddOnFn(s) : 0
+    const base  = PRINTING_FEES[s] || PRINTING_FEES['A4']
+    const addOn = paperAddOnFn ? paperAddOnFn(s) : 0
     return base + addOn
   }))
   return discountedGross + lowestPrintFee
 }
 
-// Legacy compat — kept so old callers don't break immediately
-// Remove once all callers updated to pass paperAddOnFn
+// Legacy compat — returns 0, callers should use usePapers().getPaperAddOn()
 export function getPaperAddOn(paperType: string, printSize: string): number {
   return 0
 }
