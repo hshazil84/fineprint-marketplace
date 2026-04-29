@@ -26,11 +26,9 @@ function AnimatedMVR({ amount, size = 15 }: { amount: number; size?: number }) {
   )
 }
 
-// ── Animated expand/collapse panel ───────────────────────────────────────
 function SlidePanel({ open, children }: { open: boolean; children: React.ReactNode }) {
-  const [mounted, setMounted]     = useState(open)
-  const [visible, setVisible]     = useState(open)
-
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(open)
   useEffect(() => {
     if (open) {
       setMounted(true)
@@ -41,16 +39,9 @@ function SlidePanel({ open, children }: { open: boolean; children: React.ReactNo
       return () => clearTimeout(t)
     }
   }, [open])
-
   if (!mounted) return null
-
   return (
-    <div style={{
-      overflow:   'hidden',
-      maxHeight:  visible ? 600 : 0,
-      opacity:    visible ? 1 : 0,
-      transition: 'max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease',
-    }}>
+    <div style={{ overflow: 'hidden', maxHeight: visible ? 600 : 0, opacity: visible ? 1 : 0, transition: 'max-height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease' }}>
       {children}
     </div>
   )
@@ -76,7 +67,7 @@ export default function CheckoutPage() {
 
   if (items.length === 0 && !submitted) return null
 
-  const itemPrices  = items.map(item =>
+  const itemPrices = items.map(item =>
     calculatePrices(item.artistPrice, item.offerPct || 0, item.offerLabel, deliveryMethod, item.printSize)
   )
   const subtotal    = itemPrices.reduce((s, p, i) => s + p.artworkLineItem * items[i].quantity, 0)
@@ -90,7 +81,7 @@ export default function CheckoutPage() {
     setSlipFile(file)
     if (file.type.startsWith('image/')) {
       const reader = new FileReader()
-      reader.onload = ev => setSlipPreview(ev.target?.result as string)
+      reader.onload = function(ev) { setSlipPreview(ev.target?.result as string) }
       reader.readAsDataURL(file)
     }
   }
@@ -109,46 +100,74 @@ export default function CheckoutPage() {
     if (!phoneRegex.test(form.phone)) { toast.error('Please enter a valid phone number'); return }
     if (deliveryMethod === 'delivery' && (!form.island || !form.atoll)) { toast.error('Please enter your island and atoll'); return }
     if (paymentMethod === 'bank_transfer' && !slipFile) { toast.error('Please upload your BML transfer slip'); return }
-
     setSubmitting(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const expandedItems = items.flatMap((item, i) => {
         const p = itemPrices[i]
         return Array.from({ length: item.quantity }, () => ({
-          artworkId: item.artworkId, artworkSku: item.artworkSku, artworkTitle: item.artworkTitle,
-          artistName: item.artistName, artistId: item.artistId, printSize: item.printSize,
-          originalPrice: item.artistPrice, offerLabel: item.offerLabel, offerPct: item.offerPct,
-          printingFee: p.printingFee, printPrice: p.artworkLineItem, fpCommission: p.platformFeeAmt,
-          artistEarnings: p.artistEarnings, discountAmount: p.discountAmount, quantity: item.quantity,
+          artworkId:      item.artworkId,
+          artworkSku:     item.artworkSku,
+          artworkTitle:   item.artworkTitle,
+          artistName:     item.artistName,
+          artistId:       item.artistId,
+          printSize:      item.printSize,
+          artistPrice:    item.artistPrice,      // what artist set — earned exactly
+          originalPrice:  item.artistPrice,
+          offerLabel:     item.offerLabel,
+          offerPct:       item.offerPct,
+          printingFee:    p.printingFee,
+          printPrice:     p.artworkLineItem,
+          fpCommission:   p.platformFeeAmt,
+          artistEarnings: item.artistPrice,      // always = artistPrice
+          discountAmount: p.discountAmount,
+          quantity:       item.quantity,
         }))
       })
       const res = await fetch('/api/orders', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: expandedItems, buyerId: user?.id || null, buyerName: form.name,
-          buyerEmail: form.email, buyerPhone: form.phone, deliveryMethod,
-          deliveryIsland: form.island, deliveryAtoll: form.atoll, deliveryNotes: form.notes,
-          handlingFee, totalPaid, newsletterOptIn, isGuest: !user, paymentMethod,
+          items:          expandedItems,
+          buyerId:        user?.id || null,
+          buyerName:      form.name,
+          buyerEmail:     form.email,
+          buyerPhone:     form.phone,
+          deliveryMethod,
+          deliveryIsland: form.island,
+          deliveryAtoll:  form.atoll,
+          deliveryNotes:  form.notes,
+          handlingFee,
+          totalPaid,
+          newsletterOptIn,
+          isGuest:        !user,
+          paymentMethod,
         }),
       })
       const orderData = await res.json()
       if (!orderData.success) throw new Error(orderData.error)
       if (paymentMethod === 'bank_transfer' && slipFile) {
         const formData = new FormData()
-        formData.append('slip', slipFile)
+        formData.append('slip',          slipFile)
         formData.append('invoiceNumber', orderData.invoiceNumber)
-        formData.append('orderSku', orderData.orderSku)
-        formData.append('buyerName', form.name)
-        formData.append('totalPaid', totalPaid.toString())
+        formData.append('orderSku',      orderData.orderSku)
+        formData.append('buyerName',     form.name)
+        formData.append('totalPaid',     totalPaid.toString())
         await fetch('/api/orders/slip', { method: 'POST', body: formData })
       }
       localStorage.setItem('fp_confirmed', JSON.stringify({
-        invoiceNumber: orderData.invoiceNumber, orderSku: orderData.orderSku,
-        deliveryMethod, totalPaid, paymentMethod, itemCount: totalItems,
+        invoiceNumber: orderData.invoiceNumber,
+        orderSku:      orderData.orderSku,
+        deliveryMethod,
+        totalPaid,
+        paymentMethod,
+        itemCount: totalItems,
         items: items.map((item, i) => ({
-          title: item.artworkTitle, artistName: item.artistName, printSize: item.printSize,
-          quantity: item.quantity, price: itemPrices[i].artworkLineItem * item.quantity,
+          title:      item.artworkTitle,
+          artistName: item.artistName,
+          printSize:  item.printSize,
+          quantity:   item.quantity,
+          price:      itemPrices[i].artworkLineItem * item.quantity,
           previewUrl: item.previewUrl,
         })),
       }))
@@ -163,14 +182,19 @@ export default function CheckoutPage() {
   }
 
   const optionStyle = (active: boolean) => ({
-    border:     active ? '1.5px solid rgba(0,0,0,0.7)' : '0.5px solid var(--color-border)',
-    borderRadius: 12, padding: 14, cursor: 'pointer', marginBottom: 10,
-    background:  active ? 'var(--color-surface)' : 'var(--color-bg)',
-    transition:  'border-color 0.2s, background 0.2s',
+    border:       active ? '1.5px solid rgba(0,0,0,0.7)' : '0.5px solid var(--color-border)',
+    borderRadius: 12,
+    padding:      14,
+    cursor:       'pointer',
+    marginBottom: 10,
+    background:   active ? 'var(--color-surface)' : 'var(--color-bg)',
+    transition:   'border-color 0.2s, background 0.2s',
   })
 
   const radioStyle = (active: boolean) => ({
-    width: 16, height: 16, borderRadius: '50%',
+    width:      16,
+    height:     16,
+    borderRadius: '50%',
     border:     active ? '5px solid rgba(0,0,0,0.7)' : '1.5px solid var(--color-border)',
     flexShrink: 0,
     transition: 'border 0.2s',
@@ -179,7 +203,6 @@ export default function CheckoutPage() {
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
       <style>{`
-        /* ── Digit pop-in ── */
         :root {
           --digit-dur: 500ms; --digit-distance: 8px; --digit-stagger: 70ms;
           --digit-blur: 2px; --digit-ease: cubic-bezier(0.34,1.45,0.64,1);
@@ -195,36 +218,25 @@ export default function CheckoutPage() {
         .t-digit-group.is-animating .t-digit[data-stagger="1"] { animation-delay:var(--digit-stagger); }
         .t-digit-group.is-animating .t-digit[data-stagger="2"] { animation-delay:calc(var(--digit-stagger)*2); }
         @media(prefers-reduced-motion:reduce){ .t-digit-group .t-digit { animation:none!important; } }
-
-        /* ── BML shine button ── */
         .fp-shine-btn::before {
           content:''; position:absolute; inset:0; border-radius:inherit;
           background:linear-gradient(45deg,transparent 25%,rgba(255,255,255,0.18) 50%,transparent 75%,transparent 100%);
           background-size:250% 250%,100% 100%; background-position:200% 0,0 0;
           background-repeat:no-repeat; transition:none; pointer-events:none;
         }
-        .fp-shine-btn:hover:not(:disabled)::before {
-          background-position:-100% 0,0 0; transition:background-position 1500ms ease;
-        }
+        .fp-shine-btn:hover:not(:disabled)::before { background-position:-100% 0,0 0; transition:background-position 1500ms ease; }
         .fp-shine-btn:active:not(:disabled) { transform:scale(0.99); }
-
-        /* ── Swipe colorful button ── */
         .fp-swipe-btn {
           --duration: 7s;
-          --c-color-1: rgba(172,160,255,.15);
-          --c-color-2: rgba(110,171,255,.15);
-          --c-color-3: rgba(92,134,255,.5);
-          --c-color-4: rgba(172,160,255,.15);
+          --c-color-1: rgba(172,160,255,.15); --c-color-2: rgba(110,171,255,.15);
+          --c-color-3: rgba(92,134,255,.5);   --c-color-4: rgba(172,160,255,.15);
           --c-shadow: rgba(109,88,255,.35);
-          --c-shadow-inset-top: rgba(172,160,255,.2);
-          --c-shadow-inset-bottom: rgba(172,160,255,.5);
-          --c-radial-inner: #6D58FF;
-          --c-radial-outer: #362A89;
+          --c-shadow-inset-top: rgba(172,160,255,.2); --c-shadow-inset-bottom: rgba(172,160,255,.5);
+          --c-radial-inner: #6D58FF; --c-radial-outer: #362A89;
           position: relative; cursor: pointer; border: none;
           display: block; width: 100%; border-radius: 12px;
           padding: 0; margin-top: 4px; font-family: inherit;
-          font-weight: 500; font-size: 14px; letter-spacing: .01em;
-          color: #fff;
+          font-weight: 500; font-size: 14px; letter-spacing: .01em; color: #fff;
           background: radial-gradient(circle, var(--c-radial-inner), var(--c-radial-outer) 80%);
           box-shadow: 0 0 24px var(--c-shadow);
           transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
@@ -232,8 +244,7 @@ export default function CheckoutPage() {
         .fp-swipe-btn:disabled { opacity: 0.6; cursor: default; pointer-events: none; }
         .fp-swipe-btn:active:not(:disabled) { transform: scale(0.99); }
         .fp-swipe-btn::before {
-          content: ''; pointer-events: none; position: absolute;
-          z-index: 3; inset: 0; border-radius: 12px;
+          content: ''; pointer-events: none; position: absolute; z-index: 3; inset: 0; border-radius: 12px;
           box-shadow: inset 0 4px 12px var(--c-shadow-inset-top), inset 0 -4px 6px var(--c-shadow-inset-bottom);
         }
         .fp-swipe-btn .sw-wrapper {
@@ -278,26 +289,11 @@ export default function CheckoutPage() {
         @keyframes sw-c11 { 33%{transform:translate(4px,4px) translateZ(0)}    66%{transform:translate(68px,20px) translateZ(0)} }
         @keyframes sw-c12 { 33%{transform:translate(56px,0px) translateZ(0)}   66%{transform:translate(60px,-32px) translateZ(0)} }
         @media(prefers-reduced-motion:reduce){ .fp-swipe-btn .sw-circle { animation:none!important; } }
-
-        /* ── Submit button crossfade ── */
         .fp-btn-wrap { position: relative; margin-top: 4px; }
-        .fp-btn-inner {
-          transition: opacity 0.25s ease, transform 0.25s ease;
-        }
-        .fp-btn-inner.exiting {
-          opacity: 0;
-          transform: translateY(-4px);
-          pointer-events: none;
-          position: absolute;
-          inset: 0;
-        }
-        .fp-btn-inner.entering {
-          animation: btn-fade-in 0.3s ease both;
-        }
-        @keyframes btn-fade-in {
-          0%   { opacity: 0; transform: translateY(6px); }
-          100% { opacity: 1; transform: translateY(0); }
-        }
+        .fp-btn-inner { transition: opacity 0.25s ease, transform 0.25s ease; }
+        .fp-btn-inner.exiting { opacity: 0; transform: translateY(-4px); pointer-events: none; position: absolute; inset: 0; }
+        .fp-btn-inner.entering { animation: btn-fade-in 0.3s ease both; }
+        @keyframes btn-fade-in { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       <Header />
@@ -306,7 +302,6 @@ export default function CheckoutPage() {
         <p style={{ color: 'var(--color-text-muted)', marginBottom: 32 }}>Choose your payment method and submit your order</p>
 
         <div className="grid-2" style={{ gap: 32, alignItems: 'start' }}>
-
           {/* LEFT COL */}
           <div>
             <div className="card" style={{ marginBottom: 16 }}>
@@ -349,7 +344,6 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* Delivery fields — slide in/out */}
               <SlidePanel open={deliveryMethod === 'delivery'}>
                 <div style={{ paddingTop: 4 }}>
                   <div className="form-group">
@@ -367,7 +361,6 @@ export default function CheckoutPage() {
                 </div>
               </SlidePanel>
 
-              {/* Pickup info — slide in/out */}
               <SlidePanel open={deliveryMethod === 'pickup'}>
                 <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px' }}>
                   <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>FinePrint Studio — Male</p>
@@ -394,13 +387,12 @@ export default function CheckoutPage() {
                   · {totalItems} item{totalItems !== 1 ? 's' : ''}
                 </span>
               </p>
-
               {items.map((item, i) => {
                 const p         = itemPrices[i]
                 const lineTotal = p.artworkLineItem * item.quantity
                 const sizeLabel = item.printSize + (SIZE_DIMENSIONS?.[item.printSize] ? ' (' + SIZE_DIMENSIONS[item.printSize] + ')' : '')
                 return (
-                  <div key={`${item.artworkId}-${item.printSize}`} style={{ display: 'flex', gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: i < items.length - 1 ? '0.5px solid var(--color-border)' : 'none' }}>
+                  <div key={item.artworkId + '-' + item.printSize} style={{ display: 'flex', gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: i < items.length - 1 ? '0.5px solid var(--color-border)' : 'none' }}>
                     {item.previewUrl && (
                       <img src={item.previewUrl} alt="" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, pointerEvents: 'none', flexShrink: 0 }} />
                     )}
@@ -431,17 +423,16 @@ export default function CheckoutPage() {
                   </div>
                 )
               })}
-
               <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 10, marginTop: 4 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
                   <span>Subtotal</span><span>{formatMVR(subtotal)}</span>
                 </div>
                 {deliveryMethod === 'delivery' ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4, transition: 'opacity 0.2s' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
                     <span>Handling and delivery</span><span>{formatMVR(100)}</span>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1D9E75', marginBottom: 4, transition: 'opacity 0.2s' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1D9E75', marginBottom: 4 }}>
                     <span>Pickup</span><span>Free</span>
                   </div>
                 )}
@@ -455,13 +446,11 @@ export default function CheckoutPage() {
             {/* Payment */}
             <div className="card">
               <p style={{ fontSize: 14, fontWeight: 500, marginBottom: 16 }}>Payment method</p>
-
               <div onClick={() => setPaymentMethod('bank_transfer')} style={optionStyle(paymentMethod === 'bank_transfer')}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={radioStyle(paymentMethod === 'bank_transfer')} />
                   <p style={{ fontSize: 13, fontWeight: 500 }}>Bank transfer — BML</p>
                 </div>
-                {/* BML details — slide in */}
                 <SlidePanel open={paymentMethod === 'bank_transfer'}>
                   <div style={{ paddingLeft: 24, paddingTop: 12 }}>
                     <div style={{ background: 'var(--color-bg)', border: '0.5px solid var(--color-border)', borderRadius: 8, padding: '12px 14px', marginBottom: 12 }}>
@@ -504,7 +493,6 @@ export default function CheckoutPage() {
                     <img src="/swipe-logo.svg" alt="Swipe" style={{ height: 35, width: 'auto', display: 'block' }} />
                   </div>
                 </div>
-                {/* Swipe details — slide in */}
                 <SlidePanel open={paymentMethod === 'swipe'}>
                   <div style={{ paddingLeft: 24, paddingTop: 12 }}>
                     <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '12px 14px' }}>
@@ -516,14 +504,13 @@ export default function CheckoutPage() {
                 </SlidePanel>
               </div>
 
-              {/* ── Submit button — fades between BML and Swipe ── */}
               <div className="fp-btn-wrap">
                 {paymentMethod === 'swipe' ? (
                   <div className="fp-btn-inner entering">
                     <button className="fp-swipe-btn" onClick={handleSubmit} disabled={submitting}>
                       <div className="sw-wrapper">
                         {[1,2,3,4,5,6,7,8,9,10,11,12].map(n => (
-                          <div key={n} className={`sw-circle c${n}`} />
+                          <div key={n} className={'sw-circle c' + n} />
                         ))}
                         <span className="sw-text">
                           {submitting ? 'Submitting...' : 'I have paid via Swipe — Submit order'}
@@ -537,22 +524,13 @@ export default function CheckoutPage() {
                       onClick={handleSubmit}
                       disabled={submitting}
                       className="fp-shine-btn"
-                      style={{
-                        width: '100%', padding: '13px 20px', borderRadius: 12,
-                        border: 'none', background: 'linear-gradient(to right, #1a1a1a, #2d2d2d)',
-                        color: '#fff', fontSize: 14, fontWeight: 500,
-                        cursor: submitting ? 'default' : 'pointer',
-                        opacity: submitting ? 0.6 : 1,
-                        position: 'relative', overflow: 'hidden',
-                        fontFamily: 'inherit', letterSpacing: '0.01em',
-                      }}
+                      style={{ width: '100%', padding: '13px 20px', borderRadius: 12, border: 'none', background: 'linear-gradient(to right, #1a1a1a, #2d2d2d)', color: '#fff', fontSize: 14, fontWeight: 500, cursor: submitting ? 'default' : 'pointer', opacity: submitting ? 0.6 : 1, position: 'relative', overflow: 'hidden', fontFamily: 'inherit', letterSpacing: '0.01em' }}
                     >
                       {submitting ? 'Submitting...' : 'Submit order'}
                     </button>
                   </div>
                 )}
               </div>
-
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12, textAlign: 'center', lineHeight: 1.6 }}>
                 By submitting you agree to our <a href="/terms" style={{ color: '#1D9E75' }}>Terms and Conditions</a>
               </p>
