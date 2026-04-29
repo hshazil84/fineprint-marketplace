@@ -15,10 +15,12 @@ export async function POST(req: NextRequest) {
 
     if (error || !order) throw error || new Error('Order not found')
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('orders')
       .update({ status })
       .eq('invoice_number', invoiceNumber)
+
+    if (updateError) throw updateError
 
     if (sendEmail) {
       const emailData = {
@@ -26,13 +28,12 @@ export async function POST(req: NextRequest) {
         buyerEmail:     order.buyer_email,
         invoiceNumber:  order.invoice_number,
         orderSku:       order.order_sku,
-        artworkTitle:   order.artworks.title,
+        artworkTitle:   order.artworks?.title,
         printSize:      order.print_size,
         deliveryMethod: order.delivery_method,
         deliveryIsland: order.delivery_island,
         deliveryAtoll:  order.delivery_atoll,
       }
-
       if (status === 'ready' && order.delivery_method === 'pickup') {
         await sendReadyForPickupEmail(emailData)
       } else if (status === 'ready' && order.delivery_method === 'delivery') {
