@@ -238,10 +238,9 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   }
 
   function optimisticMove(orderId: number, newStatus: string) {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
-    setTimeout(() => fetchOrders(), 1000)
-    onBadgeRefresh()
-  }
+  setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
+  onBadgeRefresh()
+}
 
   async function moveOrder(order: any, newStatus: string) {
     if (order.status === newStatus) return
@@ -256,6 +255,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       const data = await res.json()
       if (data.success) {
         toast.success('Order approved — invoice sent!')
+        fetchOrders()
       } else {
         toast.error(data.error)
         fetchOrders()
