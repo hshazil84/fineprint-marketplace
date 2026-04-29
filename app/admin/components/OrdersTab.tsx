@@ -7,10 +7,9 @@ import { InvoiceModal } from '@/app/admin/components/InvoiceModal'
 import toast from 'react-hot-toast'
 
 const COLUMNS = [
-  { key: 'pending',   label: 'Pending',   color: '#633806', bg: '#FAEEDA', border: '#EF9F27' },
-  { key: 'approved',  label: 'Approved',  color: '#185FA5', bg: '#E6F1FB', border: '#5B9FD4' },
-  { key: 'printing',  label: 'Printing',  color: '#5B3FA5', bg: '#EEE6FB', border: '#9B7FD4' },
-  { key: 'completed', label: 'Delivered', color: '#0F6E56', bg: '#E1F5EE', border: '#5DCAA5' },
+  { key: 'pending',  label: 'Pending',  color: '#633806', bg: '#FAEEDA', border: '#EF9F27' },
+  { key: 'approved', label: 'Approved', color: '#185FA5', bg: '#E6F1FB', border: '#5B9FD4' },
+  { key: 'printing', label: 'Printing', color: '#5B3FA5', bg: '#EEE6FB', border: '#9B7FD4' },
 ]
 
 const ALL_STATUSES = ['pending', 'approved', 'printing', 'ready', 'completed', 'rejected']
@@ -26,6 +25,8 @@ const NEXT_LABEL: Record<string, string> = {
   approved: 'Mark printing',
   printing: 'Mark delivered',
 }
+
+const ARCHIVE_STATUSES = ['completed', 'rejected', 'ready']
 
 function PaymentBadge({ method }: { method: string }) {
   if (method === 'swipe') return (
@@ -66,7 +67,7 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
     })
     const data = await res.json()
     if (data.success) {
-      toast.success(shouldNotify ? 'Moved — buyer notified!' : 'Status updated')
+      toast.success(shouldNotify ? 'Delivered — buyer notified!' : 'Status updated')
       onStatusChange(order.id, newStatus)
     } else {
       toast.error(data.error || 'Failed')
@@ -117,28 +118,22 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
       onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)')}
     >
       {col && <div style={{ height: 3, background: col.border }} />}
-
       <div style={{ padding: '10px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
           <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', margin: 0 }}>{order.invoice_number}</p>
           <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#1a1a1a', flexShrink: 0 }}>{formatMVR(order.total_paid)}</p>
         </div>
-
         <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artworkTitle}</p>
         <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>by {artistName}</p>
         <p style={{ fontSize: 12, fontWeight: 500, margin: '0 0 8px', color: '#1a1a1a' }}>{order.buyer_name}</p>
-
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           <PaymentBadge method={order.payment_method} />
           <DeliveryBadge method={order.delivery_method} island={order.delivery_island} />
-          {order.source === 'pos' && (
-            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#1a1a1a', color: '#fff' }}>POS</span>
-          )}
+          {order.source === 'pos' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#1a1a1a', color: '#fff' }}>POS</span>}
           <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#f0f0ec', color: '#888' }}>
             {new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
           </span>
         </div>
-
         <div style={{ display: 'flex', gap: 6 }}>
           {order.status === 'pending' ? (
             <>
@@ -181,7 +176,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
                 Notify
               </label>
             </div>
-
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {order.slip_url && (
                 <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={onViewSlip}>Slip</button>
@@ -193,7 +187,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
                 <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => onPrintLabel(order)}>Label</button>
               )}
             </div>
-
             {order.delivery_method === 'delivery' && order.delivery_island && (
               <div style={{ marginTop: 8, background: '#f8f8f6', borderRadius: 8, padding: '8px 10px' }}>
                 <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>Deliver to</p>
@@ -201,7 +194,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
                 {order.buyer_phone && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{order.buyer_phone}</p>}
               </div>
             )}
-
             {order.delivery_notes && (
               <div style={{ marginTop: 6, background: '#FAEEDA', borderRadius: 8, padding: '6px 10px' }}>
                 <p style={{ fontSize: 11, color: '#633806', margin: 0 }}>📝 {order.delivery_notes}</p>
@@ -218,10 +210,11 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   const [orders, setOrders]               = useState<any[]>([])
   const [loading, setLoading]             = useState(true)
   const [search, setSearch]               = useState('')
+  const [archiveSearch, setArchiveSearch] = useState('')
+  const [showArchive, setShowArchive]     = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [invoiceOrder, setInvoiceOrder]   = useState<any>(null)
   const [view, setView]                   = useState<'kanban' | 'list'>('kanban')
-  const [showRejected, setShowRejected]   = useState(false)
   const [dragging, setDragging]           = useState<any>(null)
   const [dragOver, setDragOver]           = useState<string | null>(null)
   const supabase = createClient()
@@ -238,82 +231,47 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   }
 
   function optimisticMove(orderId: number, newStatus: string) {
-  setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
-  onBadgeRefresh()
-}
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
+    onBadgeRefresh()
+    setTimeout(() => fetchOrders(), 1500)
+  }
 
   async function moveOrder(order: any, newStatus: string) {
     if (order.status === newStatus) return
     optimisticMove(order.id, newStatus)
-
     if (newStatus === 'approved' && order.status === 'pending') {
-      const res = await fetch('/api/orders/approve', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ invoiceNumber: order.invoice_number, action: 'approve' }),
-      })
+      const res  = await fetch('/api/orders/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNumber: order.invoice_number, action: 'approve' }) })
       const data = await res.json()
-      if (data.success) {
-        toast.success('Order approved — invoice sent!')
-        fetchOrders()
-      } else {
-        toast.error(data.error)
-        fetchOrders()
-      }
+      if (data.success) toast.success('Order approved — invoice sent!')
+      else { toast.error(data.error); fetchOrders() }
     } else if (newStatus === 'rejected') {
-      const res = await fetch('/api/orders/approve', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ invoiceNumber: order.invoice_number, action: 'reject' }),
-      })
+      const res  = await fetch('/api/orders/approve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNumber: order.invoice_number, action: 'reject' }) })
       const data = await res.json()
-      if (data.success) {
-        toast.success('Order rejected')
-      } else {
-        toast.error(data.error)
-        fetchOrders()
-      }
+      if (data.success) toast.success('Order rejected')
+      else { toast.error(data.error); fetchOrders() }
     } else {
-      const res = await fetch('/api/orders/status', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ invoiceNumber: order.invoice_number, status: newStatus, sendEmail: newStatus === 'delivered' }),
-      })
+      const res  = await fetch('/api/orders/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceNumber: order.invoice_number, status: newStatus, sendEmail: newStatus === 'completed' }) })
       const data = await res.json()
-      if (data.success) {
-        toast.success('Moved to ' + newStatus)
-      } else {
-        toast.error(data.error)
-        fetchOrders()
-      }
+      if (data.success) toast.success('Moved to ' + newStatus)
+      else { toast.error(data.error); fetchOrders() }
     }
   }
 
   async function handlePrintLabel(order: any) {
     try {
       const { printLabel } = await import('@/lib/label')
-      const items = order.order_items && order.order_items.length > 0
-        ? order.order_items
-        : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
+      const items = order.order_items?.length > 0 ? order.order_items : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
       const sizeCounts: Record<string, number> = {}
-      items.forEach((item: any) => {
-        const size = item.print_size || 'A4'
-        sizeCounts[size] = (sizeCounts[size] || 0) + 1
-      })
-      const sizes     = Object.keys(sizeCounts)
-      const hasLarge  = sizes.some(s => s === 'A2' || s === '12x16')
-      const hasSmall  = sizes.some(s => s === 'A4' || s === 'A3')
-      const packaging = hasLarge && hasSmall ? 'Flat mailer + Tube' : hasLarge ? 'Tube' : 'Flat mailer'
+      items.forEach((item: any) => { const s = item.print_size || 'A4'; sizeCounts[s] = (sizeCounts[s] || 0) + 1 })
+      const sizes = Object.keys(sizeCounts)
+      const hasLarge = sizes.some(s => s === 'A2' || s === '12x16')
+      const hasSmall = sizes.some(s => s === 'A4' || s === 'A3')
       await printLabel({
-        invoiceNumber:  order.invoice_number,
-        orderSku:       order.order_sku,
-        buyerName:      order.buyer_name,
-        buyerPhone:     order.buyer_phone    || '',
-        deliveryIsland: order.delivery_island || '',
-        deliveryAtoll:  order.delivery_atoll  || '',
-        deliveryMethod: order.delivery_method,
-        sizeCounts,
-        packaging,
+        invoiceNumber: order.invoice_number, orderSku: order.order_sku,
+        buyerName: order.buyer_name, buyerPhone: order.buyer_phone || '',
+        deliveryIsland: order.delivery_island || '', deliveryAtoll: order.delivery_atoll || '',
+        deliveryMethod: order.delivery_method, sizeCounts,
+        packaging: hasLarge && hasSmall ? 'Flat mailer + Tube' : hasLarge ? 'Tube' : 'Flat mailer',
         approvedAt: order.approved_at || order.created_at,
       })
       toast.success('Packing label downloaded!')
@@ -322,32 +280,40 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
     }
   }
 
-  const filtered     = orders.filter(o =>
+  // Split orders
+  const activeOrders  = orders.filter(o => !ARCHIVE_STATUSES.includes(o.status))
+  const archiveOrders = orders.filter(o => ARCHIVE_STATUSES.includes(o.status))
+
+  const filteredActive = activeOrders.filter(o =>
     !search ||
     o.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
     o.buyer_name?.toLowerCase().includes(search.toLowerCase()) ||
-    (o.artworks?.title || '').toLowerCase().includes(search.toLowerCase()) ||
-    o.order_sku?.toLowerCase().includes(search.toLowerCase())
+    (o.artworks?.title || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const rejected     = filtered.filter(o => o.status === 'rejected')
-  const mainFiltered = filtered.filter(o => o.status !== 'rejected')
+  const filteredArchive = archiveOrders.filter(o =>
+    !archiveSearch ||
+    o.invoice_number?.toLowerCase().includes(archiveSearch.toLowerCase()) ||
+    o.buyer_name?.toLowerCase().includes(archiveSearch.toLowerCase()) ||
+    (o.artworks?.title || '').toLowerCase().includes(archiveSearch.toLowerCase())
+  )
 
   const pending   = orders.filter(o => o.status === 'pending').length
   const approved  = orders.filter(o => o.status === 'approved').length
   const printing  = orders.filter(o => o.status === 'printing').length
-  const delivered = orders.filter(o => o.status === 'completed').length
+  const completed = orders.filter(o => o.status === 'completed').length
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading orders...</div>
 
   return (
     <div>
+      {/* Stats */}
       <div className="grid-4" style={{ marginBottom: 20 }}>
         {[
           ['Pending',   pending,   '#FAEEDA', '#633806'],
           ['Approved',  approved,  '#E6F1FB', '#185FA5'],
           ['Printing',  printing,  '#EEE6FB', '#5B3FA5'],
-          ['Delivered', delivered, '#E1F5EE', '#0F6E56'],
+          ['Completed', completed, '#E1F5EE', '#0F6E56'],
         ].map(([label, value, bg, color]) => (
           <div key={label as string} className="stat-card" style={{ background: (value as number) > 0 ? bg as string : undefined }}>
             <p className="stat-label" style={{ color: (value as number) > 0 ? color as string : undefined }}>{label as string}</p>
@@ -356,10 +322,11 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         ))}
       </div>
 
+      {/* Toolbar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
         <input
           className="form-input"
-          placeholder="Search invoice, buyer, artwork..."
+          placeholder="Search active orders..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ flex: 1, fontSize: 13 }}
@@ -371,72 +338,34 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         </div>
       </div>
 
+      {/* Kanban — 3 active columns */}
       {view === 'kanban' && (
-        <div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, width: '100%' }}>
-            {COLUMNS.map(col => {
-              const colOrders  = mainFiltered.filter(o => o.status === col.key)
-              const isDragOver = dragOver === col.key
-              return (
-                <div
-                  key={col.key}
-                  onDragOver={e => { e.preventDefault(); setDragOver(col.key) }}
-                  onDragLeave={() => setDragOver(null)}
-                  onDrop={e => {
-                    e.preventDefault()
-                    setDragOver(null)
-                    if (dragging) moveOrder(dragging, col.key)
-                    setDragging(null)
-                  }}
-                  style={{ background: isDragOver ? col.bg : 'transparent', borderRadius: 12, padding: isDragOver ? 4 : 0, transition: 'background 0.15s' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '7px 10px', background: col.bg, borderRadius: 10, border: '0.5px solid ' + col.border }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: col.color, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</p>
-                    <span style={{ fontSize: 11, fontWeight: 700, background: col.border, color: '#fff', borderRadius: 20, padding: '1px 8px', minWidth: 20, textAlign: 'center' }}>
-                      {colOrders.length}
-                    </span>
-                  </div>
-
-                  {isDragOver && (
-                    <div style={{ border: '2px dashed ' + col.border, borderRadius: 10, padding: 16, textAlign: 'center', marginBottom: 10, background: '#fff' }}>
-                      <p style={{ fontSize: 12, color: col.color, margin: 0, fontWeight: 500 }}>Drop → {col.label}</p>
-                    </div>
-                  )}
-
-                  {colOrders.length === 0 && !isDragOver ? (
-                    <div style={{ border: '1px dashed ' + col.border, borderRadius: 10, padding: '24px 12px', textAlign: 'center', opacity: 0.4 }}>
-                      <p style={{ fontSize: 11, color: col.color, margin: 0 }}>No orders</p>
-                    </div>
-                  ) : colOrders.map(order => (
-                    <KanbanCard
-                      key={order.id}
-                      order={order}
-                      onStatusChange={(orderId: number, newStatus: string) => optimisticMove(orderId, newStatus)}
-                      onViewInvoice={() => setInvoiceOrder(order)}
-                      onViewSlip={() => setSelectedOrder(order)}
-                      onPrintLabel={handlePrintLabel}
-                      onDragStart={(o: any) => setDragging(o)}
-                    />
-                  ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {COLUMNS.map(col => {
+            const colOrders  = filteredActive.filter(o => o.status === col.key)
+            const isDragOver = dragOver === col.key
+            return (
+              <div
+                key={col.key}
+                onDragOver={e => { e.preventDefault(); setDragOver(col.key) }}
+                onDragLeave={() => setDragOver(null)}
+                onDrop={e => { e.preventDefault(); setDragOver(null); if (dragging) moveOrder(dragging, col.key); setDragging(null) }}
+                style={{ background: isDragOver ? col.bg : 'transparent', borderRadius: 12, padding: isDragOver ? 4 : 0, transition: 'background 0.15s' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '7px 10px', background: col.bg, borderRadius: 10, border: '0.5px solid ' + col.border }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: col.color, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</p>
+                  <span style={{ fontSize: 11, fontWeight: 700, background: col.border, color: '#fff', borderRadius: 20, padding: '1px 8px', minWidth: 20, textAlign: 'center' }}>{colOrders.length}</span>
                 </div>
-              )
-            })}
-          </div>
-
-          <div style={{ marginTop: 20 }}>
-            <button
-              onClick={() => setShowRejected(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0', fontSize: 13, color: '#A32D2D', fontWeight: 500 }}
-            >
-              <span style={{ fontSize: 10 }}>{showRejected ? '▼' : '▶'}</span>
-              Rejected
-              <span style={{ fontSize: 11, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 600, border: '0.5px solid #F09595' }}>
-                {rejected.length}
-              </span>
-            </button>
-            {showRejected && rejected.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10, marginTop: 8 }}>
-                {rejected.map(order => (
+                {isDragOver && (
+                  <div style={{ border: '2px dashed ' + col.border, borderRadius: 10, padding: 16, textAlign: 'center', marginBottom: 10, background: '#fff' }}>
+                    <p style={{ fontSize: 12, color: col.color, margin: 0, fontWeight: 500 }}>Drop → {col.label}</p>
+                  </div>
+                )}
+                {colOrders.length === 0 && !isDragOver ? (
+                  <div style={{ border: '1px dashed ' + col.border, borderRadius: 10, padding: '24px 12px', textAlign: 'center', opacity: 0.4 }}>
+                    <p style={{ fontSize: 11, color: col.color, margin: 0 }}>No orders</p>
+                  </div>
+                ) : colOrders.map(order => (
                   <KanbanCard
                     key={order.id}
                     order={order}
@@ -448,26 +377,23 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                   />
                 ))}
               </div>
-            )}
-            {showRejected && rejected.length === 0 && (
-              <p style={{ fontSize: 13, color: 'var(--color-text-muted)', padding: '12px 0' }}>No rejected orders.</p>
-            )}
-          </div>
+            )
+          })}
         </div>
       )}
 
+      {/* List view — active orders */}
       {view === 'list' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {filtered.length === 0 ? (
-            <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No orders found.</p>
-          ) : filtered.map((o: any) => (
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 16 }}>
+          {filteredActive.length === 0 ? (
+            <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No active orders.</p>
+          ) : filteredActive.map((o: any) => (
             <div key={o.id} style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3, flexWrap: 'wrap' }}>
                   <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{o.invoice_number}</p>
                   <span className={'badge badge-' + o.status}>{o.status}</span>
                   <PaymentBadge method={o.payment_method} />
-                  {o.source === 'pos' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#1a1a1a', color: '#fff' }}>POS</span>}
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
                   {o.artworks?.title || o.order_sku} · {o.buyer_name} · {new Date(o.created_at).toLocaleDateString()}
@@ -476,21 +402,70 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
                 <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>{formatMVR(o.total_paid)}</p>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  {o.slip_url && (
-                    <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={() => setSelectedOrder(o)}>Slip</button>
-                  )}
-                  {o.status !== 'pending' && o.status !== 'rejected' && (
-                    <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => setInvoiceOrder(o)}>Invoice</button>
-                  )}
-                  {(o.status === 'approved' || o.status === 'printing') && (
-                    <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => handlePrintLabel(o)}>Label</button>
-                  )}
+                  {o.slip_url && <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={() => setSelectedOrder(o)}>Slip</button>}
+                  {o.status !== 'pending' && <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => setInvoiceOrder(o)}>Invoice</button>}
+                  {(o.status === 'approved' || o.status === 'printing') && <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => handlePrintLabel(o)}>Label</button>}
                 </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Archive — completed + rejected */}
+      <div style={{ marginTop: 28, borderTop: '0.5px solid var(--color-border)', paddingTop: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showArchive ? 14 : 0 }}>
+          <button
+            onClick={() => setShowArchive(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 14, fontWeight: 500, color: 'var(--color-text)' }}
+          >
+            <span style={{ fontSize: 10 }}>{showArchive ? '▼' : '▶'}</span>
+            Archive
+            <span style={{ fontSize: 11, background: '#f0f0ec', color: 'var(--color-text-muted)', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
+              {archiveOrders.length} orders
+            </span>
+          </button>
+          {showArchive && (
+            <input
+              className="form-input"
+              placeholder="Search archive..."
+              value={archiveSearch}
+              onChange={e => setArchiveSearch(e.target.value)}
+              style={{ fontSize: 12, maxWidth: 220 }}
+            />
+          )}
+        </div>
+
+        {showArchive && (
+          <div className="card" style={{ padding: 0, overflow: 'hidden', marginTop: 12 }}>
+            {filteredArchive.length === 0 ? (
+              <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No archived orders found.</p>
+            ) : filteredArchive.map((o: any) => (
+              <div key={o.id} style={{ padding: '12px 20px', borderBottom: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3, flexWrap: 'wrap' }}>
+                    <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{o.invoice_number}</p>
+                    <span className={'badge badge-' + o.status}>{o.status}</span>
+                    <PaymentBadge method={o.payment_method} />
+                    <DeliveryBadge method={o.delivery_method} island={o.delivery_island} />
+                    {o.source === 'pos' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#1a1a1a', color: '#fff' }}>POS</span>}
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+                    {o.artworks?.title || o.order_sku} · {o.buyer_name} · {new Date(o.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>{formatMVR(o.total_paid)}</p>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {o.slip_url && <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={() => setSelectedOrder(o)}>Slip</button>}
+                    <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => setInvoiceOrder(o)}>Invoice</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {selectedOrder && (
         <SlipModal
