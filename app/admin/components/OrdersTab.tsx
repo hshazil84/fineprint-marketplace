@@ -297,7 +297,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   async function handlePrintLabel(order: any) {
     try {
-      const { printLabel, printItemLabel } = await import('@/lib/labels')
+      const { printLabel, printItemLabel } = await import('@/lib/label')
       const items = order.order_items && order.order_items.length > 0
         ? order.order_items
         : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
