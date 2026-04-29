@@ -141,10 +141,12 @@ export default function StorefrontPage() {
   }
 
   function getFromPrice(artwork: Artwork): number {
-    const sizes     = artwork.sizes || ['A4']
-    const paperType = artwork.paper_type || ''
-    const discounted = artwork.price - Math.round(artwork.price * (artwork.offer_pct || 0) / 100)
-    return discounted + Math.min(...sizes.map(s => {
+    const sizes          = artwork.sizes || ['A4']
+    const paperType      = artwork.paper_type || ''
+    const platformFeeAmt = Math.round(artwork.price * 5 / 100)
+    const grossPrice     = artwork.price + platformFeeAmt
+    const discountedGross = grossPrice - Math.round(grossPrice * (artwork.offer_pct || 0) / 100)
+    return discountedGross + Math.min(...sizes.map(s => {
       const base  = PRINTING_FEES[s] || PRINTING_FEES['A4']
       const addOn = getPaperAddOn(paperType, s)
       return base + addOn
