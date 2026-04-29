@@ -2,133 +2,238 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
-import { usePagination, PAGE_SIZES } from '@/lib/pagination'
-import { Pagination } from '@/app/components/Pagination'
 import { SlipModal } from '@/app/admin/components/SlipModal'
 import { InvoiceModal } from '@/app/admin/components/InvoiceModal'
 import toast from 'react-hot-toast'
 
-const ORDER_STATUSES = ['pending', 'approved', 'printing', 'ready', 'completed', 'rejected', 'delivered']
+const COLUMNS = [
+  { key: 'pending',   label: 'Pending',   color: '#633806', bg: '#FAEEDA', border: '#EF9F27' },
+  { key: 'approved',  label: 'Approved',  color: '#185FA5', bg: '#E6F1FB', border: '#5B9FD4' },
+  { key: 'printing',  label: 'Printing',  color: '#5B3FA5', bg: '#EEE6FB', border: '#9B7FD4' },
+  { key: 'ready',     label: 'Ready',     color: '#0F6E56', bg: '#E1F5EE', border: '#5DCAA5' },
+  { key: 'delivered', label: 'Delivered', color: '#1a1a1a', bg: '#f0f0ec', border: '#ccc' },
+  { key: 'rejected',  label: 'Rejected',  color: '#A32D2D', bg: '#FCEBEB', border: '#F09595' },
+]
 
-function OrderRow({ order, onAction, onStatusChange, onViewInvoice, onViewSlip, onPrintLabel }: any) {
-  const [updating, setUpdating]   = useState(false)
-  const [sendEmail, setSendEmail] = useState(true)
+const ALL_STATUSES = ['pending', 'approved', 'printing', 'ready', 'delivered', 'completed', 'rejected']
+
+function PaymentBadge({ method }: { method: string }) {
+  if (method === 'swipe') return (
+    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#6A0AF2', color: '#fff' }}>Swipe</span>
+  )
+  return (
+    <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: '#E6F1FB', color: '#185FA5' }}>BML</span>
+  )
+}
+
+function DeliveryBadge({ method, island }: { method: string; island?: string }) {
+  if (method === 'pickup') return (
+    <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#f0f0ec', color: '#666' }}>Pickup</span>
+  )
+  return (
+    <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#f0f0ec', color: '#666' }}>
+      📦 {island || 'Delivery'}
+    </span>
+  )
+}
+
+function KanbanCard({ order, onAction, onStatusChange, onViewInvoice, onViewSlip, onPrintLabel }: any) {
+  const [updating, setUpdating]     = useState(false)
+  const [expanded, setExpanded]     = useState(false)
+  const [sendEmail, setSendEmail]   = useState(true)
   const artistDisplay = order.artworks?.profiles?.display_name || order.artworks?.profiles?.full_name
+  const col = COLUMNS.find(c => c.key === order.status) || COLUMNS[0]
 
-  async function updateStatus(newStatus: string) {
+  async function moveTo(newStatus: string) {
     if (newStatus === order.status) return
     setUpdating(true)
     const shouldSendEmail = sendEmail && newStatus === 'ready'
     const res = await fetch('/api/orders/status', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invoiceNumber: order.invoice_number, status: newStatus, sendEmail: shouldSendEmail }),
+      body:    JSON.stringify({ invoiceNumber: order.invoice_number, status: newStatus, sendEmail: shouldSendEmail }),
     })
     const data = await res.json()
     if (data.success) {
-      toast.success(shouldSendEmail ? 'Status updated — buyer notified!' : 'Status updated')
+      toast.success(shouldSendEmail ? 'Moved — buyer notified!' : 'Status updated')
       onStatusChange()
     } else {
-      toast.error(data.error || 'Failed to update status')
+      toast.error(data.error || 'Failed')
     }
     setUpdating(false)
   }
 
+  // Next logical status button
+  const nextStatus: Record<string, string> = {
+    pending:  'approved',
+    approved: 'printing',
+    printing: 'ready',
+    ready:    'delivered',
+  }
+  const next = nextStatus[order.status]
+
+  const nextLabel: Record<string, string> = {
+    approved:  'Mark printing',
+    printing:  'Mark ready',
+    ready:     'Mark delivered',
+    delivered: '',
+  }
+
   return (
-    <div style={{ padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 10 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
-            <p style={{ fontSize: 14, fontWeight: 500 }}>{order.invoice_number}</p>
-            <span className="sku-tag">{order.order_sku}</span>
-            <span className={'badge badge-' + order.status}>{order.status}</span>
-            {order.source === 'pos' && (
-              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#1a1a1a', color: '#fff', whiteSpace: 'nowrap' }}>
-                POS
-              </span>
-            )}
-            {order.payment_method === 'swipe' && (
-              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#6A0AF2', color: '#fff', whiteSpace: 'nowrap' }}>
-                Swipe
-              </span>
-            )}
+    <div style={{ background: '#fff', border: '0.5px solid #e8e8e4', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', marginBottom: 10, transition: 'box-shadow 0.15s' }}
+      onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)')}
+      onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)')}
+    >
+      {/* Top accent */}
+      <div style={{ height: 3, background: col.border }} />
+
+      <div style={{ padding: '12px 14px' }}>
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', margin: '0 0 2px' }}>{order.invoice_number}</p>
+            <p style={{ fontSize: 13, fontWeight: 600, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {order.artworks?.title || order.order_sku}
+            </p>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>{order.artworks?.title} by {artistDisplay}</p>
-          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
-            {order.buyer_name} · {new Date(order.created_at).toLocaleDateString()} · {formatMVR(order.total_paid)}
-            {' · '}{order.delivery_method === 'pickup' ? 'Pickup' : 'Deliver to ' + order.delivery_island}
-          </p>
+          <p style={{ fontSize: 13, fontWeight: 600, flexShrink: 0, color: '#1a1a1a' }}>{formatMVR(order.total_paid)}</p>
         </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <select
-          className="form-input"
-          style={{ fontSize: 12, padding: '5px 10px', maxWidth: 150, height: 'auto', cursor: 'pointer' }}
-          value={order.status}
-          onChange={e => updateStatus(e.target.value)}
-          disabled={updating}
-        >
-          {ORDER_STATUSES.map(s => (
-            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-          ))}
-        </select>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--color-text-muted)', cursor: 'pointer' }}>
-          <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} />
-          Notify buyer
-        </label>
-        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto', flexWrap: 'wrap' }}>
-          {order.slip_url && (
-            <button
-              className="btn btn-sm"
-              style={{ fontSize: 11, padding: '3px 10px', background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }}
-              onClick={onViewSlip}
-            >
-              Slip
-            </button>
+
+        {/* Artist + buyer */}
+        <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>by {artistDisplay}</p>
+        <p style={{ fontSize: 12, fontWeight: 500, margin: '0 0 8px' }}>{order.buyer_name}</p>
+
+        {/* Badges row */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+          <PaymentBadge method={order.payment_method} />
+          <DeliveryBadge method={order.delivery_method} island={order.delivery_island} />
+          {order.source === 'pos' && (
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#1a1a1a', color: '#fff' }}>POS</span>
           )}
-          {order.status !== 'pending' && order.status !== 'rejected' && (
-            <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 10px' }} onClick={onViewInvoice}>
-              Invoice
-            </button>
-          )}
-          {order.status === 'approved' && (
-            <button
-              className="btn btn-sm"
-              style={{ fontSize: 11, padding: '3px 10px', background: '#1a1a1a', color: '#fff', border: 'none' }}
-              onClick={() => onPrintLabel(order)}
-            >
-              Label
-            </button>
-          )}
-          {order.status === 'pending' && (order.payment_method === 'swipe' || !order.slip_url) && (
+          <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 20, background: '#f0f0ec', color: '#888' }}>
+            {new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+          </span>
+        </div>
+
+        {/* Primary action button */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {order.status === 'pending' && (
             <>
-              <button className="btn btn-sm btn-success" style={{ fontSize: 11 }} onClick={() => onAction(order.invoice_number, 'approve')}>Approve</button>
-              <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => onAction(order.invoice_number, 'reject')}>Reject</button>
+              <button
+                className="btn btn-success"
+                style={{ fontSize: 11, padding: '5px 12px', flex: 1 }}
+                onClick={() => handleOrderAction(order.invoice_number, 'approve')}
+                disabled={updating}
+              >
+                ✓ Approve
+              </button>
+              <button
+                className="btn btn-danger"
+                style={{ fontSize: 11, padding: '5px 12px' }}
+                onClick={() => handleOrderAction(order.invoice_number, 'reject')}
+                disabled={updating}
+              >
+                Reject
+              </button>
             </>
           )}
+          {next && order.status !== 'pending' && (
+            <button
+              style={{ fontSize: 11, padding: '5px 12px', flex: 1, border: 'none', borderRadius: 8, background: col.bg, color: col.color, fontWeight: 500, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}
+              onClick={() => moveTo(next)}
+              disabled={updating}
+            >
+              {updating ? '...' : nextLabel[next] || ('→ ' + next)}
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            style={{ fontSize: 11, padding: '5px 10px', border: '0.5px solid #e8e8e4', borderRadius: 8, background: 'transparent', cursor: 'pointer', color: 'var(--color-text-muted)' }}
+          >
+            {expanded ? '▲' : '▼'}
+          </button>
         </div>
+
+        {/* Expanded actions */}
+        {expanded && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f0f0ec' }}>
+            {/* Status override */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <select
+                className="form-input"
+                style={{ fontSize: 11, padding: '4px 8px', flex: 1, height: 'auto' }}
+                value={order.status}
+                onChange={e => moveTo(e.target.value)}
+                disabled={updating}
+              >
+                {ALL_STATUSES.map(s => (
+                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
+              </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--color-text-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input type="checkbox" checked={sendEmail} onChange={e => setSendEmail(e.target.checked)} />
+                Notify
+              </label>
+            </div>
+
+            {/* Quick action buttons */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {order.slip_url && (
+                <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={onViewSlip}>
+                  Slip
+                </button>
+              )}
+              {order.status !== 'pending' && order.status !== 'rejected' && (
+                <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={onViewInvoice}>
+                  Invoice
+                </button>
+              )}
+              {order.status === 'approved' && (
+                <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => onPrintLabel(order)}>
+                  Label
+                </button>
+              )}
+            </div>
+
+            {/* Delivery info */}
+            {order.delivery_method === 'delivery' && order.delivery_island && (
+              <div style={{ marginTop: 8, background: '#f8f8f6', borderRadius: 8, padding: '8px 10px' }}>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>Delivery address</p>
+                <p style={{ fontSize: 12, fontWeight: 500, margin: 0 }}>{order.delivery_island}, {order.delivery_atoll}</p>
+                {order.buyer_phone && <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '2px 0 0' }}>{order.buyer_phone}</p>}
+              </div>
+            )}
+
+            {/* Ready hints */}
+            {order.status === 'ready' && (
+              <div style={{ marginTop: 8, background: 'var(--color-teal-light)', borderRadius: 8, padding: '8px 10px' }}>
+                <p style={{ fontSize: 11, color: 'var(--color-teal-dark)', margin: 0 }}>
+                  {order.delivery_method === 'pickup'
+                    ? 'Pickup email sent — buyer will call 9998124'
+                    : 'Delivery email sent — call buyer to arrange delivery'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
-      {order.status === 'ready' && order.delivery_method === 'pickup' && (
-        <p style={{ fontSize: 11, color: 'var(--color-teal-dark)', marginTop: 8, background: 'var(--color-teal-light)', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>
-          Pickup email tells buyer to call 9998124 to arrange collection
-        </p>
-      )}
-      {order.status === 'ready' && order.delivery_method === 'delivery' && (
-        <p style={{ fontSize: 11, color: 'var(--color-teal-dark)', marginTop: 8, background: 'var(--color-teal-light)', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>
-          Delivery email tells buyer to expect a call from 9998124
-        </p>
-      )}
     </div>
   )
+
+  // Need to hoist handleOrderAction into scope
+  function handleOrderAction(invoiceNumber: string, action: 'approve' | 'reject') {
+    onAction(invoiceNumber, action)
+  }
 }
 
 export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   const [orders, setOrders]               = useState<any[]>([])
   const [loading, setLoading]             = useState(true)
-  const [orderSearch, setOrderSearch]     = useState('')
-  const [orderStatus, setOrderStatus]     = useState('all')
+  const [search, setSearch]               = useState('')
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
   const [invoiceOrder, setInvoiceOrder]   = useState<any>(null)
+  const [view, setView]                   = useState<'kanban' | 'list'>('kanban')
   const supabase = createClient()
 
   useEffect(() => { fetchOrders() }, [])
@@ -144,9 +249,9 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   async function handleOrderAction(invoiceNumber: string, action: 'approve' | 'reject') {
     const res = await fetch('/api/orders/approve', {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ invoiceNumber, action }),
+      body:    JSON.stringify({ invoiceNumber, action }),
     })
     const data = await res.json()
     if (data.success) {
@@ -161,39 +266,30 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   async function handlePrintLabel(order: any) {
     try {
       const { printLabel, printItemLabel } = await import('@/lib/label')
-
       const items = order.order_items && order.order_items.length > 0
         ? order.order_items
         : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
-
       const sizeCounts: Record<string, number> = {}
       items.forEach((item: any) => {
         const size = item.print_size || 'A4'
         sizeCounts[size] = (sizeCounts[size] || 0) + 1
       })
-
       const sizes     = Object.keys(sizeCounts)
       const hasLarge  = sizes.some(s => s === 'A2' || s === '12x16')
       const hasSmall  = sizes.some(s => s === 'A4' || s === 'A3')
-      const packaging = hasLarge && hasSmall
-        ? 'Flat mailer + Tube'
-        : hasLarge ? 'Tube' : 'Flat mailer'
-
-      // 1 — packing label
+      const packaging = hasLarge && hasSmall ? 'Flat mailer + Tube' : hasLarge ? 'Tube' : 'Flat mailer'
       printLabel({
         invoiceNumber:  order.invoice_number,
         orderSku:       order.order_sku,
         buyerName:      order.buyer_name,
-        buyerPhone:     order.buyer_phone || '',
+        buyerPhone:     order.buyer_phone   || '',
         deliveryIsland: order.delivery_island || '',
         deliveryAtoll:  order.delivery_atoll  || '',
         deliveryMethod: order.delivery_method,
         sizeCounts,
         packaging,
-        approvedAt:     order.approved_at || order.created_at,
+        approvedAt: order.approved_at || order.created_at,
       })
-
-      // N — print labels, one per item
       items.forEach((item: any) => {
         const artwork    = item.artworks || order.artworks
         const artistName = artwork?.profiles?.display_name || artwork?.profiles?.full_name || ''
@@ -206,99 +302,149 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
           printSize:     item.print_size     || order.print_size || 'A4',
         })
       })
-
       toast.success('Labels generated — ' + (items.length + 1) + ' PDFs downloaded')
     } catch (err: any) {
       toast.error('Could not generate labels: ' + err.message)
     }
   }
 
-  const filteredOrders = orders.filter(o => {
-    const matchSearch = !orderSearch ||
-      o.invoice_number?.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.buyer_name?.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.artworks?.title?.toLowerCase().includes(orderSearch.toLowerCase()) ||
-      o.order_sku?.toLowerCase().includes(orderSearch.toLowerCase())
-    const matchStatus = orderStatus === 'all' || o.status === orderStatus
-    return matchSearch && matchStatus
-  })
+  const filtered = orders.filter(o =>
+    !search ||
+    o.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
+    o.buyer_name?.toLowerCase().includes(search.toLowerCase()) ||
+    o.artworks?.title?.toLowerCase().includes(search.toLowerCase()) ||
+    o.order_sku?.toLowerCase().includes(search.toLowerCase())
+  )
 
-  const { paginated, page, setPage, totalPages, startIndex, endIndex, total } = usePagination(filteredOrders, PAGE_SIZES.orders)
+  const pending   = orders.filter(o => o.status === 'pending').length
+  const approved  = orders.filter(o => o.status === 'approved').length
+  const printing  = orders.filter(o => o.status === 'printing').length
+  const ready     = orders.filter(o => o.status === 'ready').length
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading orders...</div>
 
   return (
     <div>
-      <div className="grid-4" style={{ marginBottom: 24 }}>
+      {/* Stats */}
+      <div className="grid-4" style={{ marginBottom: 20 }}>
         {[
-          ['Pending',   orders.filter(o => o.status === 'pending').length],
-          ['Approved',  orders.filter(o => o.status === 'approved').length],
-          ['Completed', orders.filter(o => o.status === 'completed').length],
-          ['Total',     orders.length],
-        ].map(([label, value]) => (
-          <div key={label as string} className="stat-card">
-            <p className="stat-label">{label}</p>
-            <p className="stat-value">{value}</p>
+          ['Pending',   pending,                       '#FAEEDA', '#633806'],
+          ['Approved',  approved,                      '#E6F1FB', '#185FA5'],
+          ['Printing',  printing,                      '#EEE6FB', '#5B3FA5'],
+          ['Ready',     ready,                         '#E1F5EE', '#0F6E56'],
+        ].map(([label, value, bg, color]) => (
+          <div key={label as string} className="stat-card" style={{ background: (value as number) > 0 ? bg as string : undefined }}>
+            <p className="stat-label" style={{ color: (value as number) > 0 ? color as string : undefined }}>{label}</p>
+            <p className="stat-value" style={{ color: (value as number) > 0 ? color as string : undefined }}>{value as number}</p>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
         <input
           className="form-input"
           placeholder="Search invoice, buyer, artwork..."
-          value={orderSearch}
-          onChange={e => setOrderSearch(e.target.value)}
-          style={{ flex: 1, minWidth: 200, fontSize: 13 }}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ flex: 1, fontSize: 13 }}
         />
-        <select
-          className="form-input"
-          value={orderStatus}
-          onChange={e => setOrderStatus(e.target.value)}
-          style={{ fontSize: 13, maxWidth: 150 }}
-        >
-          <option value="all">All statuses</option>
-          {ORDER_STATUSES.map(s => (
-            <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+        {search && <button className="btn btn-sm" onClick={() => setSearch('')}>Clear ×</button>}
+        <div style={{ display: 'flex', border: '0.5px solid var(--color-border)', borderRadius: 8, overflow: 'hidden', flexShrink: 0 }}>
+          <button
+            onClick={() => setView('kanban')}
+            style={{ padding: '7px 12px', border: 'none', cursor: 'pointer', fontSize: 12, background: view === 'kanban' ? '#1a1a1a' : 'transparent', color: view === 'kanban' ? '#fff' : 'var(--color-text-muted)' }}
+          >
+            Board
+          </button>
+          <button
+            onClick={() => setView('list')}
+            style={{ padding: '7px 12px', border: 'none', cursor: 'pointer', fontSize: 12, background: view === 'list' ? '#1a1a1a' : 'transparent', color: view === 'list' ? '#fff' : 'var(--color-text-muted)' }}
+          >
+            List
+          </button>
+        </div>
+      </div>
+
+      {/* Kanban board */}
+      {view === 'kanban' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(220px, 1fr))', gap: 12, overflowX: 'auto', paddingBottom: 16 }}>
+          {COLUMNS.map(col => {
+            const colOrders = filtered.filter(o => o.status === col.key)
+            return (
+              <div key={col.key} style={{ minWidth: 220 }}>
+                {/* Column header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '8px 12px', background: col.bg, borderRadius: 10, border: '0.5px solid ' + col.border }}>
+                  <p style={{ fontSize: 12, fontWeight: 600, color: col.color, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</p>
+                  <span style={{ fontSize: 11, fontWeight: 700, background: col.border, color: '#fff', borderRadius: 20, padding: '1px 8px', minWidth: 20, textAlign: 'center' }}>
+                    {colOrders.length}
+                  </span>
+                </div>
+
+                {/* Cards */}
+                {colOrders.length === 0 ? (
+                  <div style={{ border: '1px dashed ' + col.border, borderRadius: 10, padding: '20px 12px', textAlign: 'center', opacity: 0.5 }}>
+                    <p style={{ fontSize: 11, color: col.color, margin: 0 }}>No orders</p>
+                  </div>
+                ) : colOrders.map(order => (
+                  <KanbanCard
+                    key={order.id}
+                    order={order}
+                    onAction={handleOrderAction}
+                    onStatusChange={fetchOrders}
+                    onViewInvoice={() => setInvoiceOrder(order)}
+                    onViewSlip={() => setSelectedOrder(order)}
+                    onPrintLabel={handlePrintLabel}
+                  />
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* List view — fallback */}
+      {view === 'list' && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          {filtered.length === 0 ? (
+            <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>No orders found.</p>
+          ) : filtered.map((o: any) => (
+            <div key={o.id} style={{ padding: '14px 20px', borderBottom: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 3, flexWrap: 'wrap' }}>
+                  <p style={{ fontSize: 13, fontWeight: 500, margin: 0 }}>{o.invoice_number}</p>
+                  <span className={'badge badge-' + o.status}>{o.status}</span>
+                  <PaymentBadge method={o.payment_method} />
+                  {o.source === 'pos' && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20, background: '#1a1a1a', color: '#fff' }}>POS</span>}
+                </div>
+                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+                  {o.artworks?.title} · {o.buyer_name} · {new Date(o.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>{formatMVR(o.total_paid)}</p>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {o.slip_url && (
+                    <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={() => setSelectedOrder(o)}>Slip</button>
+                  )}
+                  {o.status !== 'pending' && o.status !== 'rejected' && (
+                    <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => setInvoiceOrder(o)}>Invoice</button>
+                  )}
+                  {o.status === 'approved' && (
+                    <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => handlePrintLabel(o)}>Label</button>
+                  )}
+                </div>
+              </div>
+            </div>
           ))}
-        </select>
-        {(orderSearch || orderStatus !== 'all') && (
-          <button className="btn btn-sm" onClick={() => { setOrderSearch(''); setOrderStatus('all') }}>Clear ×</button>
-        )}
-      </div>
-
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {paginated.length === 0 ? (
-          <p style={{ padding: 24, textAlign: 'center', color: 'var(--color-text-muted)' }}>
-            {filteredOrders.length === 0 && orders.length > 0 ? 'No orders match your search.' : 'No orders yet.'}
-          </p>
-        ) : paginated.map((o: any) => (
-          <OrderRow
-            key={o.id}
-            order={o}
-            onAction={handleOrderAction}
-            onStatusChange={fetchOrders}
-            onViewInvoice={() => setInvoiceOrder(o)}
-            onViewSlip={() => setSelectedOrder(o)}
-            onPrintLabel={handlePrintLabel}
-          />
-        ))}
-      </div>
-
-      <Pagination
-        page={page}
-        totalPages={totalPages}
-        total={total}
-        startIndex={startIndex}
-        endIndex={endIndex}
-        onPage={setPage}
-      />
+        </div>
+      )}
 
       {selectedOrder && (
         <SlipModal
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onAction={(inv, action) => { handleOrderAction(inv, action); setSelectedOrder(null) }}
+          onAction={(inv: string, action: 'approve' | 'reject') => { handleOrderAction(inv, action); setSelectedOrder(null) }}
         />
       )}
       {invoiceOrder && (
