@@ -1,5 +1,4 @@
-import { jsPDF } from 'jspdf'
-import bwipjs from 'bwip-js'
+import type { jsPDF as jsPDFType } from 'jspdf'
 
 export interface LabelData {
   invoiceNumber:  string
@@ -23,7 +22,8 @@ export interface PrintItemLabelData {
   printSize:     string
 }
 
-function generateBarcode(text: string): string {
+async function generateBarcode(text: string): Promise<string> {
+  const bwipjs = (await import('bwip-js')).default
   const canvas = document.createElement('canvas')
   bwipjs.toCanvas(canvas, {
     bcid:            'code128',
@@ -36,7 +36,8 @@ function generateBarcode(text: string): string {
   return canvas.toDataURL('image/png')
 }
 
-export function printLabel(data: LabelData) {
+export async function printLabel(data: LabelData) {
+  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ unit: 'pt', format: [288, 432], orientation: 'portrait' })
   const W   = 288
   const pad = 18
@@ -69,7 +70,7 @@ export function printLabel(data: LabelData) {
     doc.text(str, x, yPos)
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  // Header
   bold('fineprint', pad, y + 10, 13)
   const fw = doc.getTextWidth('fineprint')
   bold('studio', pad + fw, y + 10, 13)
@@ -94,9 +95,8 @@ export function printLabel(data: LabelData) {
   y += 28
   line(y); y += 10
 
-  // ── Ship to / From ────────────────────────────────────────────────────────
+  // Ship to / From
   const col2 = W / 2 + 4
-
   label('SHIP TO', pad, y)
   label('FROM', col2, y)
   y += 9
@@ -125,7 +125,7 @@ export function printLabel(data: LabelData) {
 
   line(y); y += 10
 
-  // ── Items ─────────────────────────────────────────────────────────────────
+  // Items
   const totalItems = Object.values(data.sizeCounts).reduce((s, c) => s + c, 0)
   label('ITEMS (' + totalItems + ')', pad, y)
   y += 9
@@ -146,7 +146,7 @@ export function printLabel(data: LabelData) {
   y += 3
   line(y); y += 10
 
-  // ── Packaging ─────────────────────────────────────────────────────────────
+  // Packaging
   label('PACKAGING', pad, y)
   y += 9
   bold(data.packaging, pad, y, 9)
@@ -154,7 +154,7 @@ export function printLabel(data: LabelData) {
 
   line(y); y += 10
 
-  // ── Order SKU ─────────────────────────────────────────────────────────────
+  // Order SKU
   label('ORDER SKU', pad, y)
   y += 9
   doc.setFontSize(9)
@@ -165,10 +165,10 @@ export function printLabel(data: LabelData) {
 
   line(y); y += 12
 
-  // ── Barcode (order SKU) ───────────────────────────────────────────────────
+  // Barcode
   try {
     const barcodeData  = data.orderSku.replace(/[^A-Za-z0-9\-]/g, '')
-    const barcodeImage = generateBarcode(barcodeData)
+    const barcodeImage = await generateBarcode(barcodeData)
     const barcodeW     = W - pad * 2
     const barcodeH     = 36
     doc.addImage(barcodeImage, 'PNG', pad, y, barcodeW, barcodeH)
@@ -184,7 +184,7 @@ export function printLabel(data: LabelData) {
 
   line(y); y += 10
 
-  // ── Footer ────────────────────────────────────────────────────────────────
+  // Footer
   doc.setFontSize(6.5)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor('#aaaaaa')
@@ -193,8 +193,10 @@ export function printLabel(data: LabelData) {
   doc.save('FP-label-' + data.invoiceNumber + '.pdf')
 }
 
-export function printItemLabel(data: PrintItemLabelData) {
-  const doc = new jsPDF({ unit: 'pt', format: [288, 216], orientation: 'portrait' })
+export async function printItemLabel(data: PrintItemLabelData) {
+  const { jsPDF } = await import('jspdf')
+  // 4x6 inches in points = 288 x 432
+  const doc = new jsPDF({ unit: 'pt', format: [288, 432], orientation: 'portrait' })
   const W   = 288
   const pad = 18
   let   y   = pad
@@ -226,12 +228,12 @@ export function printItemLabel(data: PrintItemLabelData) {
     doc.text(str, x, yPos)
   }
 
-  // ── Header ────────────────────────────────────────────────────────────────
+  // Header
   bold('fineprint', pad, y + 10, 11)
   const fw = doc.getTextWidth('fineprint')
   bold('studio', pad + fw, y + 10, 11)
 
-  // PRINT badge top right
+  // PRINT badge
   doc.setFillColor('#1a1a1a')
   doc.roundedRect(W - pad - 36, y + 2, 36, 12, 2, 2, 'F')
   doc.setFontSize(7)
@@ -240,43 +242,46 @@ export function printItemLabel(data: PrintItemLabelData) {
   doc.text('PRINT', W - pad - 18, y + 10, { align: 'center' })
 
   y += 24
-  line(y); y += 10
+  line(y); y += 12
 
-  // ── Artwork info ──────────────────────────────────────────────────────────
+  // Artwork info
   label('ARTWORK', pad, y)
-  y += 9
-  bold(data.artworkTitle, pad, y, 10)
-  y += 12
-  value('by ' + data.artistName, pad, y, 8)
-  y += 12
-
-  line(y); y += 10
-
-  // ── Print specs ───────────────────────────────────────────────────────────
-  const col2 = W / 2 + 4
-
-  label('SIZE', pad, y)
-  label('PAPER', col2, y)
-  y += 9
-  bold(data.printSize, pad, y, 11)
-  bold(data.paperType || 'Standard', col2, y, 9)
+  y += 10
+  bold(data.artworkTitle, pad, y, 12)
+  y += 14
+  value('by ' + data.artistName, pad, y, 9)
   y += 14
 
-  line(y); y += 10
+  line(y); y += 12
 
-  // ── Barcode (SKU-SIZE — unified with POS) ─────────────────────────────────
+  // Print specs
+  const col2 = W / 2 + 4
+  label('SIZE', pad, y)
+  label('PAPER', col2, y)
+  y += 10
+  bold(data.printSize, pad, y, 14)
+
+  // Truncate paper name if too long
+  const paperName = data.paperType && data.paperType.length > 20
+    ? data.paperType.slice(0, 18) + '…'
+    : (data.paperType || 'Standard')
+  bold(paperName, col2, y, 10)
+  y += 18
+
+  line(y); y += 12
+
+  // Barcode
   const barcodeData = (data.artworkSku + '-' + data.printSize).replace(/[^A-Za-z0-9\-]/g, '')
-
   label('SKU · ' + data.invoiceNumber, pad, y)
-  y += 9
+  y += 10
 
   try {
-    const barcodeImage = generateBarcode(barcodeData)
+    const barcodeImage = await generateBarcode(barcodeData)
     const barcodeW     = W - pad * 2
-    const barcodeH     = 32
+    const barcodeH     = 48
     doc.addImage(barcodeImage, 'PNG', pad, y, barcodeW, barcodeH)
-    y += barcodeH + 6
-    doc.setFontSize(7)
+    y += barcodeH + 8
+    doc.setFontSize(8)
     doc.setFont('courier', 'normal')
     doc.setTextColor('#555555')
     doc.text(barcodeData, W / 2, y, { align: 'center' })
