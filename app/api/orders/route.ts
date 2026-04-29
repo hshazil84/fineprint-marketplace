@@ -3,22 +3,24 @@ import { createAdminClient } from '@/lib/supabase'
 import { notifyNewOrder } from '@/lib/telegram'
 
 function generateInvoiceNumber(): string {
-  const now = new Date()
-  const year = now.getFullYear()
+  const now   = new Date()
+  const year  = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  const rand = Math.floor(Math.random() * 9000) + 1000
+  const day   = String(now.getDate()).padStart(2, '0')
+  const rand  = Math.floor(Math.random() * 9000) + 1000
   return 'INV-' + year + '-' + month + day + '-' + rand
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
+    const body     = await req.json()
     const supabase = createAdminClient()
 
-    const { items, buyerId, buyerName, buyerEmail, buyerPhone,
-            deliveryMethod, deliveryIsland, deliveryAtoll, deliveryNotes,
-            handlingFee, totalPaid, newsletterOptIn, isGuest, paymentMethod } = body
+    const {
+      items, buyerId, buyerName, buyerEmail, buyerPhone,
+      deliveryMethod, deliveryIsland, deliveryAtoll, deliveryNotes,
+      handlingFee, totalPaid, newsletterOptIn, isGuest, paymentMethod,
+    } = body
 
     const invoiceNumber = generateInvoiceNumber()
 
@@ -27,10 +29,10 @@ export async function POST(req: NextRequest) {
       ? items[0].artworkSku + '-' + items[0].printSize
       : items[0].artworkSku + '-' + items[0].printSize + '+' + (items.length - 1) + 'more'
 
-    // Totals for the order header
-    const totalFpCommission = items.reduce((s: number, i: any) => s + i.fpCommission, 0)
-    const totalArtistEarnings = items.reduce((s: number, i: any) => s + i.artistEarnings, 0)
-    const firstItem = items[0]
+    // Recalculate artist earnings server-side — artist earns exactly what they set
+    const totalArtistEarnings = items.reduce((s: number, i: any) => s + (i.artistPrice || i.artistEarnings || 0), 0)
+    const totalFpCommission   = items.reduce((s: number, i: any) => s + i.fpCommission, 0)
+    const firstItem           = items[0]
 
     // Insert order header
     const { data: order, error } = await supabase.from('orders').insert({
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
       buyer_phone:     buyerPhone,
       original_price:  firstItem.originalPrice,
       offer_label:     items.length === 1 ? firstItem.offerLabel || null : null,
-      offer_pct:       items.length === 1 ? firstItem.offerPct || null : null,
+      offer_pct:       items.length === 1 ? firstItem.offerPct   || null : null,
       discount_amount: items.reduce((s: number, i: any) => s + (i.discountAmount || 0), 0),
       print_price:     items.reduce((s: number, i: any) => s + i.printPrice, 0),
       printing_fee:    items.reduce((s: number, i: any) => s + i.printingFee, 0),
@@ -54,28 +56,28 @@ export async function POST(req: NextRequest) {
       print_size:      items.length === 1 ? firstItem.printSize : '',
       delivery_method: deliveryMethod,
       delivery_island: deliveryIsland || null,
-      delivery_atoll:  deliveryAtoll || null,
-      delivery_notes:  deliveryNotes || null,
+      delivery_atoll:  deliveryAtoll  || null,
+      delivery_notes:  deliveryNotes  || null,
       status:          'pending',
       payment_method:  paymentMethod || 'bank_transfer',
     }).select().single()
 
     if (error) throw error
 
-    // Insert order_items
+    // Insert order_items — artist_earnings = artistPrice (exactly what artist set)
     const orderItems = items.map((item: any) => ({
       order_id:        order.id,
       artwork_id:      item.artworkId,
       artist_id:       item.artistId,
       print_size:      item.printSize,
       original_price:  item.originalPrice,
-      offer_pct:       item.offerPct || 0,
-      offer_label:     item.offerLabel || null,
+      offer_pct:       item.offerPct       || 0,
+      offer_label:     item.offerLabel     || null,
       discount_amount: item.discountAmount || 0,
       print_price:     item.printPrice,
       printing_fee:    item.printingFee,
       fp_commission:   item.fpCommission,
-      artist_earnings: item.artistEarnings,
+      artist_earnings: item.artistPrice || item.artistEarnings || 0,
     }))
 
     const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
@@ -85,18 +87,18 @@ export async function POST(req: NextRequest) {
     await notifyNewOrder({
       invoiceNumber,
       orderSku,
-      artworkTitle:   items.length === 1 ? firstItem.artworkTitle : items.map((i: any) => i.artworkTitle).join(', '),
-      artistName:     items.length === 1 ? firstItem.artistName : items.map((i: any) => i.artistName).join(', '),
+      artworkTitle:  items.length === 1 ? firstItem.artworkTitle : items.map((i: any) => i.artworkTitle).join(', '),
+      artistName:    items.length === 1 ? firstItem.artistName   : items.map((i: any) => i.artistName).join(', '),
       buyerName,
       buyerPhone,
       deliveryMethod,
       deliveryIsland,
       deliveryAtoll,
       totalPaid,
-      offerLabel:     items.length === 1 ? firstItem.offerLabel : null,
-      offerPct:       items.length === 1 ? firstItem.offerPct : null,
-      paymentMethod:  paymentMethod || 'bank_transfer',
-      itemCount:      items.length,
+      offerLabel:    items.length === 1 ? firstItem.offerLabel : null,
+      offerPct:      items.length === 1 ? firstItem.offerPct   : null,
+      paymentMethod: paymentMethod || 'bank_transfer',
+      itemCount:     items.length,
     })
 
     // Customer upsert
@@ -135,7 +137,7 @@ async function upsertCustomer(supabase: any, data: {
       name:              data.name,
       phone:             data.phone,
       order_count:       (existing.order_count || 0) + 1,
-      total_spent:       (existing.total_spent || 0) + data.totalPaid,
+      total_spent:       (existing.total_spent  || 0) + data.totalPaid,
       last_order_at:     new Date().toISOString(),
       newsletter_opt_in: data.newsletterOptIn || false,
       updated_at:        new Date().toISOString(),
