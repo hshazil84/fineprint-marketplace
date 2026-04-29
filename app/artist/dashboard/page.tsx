@@ -196,6 +196,7 @@ export default function ArtistDashboard() {
             onToggleHide={toggleHide}
             onDelete={deleteArtwork}
             onSaveEdit={saveEdit}
+            onUpload={() => setTab('upload')}
           />
         )}
 
