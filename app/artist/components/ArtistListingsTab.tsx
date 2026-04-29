@@ -17,34 +17,180 @@ function Divider() {
 // ── Empty state ───────────────────────────────────────────────────────────
 function EmptyListings({ onUpload }: { onUpload: () => void }) {
   return (
-    <div style={{ textAlign: 'center', padding: '48px 24px', maxWidth: 400, margin: '0 auto' }}>
-      <div style={{ fontSize: 48, marginBottom: 16 }}>🎨</div>
-      <h2 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 8px', fontFamily: 'var(--font-display)' }}>
-        Your shop is ready
+    <div style={{ textAlign: 'center', padding: '60px 24px 48px', maxWidth: 480, margin: '0 auto' }}>
+      <style>{`
+        @property --gradient-angle {
+          syntax: "<angle>"; initial-value: 0deg; inherits: false;
+        }
+        @property --gradient-angle-offset {
+          syntax: "<angle>"; initial-value: 0deg; inherits: false;
+        }
+        @property --gradient-percent {
+          syntax: "<percentage>"; initial-value: 5%; inherits: false;
+        }
+        @property --gradient-shine {
+          syntax: "<color>"; initial-value: white; inherits: false;
+        }
+        .fp-shiny-cta {
+          --shiny-bg: #0a1f1c;
+          --shiny-bg-subtle: #0f2e28;
+          --shiny-fg: #ffffff;
+          --shiny-highlight: #1D9E75;
+          --shiny-highlight-subtle: #5DCAA5;
+          --animation: gradient-angle linear infinite;
+          --duration: 3s;
+          --shadow-size: 2px;
+          isolation: isolate;
+          position: relative;
+          overflow: hidden;
+          cursor: pointer;
+          outline-offset: 4px;
+          padding: 1rem 2.5rem;
+          font-family: inherit;
+          font-size: 1rem;
+          font-weight: 500;
+          line-height: 1.2;
+          border: 1px solid transparent;
+          border-radius: 360px;
+          color: var(--shiny-fg);
+          background:
+            linear-gradient(var(--shiny-bg), var(--shiny-bg)) padding-box,
+            conic-gradient(
+              from calc(var(--gradient-angle) - var(--gradient-angle-offset)),
+              transparent,
+              var(--shiny-highlight) var(--gradient-percent),
+              var(--gradient-shine) calc(var(--gradient-percent) * 2),
+              var(--shiny-highlight) calc(var(--gradient-percent) * 3),
+              transparent calc(var(--gradient-percent) * 4)
+            ) border-box;
+          box-shadow: inset 0 0 0 1px var(--shiny-bg-subtle);
+          --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
+          transition: var(--transition);
+          transition-property: --gradient-angle-offset, --gradient-percent, --gradient-shine;
+        }
+        .fp-shiny-cta::before, .fp-shiny-cta::after, .fp-shiny-cta span::before {
+          content: "";
+          pointer-events: none;
+          position: absolute;
+          inset-inline-start: 50%;
+          inset-block-start: 50%;
+          translate: -50% -50%;
+          z-index: -1;
+        }
+        .fp-shiny-cta::before {
+          --size: calc(100% - var(--shadow-size) * 3);
+          --position: 2px;
+          --space: calc(var(--position) * 2);
+          width: var(--size);
+          height: var(--size);
+          background: radial-gradient(
+            circle at var(--position) var(--position),
+            white calc(var(--position) / 4),
+            transparent 0
+          ) padding-box;
+          background-size: var(--space) var(--space);
+          background-repeat: space;
+          mask-image: conic-gradient(
+            from calc(var(--gradient-angle) + 45deg),
+            black, transparent 10% 90%, black
+          );
+          border-radius: inherit;
+          opacity: 0.4;
+          z-index: -1;
+        }
+        .fp-shiny-cta::after {
+          --animation: shimmer-fp linear infinite;
+          width: 100%;
+          aspect-ratio: 1;
+          background: linear-gradient(-50deg, transparent, var(--shiny-highlight), transparent);
+          mask-image: radial-gradient(circle at bottom, transparent 40%, black);
+          opacity: 0.6;
+        }
+        .fp-shiny-cta span {
+          z-index: 1;
+        }
+        .fp-shiny-cta span::before {
+          --size: calc(100% + 1rem);
+          width: var(--size);
+          height: var(--size);
+          box-shadow: inset 0 -1ex 2rem 4px var(--shiny-highlight);
+          opacity: 0;
+        }
+        .fp-shiny-cta, .fp-shiny-cta::before, .fp-shiny-cta::after {
+          animation:
+            var(--animation) var(--duration),
+            var(--animation) calc(var(--duration) / 0.4) reverse paused;
+          animation-composition: add;
+        }
+        .fp-shiny-cta span::before {
+          transition: opacity var(--transition);
+          animation: calc(var(--duration) * 1.5) breathe-fp linear infinite;
+        }
+        .fp-shiny-cta:hover, .fp-shiny-cta:focus-visible {
+          --gradient-percent: 20%;
+          --gradient-angle-offset: 95deg;
+          --gradient-shine: var(--shiny-highlight-subtle);
+        }
+        .fp-shiny-cta:hover, .fp-shiny-cta:focus-visible,
+        .fp-shiny-cta:hover::before, .fp-shiny-cta:focus-visible::before,
+        .fp-shiny-cta:hover::after, .fp-shiny-cta:focus-visible::after {
+          animation-play-state: running;
+        }
+        .fp-shiny-cta:hover span::before, .fp-shiny-cta:focus-visible span::before {
+          opacity: 1;
+        }
+        .fp-shiny-cta:active { translate: 0 1px; }
+        @keyframes gradient-angle { to { --gradient-angle: 360deg; } }
+        @keyframes shimmer-fp { to { rotate: 360deg; } }
+        @keyframes breathe-fp {
+          from, to { scale: 1; }
+          50% { scale: 1.2; }
+        }
+      `}</style>
+
+      {/* Icon */}
+      <div style={{ fontSize: 64, marginBottom: 28, filter: 'drop-shadow(0 4px 16px rgba(29,158,117,0.2))' }}>🎨</div>
+
+      {/* Headline */}
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '2rem', fontWeight: 700, margin: '0 0 12px', letterSpacing: '-0.03em', lineHeight: 1.15, color: 'var(--color-text-primary)' }}>
+        Start selling your art
       </h2>
-      <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.7, margin: '0 0 24px' }}>
-        Upload your first artwork and we'll review it within <strong>24 hours</strong>. Once approved it goes live on the storefront instantly.
+
+      {/* Subheadline */}
+      <p style={{ fontSize: 15, color: 'var(--color-text-muted)', lineHeight: 1.65, margin: '0 0 32px', maxWidth: 360, marginLeft: 'auto', marginRight: 'auto' }}>
+        Your prints, professionally made and delivered across the Maldives. Upload once, sell forever.
       </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32, textAlign: 'left' }}>
+
+      {/* Shiny CTA */}
+      <button className="fp-shiny-cta" onClick={onUpload}>
+        <span>Upload your first artwork →</span>
+      </button>
+
+      {/* Horizontal steps */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 0, marginTop: 40, position: 'relative' }}>
+        {/* Connector line */}
+        <div style={{ position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', width: '55%', height: '0.5px', background: 'var(--color-border)', zIndex: 0 }} />
         {[
-          { step: '1', label: 'Upload your artwork', sub: 'Hi-res file + watermarked preview' },
-          { step: '2', label: 'We review it',        sub: 'Approved within 24 hours' },
-          { step: '3', label: 'It goes live',        sub: 'Buyers can find and order your print' },
+          { step: '1', label: 'Upload',    sub: 'Hi-res + preview' },
+          { step: '2', label: 'We review', sub: 'Within 24 hours'  },
+          { step: '3', label: 'Go live',   sub: 'Instant on store' },
         ].map(function({ step, label, sub }) {
           return (
-            <div key={step} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', background: 'var(--color-background-secondary)', borderRadius: 12, padding: '12px 16px' }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{step}</div>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 500, margin: '0 0 2px' }}>{label}</p>
-                <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>{sub}</p>
+            <div key={step} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, position: 'relative', zIndex: 1 }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, border: '3px solid var(--color-background-primary)' }}>
+                {step}
               </div>
+              <p style={{ fontSize: 12, fontWeight: 600, margin: '0 0 2px', color: 'var(--color-text-primary)' }}>{label}</p>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0 }}>{sub}</p>
             </div>
           )
         })}
       </div>
-      <button className="btn btn-primary btn-full" onClick={onUpload} style={{ fontSize: 14, padding: '13px' }}>
-        Upload your first artwork →
-      </button>
+
+      {/* Reassurance */}
+      <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+        <span>🔒</span> Your hi-res files are never shown to buyers
+      </p>
     </div>
   )
 }
