@@ -6,7 +6,6 @@ import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
 import { PaperDetailModal } from './PaperDetailModal'
 import toast from 'react-hot-toast'
 
-const PLATFORM_FEE = 5
 const CATEGORIES = [
   'Photography', 'Fine Art', 'Abstract', 'Illustration',
   'Digital Art', 'Mixed Media', 'Watercolour', 'Charcoal & Sketch',
@@ -69,13 +68,11 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const effectivePaperType = paperType || getDefaultPaper(form.category)
   const nextSku            = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
   const price              = parseInt(form.price) || 0
-  const platformFeeAmt     = Math.round(price * PLATFORM_FEE / 100)
-  const artistEarns        = price - platformFeeAmt
+  const platformFeeAmt     = Math.round(price * 5 / 100)
+  const artistEarns        = price
   const papersByCategory   = getPapersByCategory()
   const selectedPaper      = papers.find(p => p.name === effectivePaperType)
-
-  // Get best_for key for current artwork category
-  const bestForKey = CATEGORY_TO_BEST_FOR[form.category]
+  const bestForKey         = CATEGORY_TO_BEST_FOR[form.category]
 
   function toggleSize(size: string) {
     setSelectedSizes(prev =>
@@ -83,7 +80,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     )
   }
 
-  // When category changes, reset paper selection so default recalculates
   function handleCategoryChange(category: string) {
     setForm(f => ({ ...f, category }))
     setPaperType('')
@@ -381,36 +377,24 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
               <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 6, marginTop: 8 }}>{category}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {(categoryPapers as any[]).map(paper => {
-                  const isSelected   = effectivePaperType === paper.name
-                  const addOnA4      = paper.addOn['A4'] || 0
-                  const addOnA3      = paper.addOn['A3'] || 0
-                  const hasPremium   = addOnA4 > 0 || addOnA3 > 0
-                  const isOutOfStock = !paper.in_stock
+                  const isSelected    = effectivePaperType === paper.name
+                  const addOnA4       = paper.addOn['A4'] || 0
+                  const addOnA3       = paper.addOn['A3'] || 0
+                  const hasPremium    = addOnA4 > 0 || addOnA3 > 0
+                  const isOutOfStock  = !paper.in_stock
                   const isRecommended = bestForKey && paper.best_for?.includes(bestForKey)
                   return (
                     <div
                       key={paper.name}
                       onClick={() => !isOutOfStock && setPaperType(paper.name)}
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: 12,
-                        padding: '12px 14px',
-                        border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                        borderRadius: 10,
-                        cursor: isOutOfStock ? 'not-allowed' : 'pointer',
-                        background: isSelected ? 'var(--color-surface)' : 'transparent',
-                        opacity: isOutOfStock ? 0.45 : 1,
-                        transition: 'all 0.15s',
-                      }}
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 10, cursor: isOutOfStock ? 'not-allowed' : 'pointer', background: isSelected ? 'var(--color-surface)' : 'transparent', opacity: isOutOfStock ? 0.45 : 1, transition: 'all 0.15s' }}
                     >
                       <div style={{ width: 16, height: 16, borderRadius: '50%', border: isSelected ? '5px solid #1a1a1a' : '1.5px solid var(--color-border)', flexShrink: 0, marginTop: 2, transition: 'all 0.15s' }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
-                          {/* Recommended badge */}
                           {isRecommended && !isOutOfStock && (
-                            <span style={{ fontSize: 10, background: '#185FA5', color: '#fff', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
-                              ✓ Recommended
-                            </span>
+                            <span style={{ fontSize: 10, background: '#185FA5', color: '#fff', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>✓ Recommended</span>
                           )}
                           {isOutOfStock && (
                             <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Out of stock</span>
@@ -457,7 +441,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <Divider />
 
       {/* ── PRICING ───────────────────────────────────────────── */}
-      <SectionLabel hint="Set your artwork price. The printing fee and any paper add-on are added on top for buyers.">
+      <SectionLabel hint="Set the amount you want to receive. We add a 5% platform fee and print costs on top for buyers.">
         Your artwork price (MVR)
       </SectionLabel>
       <input className="form-input" type="number" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="e.g. 800" style={{ maxWidth: 160, marginBottom: 10 }} />
@@ -468,11 +452,11 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
           {selectedSizes.map(size => {
             const addOn   = getPaperAddOn(effectivePaperType, size)
             const baseFee = PRINTING_FEES[size] || 200
-            const total   = price + baseFee + addOn + 100
+            const total   = price + platformFeeAmt + baseFee + addOn + 100
             return (
               <div key={size} style={{ marginBottom: 8 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
-                  <span>{size} — Artwork</span><span>{formatMVR(price)}</span>
+                  <span>{size} — Artwork</span><span>{formatMVR(price + platformFeeAmt)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
                   <span>{size} — Printing</span><span>{formatMVR(baseFee)}</span>
@@ -492,7 +476,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
             )
           })}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 500, color: '#1D9E75', borderTop: '0.5px solid var(--color-border)', paddingTop: 10, marginTop: 6 }}>
-            <span>You earn (after 5% fee)</span><span>{formatMVR(artistEarns)}</span>
+            <span>You earn</span><span>{formatMVR(artistEarns)}</span>
           </div>
         </div>
       )}
@@ -542,7 +526,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         {uploading ? 'Uploading...' : 'Submit for review'}
       </button>
 
-      {/* Paper detail modal */}
       {detailPaper && (
         <PaperDetailModal
           paper={detailPaper}
