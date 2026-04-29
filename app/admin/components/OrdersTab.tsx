@@ -67,7 +67,7 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
     const data = await res.json()
     if (data.success) {
       toast.success(shouldNotify ? 'Moved — buyer notified!' : 'Status updated')
-      onStatusChange()
+      onStatusChange(order.id, newStatus)
     } else {
       toast.error(data.error || 'Failed')
     }
@@ -84,7 +84,7 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
     const data = await res.json()
     if (data.success) {
       toast.success('Order approved — invoice sent!')
-      onStatusChange()
+      onStatusChange(order.id, 'approved')
     } else {
       toast.error(data.error)
     }
@@ -101,7 +101,7 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
     const data = await res.json()
     if (data.success) {
       toast.success('Order rejected')
-      onStatusChange()
+      onStatusChange(order.id, 'rejected')
     } else {
       toast.error(data.error)
     }
@@ -119,20 +119,15 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
       {col && <div style={{ height: 3, background: col.border }} />}
 
       <div style={{ padding: '10px 12px' }}>
-        {/* Invoice + amount */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
           <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', margin: 0 }}>{order.invoice_number}</p>
           <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#1a1a1a', flexShrink: 0 }}>{formatMVR(order.total_paid)}</p>
         </div>
 
-        {/* Artwork title */}
-        <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {artworkTitle}
-        </p>
+        <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{artworkTitle}</p>
         <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>by {artistName}</p>
         <p style={{ fontSize: 12, fontWeight: 500, margin: '0 0 8px', color: '#1a1a1a' }}>{order.buyer_name}</p>
 
-        {/* Badges */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           <PaymentBadge method={order.payment_method} />
           <DeliveryBadge method={order.delivery_method} island={order.delivery_island} />
@@ -144,7 +139,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
           </span>
         </div>
 
-        {/* Primary actions */}
         <div style={{ display: 'flex', gap: 6 }}>
           {order.status === 'pending' ? (
             <>
@@ -169,7 +163,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
           </button>
         </div>
 
-        {/* Expanded */}
         {expanded && (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f0f0ec' }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
@@ -191,17 +184,13 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
 
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {order.slip_url && (
-                <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={onViewSlip}>
-                  Slip
-                </button>
+                <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={onViewSlip}>Slip</button>
               )}
               {order.status !== 'pending' && order.status !== 'rejected' && (
                 <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={onViewInvoice}>Invoice</button>
               )}
               {(order.status === 'approved' || order.status === 'printing') && (
-                <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => onPrintLabel(order)}>
-                  Label
-                </button>
+                <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => onPrintLabel(order)}>Label</button>
               )}
             </div>
 
@@ -244,12 +233,21 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       .from('orders')
       .select('*, artworks(title, sku, artist_id, paper_type, profiles:artist_id(full_name, display_name)), order_items(print_size, artwork_id, artworks(title, sku, paper_type, profiles:artist_id(full_name, display_name)))')
       .order('created_at', { ascending: false })
-    setOrders(data || [])
+    if (data) setOrders([...data])
     setLoading(false)
+  }
+
+  function optimisticMove(orderId: number, newStatus: string) {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
+    setTimeout(() => fetchOrders(), 1000)
+    onBadgeRefresh()
   }
 
   async function moveOrder(order: any, newStatus: string) {
     if (order.status === newStatus) return
+    // Optimistic update immediately
+    optimisticMove(order.id, newStatus)
+
     if (newStatus === 'approved' && order.status === 'pending') {
       const res = await fetch('/api/orders/approve', {
         method:  'POST',
@@ -259,10 +257,9 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       const data = await res.json()
       if (data.success) {
         toast.success('Order approved — invoice sent!')
-        fetchOrders()
-        onBadgeRefresh()
       } else {
         toast.error(data.error)
+        fetchOrders() // revert on error
       }
     } else if (newStatus === 'rejected') {
       const res = await fetch('/api/orders/approve', {
@@ -273,10 +270,9 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       const data = await res.json()
       if (data.success) {
         toast.success('Order rejected')
-        fetchOrders()
-        onBadgeRefresh()
       } else {
         toast.error(data.error)
+        fetchOrders()
       }
     } else {
       const res = await fetch('/api/orders/status', {
@@ -287,10 +283,9 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       const data = await res.json()
       if (data.success) {
         toast.success('Moved to ' + newStatus)
-        fetchOrders()
-        onBadgeRefresh()
       } else {
         toast.error(data.error)
+        fetchOrders()
       }
     }
   }
@@ -340,7 +335,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
     }
   }
 
-  const filtered = orders.filter(o =>
+  const filtered     = orders.filter(o =>
     !search ||
     o.invoice_number?.toLowerCase().includes(search.toLowerCase()) ||
     o.buyer_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -360,7 +355,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   return (
     <div>
-      {/* Stats */}
       <div className="grid-4" style={{ marginBottom: 20 }}>
         {[
           ['Pending',   pending,   '#FAEEDA', '#633806'],
@@ -375,7 +369,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         ))}
       </div>
 
-      {/* Toolbar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
         <input
           className="form-input"
@@ -391,10 +384,8 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         </div>
       </div>
 
-      {/* Kanban board */}
       {view === 'kanban' && (
         <div>
-          {/* 4 columns — fit to width, no horizontal scroll */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, width: '100%' }}>
             {COLUMNS.map(col => {
               const colOrders  = mainFiltered.filter(o => o.status === col.key)
@@ -412,7 +403,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                   }}
                   style={{ background: isDragOver ? col.bg : 'transparent', borderRadius: 12, padding: isDragOver ? 4 : 0, transition: 'background 0.15s' }}
                 >
-                  {/* Column header */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '7px 10px', background: col.bg, borderRadius: 10, border: '0.5px solid ' + col.border }}>
                     <p style={{ fontSize: 11, fontWeight: 700, color: col.color, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</p>
                     <span style={{ fontSize: 11, fontWeight: 700, background: col.border, color: '#fff', borderRadius: 20, padding: '1px 8px', minWidth: 20, textAlign: 'center' }}>
@@ -434,7 +424,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                     <KanbanCard
                       key={order.id}
                       order={order}
-                      onStatusChange={() => { fetchOrders(); onBadgeRefresh() }}
+                      onStatusChange={(orderId: number, newStatus: string) => optimisticMove(orderId, newStatus)}
                       onViewInvoice={() => setInvoiceOrder(order)}
                       onViewSlip={() => setSelectedOrder(order)}
                       onPrintLabel={handlePrintLabel}
@@ -446,7 +436,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
             })}
           </div>
 
-          {/* Rejected swimlane */}
           <div style={{ marginTop: 20 }}>
             <button
               onClick={() => setShowRejected(v => !v)}
@@ -464,7 +453,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                   <KanbanCard
                     key={order.id}
                     order={order}
-                    onStatusChange={() => { fetchOrders(); onBadgeRefresh() }}
+                    onStatusChange={(orderId: number, newStatus: string) => optimisticMove(orderId, newStatus)}
                     onViewInvoice={() => setInvoiceOrder(order)}
                     onViewSlip={() => setSelectedOrder(order)}
                     onPrintLabel={handlePrintLabel}
@@ -480,7 +469,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         </div>
       )}
 
-      {/* List view */}
       {view === 'list' && (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {filtered.length === 0 ? (
