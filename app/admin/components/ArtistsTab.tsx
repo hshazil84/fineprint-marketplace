@@ -43,7 +43,7 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
     const { data } = await supabase
       .from('orders')
       .select('artist_earnings, artworks(artist_id)')
-      .eq('status', 'approved')
+      .neq('status', 'rejected')
     setOrders(data || [])
   }
 
@@ -153,20 +153,8 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                     <p style={{ fontSize: 11, color: '#A32D2D', marginTop: 2 }}>{a.email}</p>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      style={{ fontSize: 11 }}
-                      onClick={() => handleWithdrawalAction(a.id, 'approve')}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      className="btn btn-sm"
-                      style={{ fontSize: 11 }}
-                      onClick={() => handleWithdrawalAction(a.id, 'reject')}
-                    >
-                      Reject
-                    </button>
+                    <button className="btn btn-sm btn-danger" style={{ fontSize: 11 }} onClick={() => handleWithdrawalAction(a.id, 'approve')}>Approve</button>
+                    <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => handleWithdrawalAction(a.id, 'reject')}>Reject</button>
                   </div>
                 </div>
               </div>
@@ -215,6 +203,7 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
           const artistPayoutsArr = payouts.filter(p => p.artist_id === a.id && p.status === 'paid')
           const totalEarned      = artistOrders.reduce((s: number, o: any) => s + (o.artist_earnings || 0), 0)
           const totalPaid        = artistPayoutsArr.reduce((s: number, p: any) => s + p.amount, 0)
+          const pendingAmt       = Math.max(0, totalEarned - totalPaid)
           return (
             <div key={a.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: '0.5px solid var(--color-border)' }}>
               <div>
@@ -227,16 +216,12 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                     <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 7px', borderRadius: 20 }}>Withdrawal requested</span>
                   )}
                   {a.account_status === 'withdrawn' && (
-                    <>
-                      <span style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>Withdrawn</span>
-                      <button
-                        className="btn btn-sm"
-                        style={{ fontSize: 11, padding: '2px 10px' }}
-                        onClick={() => handleWithdrawalAction(a.id, 'reactivate')}
-                      >
-                        Reactivate
-                      </button>
-                    </>
+                    <span style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', padding: '1px 7px', borderRadius: 20 }}>Withdrawn</span>
+                  )}
+                  {a.account_status === 'withdrawn' && (
+                    <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 10px' }} onClick={() => handleWithdrawalAction(a.id, 'reactivate')}>
+                      Reactivate
+                    </button>
                   )}
                 </div>
                 <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 2 }}>
@@ -244,7 +229,7 @@ export function ArtistsTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                 </p>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(totalEarned - totalPaid)} pending</p>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{formatMVR(pendingAmt)} pending</p>
                 <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{formatMVR(totalPaid)} paid out</p>
               </div>
             </div>
