@@ -15,20 +15,11 @@ function Divider() {
   return <div style={{ height: '0.5px', background: 'var(--color-border)', margin: '20px 0' }} />
 }
 
-// ── Load font as base64 ───────────────────────────────────────────────────
-async function loadFontAsBase64(path: string): Promise<string> {
-  const res = await fetch(path)
-  const buf = await res.arrayBuffer()
-  const bytes = new Uint8Array(buf)
-  let binary = ''
-  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i])
-  return btoa(binary)
-}
-
 // ── QR Modal ─────────────────────────────────────────────────────────────
 function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, onClose: () => void }) {
   const [downloading, setDownloading] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const cardRef   = useRef<HTMLDivElement>(null)
   const url = APP_URL + '/artwork/' + artwork.id
 
   useEffect(() => {
@@ -44,119 +35,19 @@ function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, on
     renderQR()
   }, [url])
 
-  async function downloadPDF() {
+  async function downloadPNG() {
+    if (!cardRef.current) return
     setDownloading(true)
     try {
-      const QRCode = (await import('qrcode')).default
-      const qrDataUrl = await QRCode.toDataURL(url, {
-        width: 300,
-        margin: 2,
-        color: { dark: '#1a1a1a', light: '#ffffff' },
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(cardRef.current, {
+        pixelRatio: 3,
+        backgroundColor: '#ffffff',
       })
-
-      const { jsPDF } = await import('jspdf')
-      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a6' })
-      const W = 105
-      const H = 148
-      const cx = W / 2
-      const pad = 12
-
-      // Embed DM Sans
-      try {
-        const [regularB64, boldB64] = await Promise.all([
-          loadFontAsBase64('/DMSans-Regular.ttf'),
-          loadFontAsBase64('/DMSans-Bold.ttf'),
-        ])
-        doc.addFileToVFS('DMSans-Regular.ttf', regularB64)
-        doc.addFileToVFS('DMSans-Bold.ttf', boldB64)
-        doc.addFont('DMSans-Regular.ttf', 'DMSans', 'normal')
-        doc.addFont('DMSans-Bold.ttf', 'DMSans', 'bold')
-      } catch {
-        // Font load failed — fallback to helvetica silently
-      }
-
-      const fontName = (doc as any).getFontList()['DMSans'] ? 'DMSans' : 'helvetica'
-
-      // White background
-      doc.setFillColor(255, 255, 255)
-      doc.rect(0, 0, W, H, 'F')
-
-      let y = 22
-
-      // Artwork title
-      doc.setFont(fontName, 'bold')
-      doc.setFontSize(17)
-      doc.setTextColor(10, 10, 10)
-      const titleLines = doc.splitTextToSize(artwork.title || 'Untitled', W - pad * 2)
-      doc.text(titleLines.slice(0, 2), cx, y, { align: 'center', lineHeightFactor: 1.25 })
-      y += titleLines.slice(0, 2).length * 7.8
-
-      // Artist name
-      doc.setFont(fontName, 'normal')
-      doc.setFontSize(9.5)
-      doc.setTextColor(120, 120, 120)
-      doc.text(profile?.display_name || profile?.full_name || '', cx, y + 3, { align: 'center' })
-      y += 9
-
-      // SKU
-      doc.setFont('courier', 'normal')
-      doc.setFontSize(7.5)
-      doc.setTextColor(185, 183, 180)
-      doc.text(artwork.sku || '', cx, y + 2, { align: 'center' })
-      y += 8
-
-      // Hairline divider
-      doc.setDrawColor(230, 230, 230)
-      doc.setLineWidth(0.2)
-      doc.line(pad + 6, y, W - pad - 6, y)
-      y += 7
-
-      // QR code with subtle card
-      const qrSize = 54
-      const qrPad  = 3
-      doc.setFillColor(255, 255, 255)
-      doc.setDrawColor(235, 235, 235)
-      doc.setLineWidth(0.3)
-      doc.roundedRect((W - qrSize - qrPad * 2) / 2, y - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2, 3, 3, 'FD')
-      doc.addImage(qrDataUrl, 'PNG', (W - qrSize) / 2, y, qrSize, qrSize)
-      y += qrSize + qrPad * 2 + 5
-
-      // Hairline divider
-      doc.setDrawColor(230, 230, 230)
-      doc.line(pad + 6, y, W - pad - 6, y)
-      y += 6
-
-      // Scan label
-      doc.setFont(fontName, 'normal')
-      doc.setFontSize(6.5)
-      doc.setTextColor(190, 188, 185)
-      doc.text('scan to own this print', cx, y, { align: 'center' })
-      y += 6
-
-      // FinePrint logo
-      try {
-        const logoImg = new Image()
-        logoImg.crossOrigin = 'anonymous'
-        await new Promise((res, rej) => {
-          logoImg.onload = res
-          logoImg.onerror = rej
-          logoImg.src = '/Asset 1fineprint_long.png'
-        })
-        const logoW = 30
-        const logoH = (logoImg.naturalHeight / logoImg.naturalWidth) * logoW
-        const canvas = document.createElement('canvas')
-        canvas.width  = logoImg.naturalWidth
-        canvas.height = logoImg.naturalHeight
-        canvas.getContext('2d')!.drawImage(logoImg, 0, 0)
-        doc.addImage(canvas.toDataURL('image/png'), 'PNG', (W - logoW) / 2, y, logoW, logoH)
-      } catch {
-        doc.setFont(fontName, 'bold')
-        doc.setFontSize(8)
-        doc.setTextColor(26, 26, 26)
-        doc.text('fineprintstudio', cx, y + 4, { align: 'center' })
-      }
-
-      doc.save('fineprint-' + (artwork.sku || artwork.id) + '-qr.pdf')
+      const link = document.createElement('a')
+      link.download = 'fineprint-' + (artwork.sku || artwork.id) + '-qr.png'
+      link.href = dataUrl
+      link.click()
       toast.success('QR card downloaded!')
     } catch (err: any) {
       toast.error('Download failed: ' + err.message)
@@ -178,20 +69,22 @@ function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, on
         </div>
 
         <div style={{ overflowY: 'auto', padding: 20 }}>
-          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '0.5px solid #e8e8e8', maxWidth: 200, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-            <div style={{ padding: '20px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+
+          {/* Card — exported as PNG */}
+          <div ref={cardRef} style={{ background: '#fff', borderRadius: 16, overflow: 'hidden', border: '0.5px solid #e8e8e8', maxWidth: 220, margin: '0 auto', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
+            <div style={{ padding: '24px 20px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 14, fontWeight: 600, color: '#0a0a0a', margin: '0 0 3px', lineHeight: 1.3 }}>{artwork.title}</p>
-                <p style={{ fontSize: 10, color: '#888', margin: '0 0 2px' }}>{profile?.display_name || profile?.full_name}</p>
+                <p style={{ fontSize: 16, fontWeight: 600, color: '#0a0a0a', margin: '0 0 4px', lineHeight: 1.3, fontFamily: 'DM Sans, sans-serif' }}>{artwork.title}</p>
+                <p style={{ fontSize: 11, color: '#888', margin: '0 0 2px', fontFamily: 'DM Sans, sans-serif' }}>{profile?.display_name || profile?.full_name}</p>
                 <p style={{ fontSize: 9, color: '#bbb', fontFamily: 'monospace', margin: 0 }}>{artwork.sku}</p>
               </div>
               <div style={{ width: '100%', height: '0.5px', background: '#eee' }} />
               <div style={{ background: '#fff', borderRadius: 8, padding: 4, border: '0.5px solid #eee' }}>
-                <canvas ref={canvasRef} style={{ display: 'block', width: 110, height: 110 }} />
+                <canvas ref={canvasRef} style={{ display: 'block', width: 130, height: 130 }} />
               </div>
               <div style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 8, color: '#bbb', margin: '0 0 5px' }}>scan to own this print</p>
-                <img src="/Asset 1fineprint_long.png" alt="FinePrint Studio" style={{ height: 13, width: 'auto', opacity: 0.75 }} />
+                <p style={{ fontSize: 9, color: '#bbb', margin: '0 0 6px', fontFamily: 'DM Sans, sans-serif' }}>scan to own this print</p>
+                <img src="/Asset 1fineprint_long.png" alt="FinePrint Studio" style={{ height: 16, width: 'auto', opacity: 0.8 }} />
               </div>
             </div>
           </div>
@@ -200,16 +93,16 @@ function QRModal({ artwork, profile, onClose }: { artwork: any, profile: any, on
 
           <div style={{ background: 'var(--color-background-secondary)', borderRadius: 8, padding: '10px 14px', marginTop: 10 }}>
             <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: 0 }}>
-              Print this A6 card and place it next to your artwork in galleries, cafes, or hotels. Buyers scan to view and order your print.
+              Print this card and place it next to your artwork in galleries, cafes, or hotels. Buyers scan to view and order your print.
             </p>
           </div>
 
           <button
-            onClick={downloadPDF}
+            onClick={downloadPNG}
             disabled={downloading}
             style={{ width: '100%', marginTop: 14, padding: '13px', background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: downloading ? 'not-allowed' : 'pointer', opacity: downloading ? 0.7 : 1 }}
           >
-            {downloading ? 'Generating PDF...' : 'Download A6 PDF'}
+            {downloading ? 'Generating...' : 'Download PNG'}
           </button>
         </div>
       </div>
