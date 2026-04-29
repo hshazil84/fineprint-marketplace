@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
 import { SlipModal } from '@/app/admin/components/SlipModal'
@@ -116,15 +116,12 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
       onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.1)')}
       onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)')}
     >
-      {/* Top accent */}
       {col && <div style={{ height: 3, background: col.border }} />}
 
-      <div style={{ padding: '12px 14px' }}>
+      <div style={{ padding: '10px 12px' }}>
         {/* Invoice + amount */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
-          <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', margin: 0 }}>
-            {order.invoice_number}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+          <p style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--color-text-muted)', margin: 0 }}>{order.invoice_number}</p>
           <p style={{ fontSize: 13, fontWeight: 700, margin: 0, color: '#1a1a1a', flexShrink: 0 }}>{formatMVR(order.total_paid)}</p>
         </div>
 
@@ -136,7 +133,7 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
         <p style={{ fontSize: 12, fontWeight: 500, margin: '0 0 8px', color: '#1a1a1a' }}>{order.buyer_name}</p>
 
         {/* Badges */}
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           <PaymentBadge method={order.payment_method} />
           <DeliveryBadge method={order.delivery_method} island={order.delivery_island} />
           {order.source === 'pos' && (
@@ -147,38 +144,27 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
           </span>
         </div>
 
-        {/* Action buttons */}
+        {/* Primary actions */}
         <div style={{ display: 'flex', gap: 6 }}>
           {order.status === 'pending' ? (
             <>
-              <button
-                onClick={handleApprove}
-                disabled={updating}
-                style={{ flex: 1, fontSize: 11, padding: '6px 10px', border: 'none', borderRadius: 8, background: '#1D9E75', color: '#fff', fontWeight: 600, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}
-              >
+              <button onClick={handleApprove} disabled={updating}
+                style={{ flex: 1, fontSize: 11, padding: '6px 8px', border: 'none', borderRadius: 8, background: '#1D9E75', color: '#fff', fontWeight: 600, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}>
                 {updating ? '...' : '✓ Approve'}
               </button>
-              <button
-                onClick={handleReject}
-                disabled={updating}
-                style={{ fontSize: 11, padding: '6px 10px', border: 'none', borderRadius: 8, background: '#FCEBEB', color: '#A32D2D', fontWeight: 500, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}
-              >
+              <button onClick={handleReject} disabled={updating}
+                style={{ fontSize: 11, padding: '6px 8px', border: 'none', borderRadius: 8, background: '#FCEBEB', color: '#A32D2D', fontWeight: 500, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}>
                 Reject
               </button>
             </>
           ) : next ? (
-            <button
-              onClick={() => moveTo(next)}
-              disabled={updating}
-              style={{ flex: 1, fontSize: 11, padding: '6px 10px', border: 'none', borderRadius: 8, background: col?.bg || '#f0f0ec', color: col?.color || '#333', fontWeight: 500, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}
-            >
+            <button onClick={() => moveTo(next)} disabled={updating}
+              style={{ flex: 1, fontSize: 11, padding: '6px 8px', border: 'none', borderRadius: 8, background: col?.bg || '#f0f0ec', color: col?.color || '#333', fontWeight: 500, cursor: updating ? 'not-allowed' : 'pointer', opacity: updating ? 0.6 : 1 }}>
               {updating ? '...' : NEXT_LABEL[order.status] || '→'}
             </button>
           ) : null}
-          <button
-            onClick={() => setExpanded(v => !v)}
-            style={{ fontSize: 11, padding: '6px 10px', border: '0.5px solid #e8e8e4', borderRadius: 8, background: 'transparent', cursor: 'pointer', color: 'var(--color-text-muted)', flexShrink: 0 }}
-          >
+          <button onClick={() => setExpanded(v => !v)}
+            style={{ fontSize: 11, padding: '6px 10px', border: '0.5px solid #e8e8e4', borderRadius: 8, background: 'transparent', cursor: 'pointer', color: 'var(--color-text-muted)', flexShrink: 0 }}>
             {expanded ? '▲' : '▼'}
           </button>
         </div>
@@ -186,10 +172,8 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
         {/* Expanded */}
         {expanded && (
           <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid #f0f0ec' }}>
-            {/* Status override */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-              <select
-                className="form-input"
+              <select className="form-input"
                 style={{ fontSize: 11, padding: '4px 8px', flex: 1, height: 'auto' }}
                 value={order.status}
                 onChange={e => moveTo(e.target.value)}
@@ -205,7 +189,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
               </label>
             </div>
 
-            {/* Action links */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {order.slip_url && (
                 <button className="btn btn-sm" style={{ fontSize: 10, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none' }} onClick={onViewSlip}>
@@ -215,14 +198,13 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
               {order.status !== 'pending' && order.status !== 'rejected' && (
                 <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={onViewInvoice}>Invoice</button>
               )}
-              {order.status === 'approved' && (
+              {(order.status === 'approved' || order.status === 'printing') && (
                 <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => onPrintLabel(order)}>
                   Label
                 </button>
               )}
             </div>
 
-            {/* Delivery info */}
             {order.delivery_method === 'delivery' && order.delivery_island && (
               <div style={{ marginTop: 8, background: '#f8f8f6', borderRadius: 8, padding: '8px 10px' }}>
                 <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>Deliver to</p>
@@ -231,7 +213,6 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
               </div>
             )}
 
-            {/* Notes */}
             {order.delivery_notes && (
               <div style={{ marginTop: 6, background: '#FAEEDA', borderRadius: 8, padding: '6px 10px' }}>
                 <p style={{ fontSize: 11, color: '#633806', margin: 0 }}>📝 {order.delivery_notes}</p>
@@ -270,7 +251,6 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   async function moveOrder(order: any, newStatus: string) {
     if (order.status === newStatus) return
     if (newStatus === 'approved' && order.status === 'pending') {
-      // Use approve endpoint to send invoice
       const res = await fetch('/api/orders/approve', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -279,6 +259,20 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       const data = await res.json()
       if (data.success) {
         toast.success('Order approved — invoice sent!')
+        fetchOrders()
+        onBadgeRefresh()
+      } else {
+        toast.error(data.error)
+      }
+    } else if (newStatus === 'rejected') {
+      const res = await fetch('/api/orders/approve', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ invoiceNumber: order.invoice_number, action: 'reject' }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Order rejected')
         fetchOrders()
         onBadgeRefresh()
       } else {
@@ -303,7 +297,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
 
   async function handlePrintLabel(order: any) {
     try {
-      const { printLabel, printItemLabel } = await import('@/lib/label')
+      const { printLabel, printItemLabel } = await import('@/lib/labels')
       const items = order.order_items && order.order_items.length > 0
         ? order.order_items
         : [{ print_size: order.print_size || 'A4', artworks: order.artworks }]
@@ -316,7 +310,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       const hasLarge  = sizes.some(s => s === 'A2' || s === '12x16')
       const hasSmall  = sizes.some(s => s === 'A4' || s === 'A3')
       const packaging = hasLarge && hasSmall ? 'Flat mailer + Tube' : hasLarge ? 'Tube' : 'Flat mailer'
-      printLabel({
+      await printLabel({
         invoiceNumber:  order.invoice_number,
         orderSku:       order.order_sku,
         buyerName:      order.buyer_name,
@@ -328,10 +322,10 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
         packaging,
         approvedAt: order.approved_at || order.created_at,
       })
-      items.forEach((item: any) => {
+      for (const item of items) {
         const artwork    = item.artworks || order.artworks
         const artistName = artwork?.profiles?.display_name || artwork?.profiles?.full_name || ''
-        printItemLabel({
+        await printItemLabel({
           invoiceNumber: order.invoice_number,
           artworkSku:    artwork?.sku    || order.order_sku,
           artworkTitle:  artwork?.title  || 'Untitled',
@@ -339,7 +333,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
           paperType:     artwork?.paper_type || order.paper_type || 'Standard',
           printSize:     item.print_size     || order.print_size || 'A4',
         })
-      })
+      }
       toast.success('Labels generated — ' + (items.length + 1) + ' PDFs')
     } catch (err: any) {
       toast.error('Label error: ' + err.message)
@@ -354,8 +348,8 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
     o.order_sku?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const rejected      = filtered.filter(o => o.status === 'rejected')
-  const mainFiltered  = filtered.filter(o => o.status !== 'rejected')
+  const rejected     = filtered.filter(o => o.status === 'rejected')
+  const mainFiltered = filtered.filter(o => o.status !== 'rejected')
 
   const pending   = orders.filter(o => o.status === 'pending').length
   const approved  = orders.filter(o => o.status === 'approved').length
@@ -400,8 +394,8 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
       {/* Kanban board */}
       {view === 'kanban' && (
         <div>
-          {/* Main columns */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(240px, 1fr))', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+          {/* 4 columns — fit to width, no horizontal scroll */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, width: '100%' }}>
             {COLUMNS.map(col => {
               const colOrders  = mainFiltered.filter(o => o.status === col.key)
               const isDragOver = dragOver === col.key
@@ -416,20 +410,19 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                     if (dragging) moveOrder(dragging, col.key)
                     setDragging(null)
                   }}
-                  style={{ minWidth: 240, transition: 'background 0.15s', background: isDragOver ? col.bg : 'transparent', borderRadius: 12, padding: isDragOver ? 4 : 0 }}
+                  style={{ background: isDragOver ? col.bg : 'transparent', borderRadius: 12, padding: isDragOver ? 4 : 0, transition: 'background 0.15s' }}
                 >
                   {/* Column header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '8px 12px', background: col.bg, borderRadius: 10, border: '0.5px solid ' + col.border }}>
-                    <p style={{ fontSize: 11, fontWeight: 700, color: col.color, margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{col.label}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, padding: '7px 10px', background: col.bg, borderRadius: 10, border: '0.5px solid ' + col.border }}>
+                    <p style={{ fontSize: 11, fontWeight: 700, color: col.color, margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{col.label}</p>
                     <span style={{ fontSize: 11, fontWeight: 700, background: col.border, color: '#fff', borderRadius: 20, padding: '1px 8px', minWidth: 20, textAlign: 'center' }}>
                       {colOrders.length}
                     </span>
                   </div>
 
-                  {/* Drop zone hint */}
                   {isDragOver && (
                     <div style={{ border: '2px dashed ' + col.border, borderRadius: 10, padding: 16, textAlign: 'center', marginBottom: 10, background: '#fff' }}>
-                      <p style={{ fontSize: 12, color: col.color, margin: 0, fontWeight: 500 }}>Drop to move → {col.label}</p>
+                      <p style={{ fontSize: 12, color: col.color, margin: 0, fontWeight: 500 }}>Drop → {col.label}</p>
                     </div>
                   )}
 
@@ -466,7 +459,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
               </span>
             </button>
             {showRejected && rejected.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10, marginTop: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10, marginTop: 8 }}>
                 {rejected.map(order => (
                   <KanbanCard
                     key={order.id}
@@ -514,7 +507,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
                   {o.status !== 'pending' && o.status !== 'rejected' && (
                     <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => setInvoiceOrder(o)}>Invoice</button>
                   )}
-                  {o.status === 'approved' && (
+                  {(o.status === 'approved' || o.status === 'printing') && (
                     <button className="btn btn-sm" style={{ fontSize: 10, background: '#1a1a1a', color: '#fff', border: 'none' }} onClick={() => handlePrintLabel(o)}>Label</button>
                   )}
                 </div>
