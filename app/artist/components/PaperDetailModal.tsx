@@ -83,79 +83,125 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
   return (
     <div
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
-      style={{ position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(0,0,0,0.5)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 20,
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+      }}
     >
       <div
         onClick={e => e.stopPropagation()}
-        style={{ background: 'var(--color-background-primary)', borderRadius: '20px 20px 0 0', width: '100%', maxWidth: 560, maxHeight: '92dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        style={{
+          background: 'var(--color-background-primary)',
+          borderRadius: 20,
+          width: '100%',
+          maxWidth: 400,
+          maxHeight: '88vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.3)',
+        }}
       >
-        {/* Drag handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flexShrink: 0 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 2, background: 'var(--color-border)' }} />
-        </div>
-
         {/* Image carousel */}
         <div
-          style={{ position: 'relative', height: 200, background: 'var(--color-background-secondary)', flexShrink: 0, overflow: 'hidden' }}
+          style={{ position: 'relative', height: 200, background: 'var(--color-background-secondary)', flexShrink: 0, overflow: 'hidden', borderRadius: '20px 20px 0 0' }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
           {images.length > 0 ? (
-            <img src={images[activeImg]} alt={paper.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img
+              src={images[activeImg]}
+              alt={paper.name}
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
           ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>No images yet</div>
+            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-text-muted)' }}>
+              No images yet
+            </div>
           )}
-          <button onClick={onClose} style={{ position: 'absolute', top: 10, right: 10, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>×</button>
+
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2, backdropFilter: 'blur(4px)' }}
+          >×</button>
+
+          {/* Prev */}
           {images.length > 1 && activeImg > 0 && (
-            <button onClick={() => setActiveImg(i => i - 1)} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>‹</button>
+            <button onClick={() => setActiveImg(i => i - 1)}
+              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>‹</button>
           )}
+
+          {/* Next */}
           {images.length > 1 && activeImg < images.length - 1 && (
-            <button onClick={() => setActiveImg(i => i + 1)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: '#fff', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>›</button>
+            <button onClick={() => setActiveImg(i => i + 1)}
+              style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 30, height: 30, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.45)', color: '#fff', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>›</button>
           )}
+
+          {/* Dots */}
           {images.length > 1 && (
             <div style={{ position: 'absolute', bottom: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 6, zIndex: 2 }}>
               {images.map((_, i) => (
-                <div key={i} onClick={() => setActiveImg(i)} style={{ width: 6, height: 6, borderRadius: '50%', background: i === activeImg ? '#fff' : 'rgba(255,255,255,0.5)', cursor: 'pointer' }} />
+                <div key={i} onClick={() => setActiveImg(i)}
+                  style={{ width: 6, height: 6, borderRadius: '50%', background: i === activeImg ? '#fff' : 'rgba(255,255,255,0.45)', cursor: 'pointer', transition: 'background 0.2s' }} />
               ))}
             </div>
           )}
         </div>
 
-        {/* Scrollable content */}
-        <div style={{ padding: '16px 20px 40px', overflowY: 'auto', flex: 1 }}>
-
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-              <p style={{ fontSize: 15, fontWeight: 500, margin: 0 }}>{paper.name}</p>
-              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 500, background: hasPremium ? '#2C2C2A' : '#D3D1C7', color: hasPremium ? '#F1EFE8' : '#444441' }}>
-                {hasPremium ? 'Premium' : 'Standard'}
-              </span>
+        {/* Header */}
+        <div style={{ padding: '18px 20px 0', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+            <div>
+              <p style={{ fontSize: 17, fontWeight: 600, margin: '0 0 3px', color: 'var(--color-text-primary)', letterSpacing: '-0.2px' }}>{paper.name}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {paper.weight_gsm && (
+                  <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{paper.weight_gsm} gsm</span>
+                )}
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 20, fontWeight: 600, background: hasPremium ? '#2C2C2A' : '#E8E6E0', color: hasPremium ? '#F1EFE8' : '#666460' }}>
+                  {hasPremium ? 'Premium' : 'Standard'}
+                </span>
+              </div>
             </div>
-            {paper.weight_gsm && <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>{paper.weight_gsm} gsm</p>}
           </div>
+        </div>
 
+        {/* Scrollable content */}
+        <div style={{ padding: '16px 20px 32px', overflowY: 'auto', flex: 1 }}>
+
+          {/* Best for tags */}
           {bestFor.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
               {bestFor.map(key => (
-                <span key={key} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 20, background: '#E6F1FB', color: '#185FA5', fontWeight: 500 }}>
+                <span key={key} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 20, background: '#EBF3FC', color: '#185FA5', fontWeight: 500 }}>
                   ✓ {BEST_FOR_LABELS[key] || key}
                 </span>
               ))}
             </div>
           )}
 
+          {/* Description */}
           {paper.description && (
-            <p style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.6, margin: '0 0 14px' }}>{paper.description}</p>
+            <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.65, margin: '0 0 20px' }}>
+              {paper.description}
+            </p>
           )}
 
-          <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14 }}>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available sizes</p>
+          {/* Available sizes */}
+          <div style={{ background: 'var(--color-background-secondary)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 500 }}>
+              Available sizes
+            </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {offeredSizes.map(({ label, qty }) => {
                 const status = getSizeStatus(qty, paper.stock_low_threshold)
                 const config = STOCK_SIZE_CONFIG[status]
                 return (
-                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, background: config.bg, borderRadius: 8, padding: '6px 12px' }}>
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, background: config.bg, borderRadius: 8, padding: '6px 14px' }}>
                     <div style={{ width: 6, height: 6, borderRadius: '50%', background: config.color, flexShrink: 0 }} />
                     <span style={{ fontSize: 13, fontWeight: 500, color: config.color }}>{label}{config.label}</span>
                   </div>
@@ -164,32 +210,43 @@ export function PaperDetailModal({ paper, onClose }: PaperDetailProps) {
             </div>
           </div>
 
-          <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14 }}>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Price add-ons (MVR)</p>
+          {/* Price add-ons */}
+          <div style={{ background: 'var(--color-background-secondary)', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 10px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 500 }}>
+              Price add-ons (MVR)
+            </p>
             <div style={{ display: 'flex', gap: 8 }}>
               {addOns.map(({ label, value }) => (
-                <div key={label} style={{ flex: 1, textAlign: 'center', background: 'var(--color-background-secondary)', borderRadius: 8, padding: 8 }}>
-                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px' }}>{label}</p>
-                  <p style={{ fontSize: 14, fontWeight: 500, margin: 0 }}>{value > 0 ? '+' + value : 'Free'}</p>
+                <div key={label} style={{ flex: 1, textAlign: 'center', background: 'var(--color-background-primary)', borderRadius: 8, padding: '10px 8px', border: '0.5px solid var(--color-border)' }}>
+                  <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 3px' }}>{label}</p>
+                  <p style={{ fontSize: 15, fontWeight: 600, margin: 0, color: value > 0 ? '#633806' : '#0F6E56' }}>
+                    {value > 0 ? '+' + value : 'Free'}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Barcode */}
           {paper.barcode && (
-            <div style={{ borderTop: '0.5px solid var(--color-border)', paddingTop: 12, marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ background: 'var(--color-background-secondary)', borderRadius: 12, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
               <div>
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>EAN</p>
-                <p style={{ fontSize: 13, fontFamily: 'var(--font-mono)', margin: 0 }}>{paper.barcode}</p>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 500 }}>EAN</p>
+                <p style={{ fontSize: 13, fontFamily: 'var(--font-mono)', margin: 0, color: 'var(--color-text-primary)' }}>{paper.barcode}</p>
               </div>
-              <BarcodeImage value={paper.barcode} width={120} />
+              <BarcodeImage value={paper.barcode} width={110} />
             </div>
           )}
 
+          {/* Datasheet */}
           {paper.datasheet_url && (
-            <a href={paper.datasheet_url} target="_blank" rel="noopener noreferrer"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#0F6E56', textDecoration: 'none', border: '0.5px solid #5DCAA5', borderRadius: 8, padding: '8px 14px' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            
+              href={paper.datasheet_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13, fontWeight: 500, color: '#0F6E56', textDecoration: 'none', background: '#E1F5EE', borderRadius: 12, padding: '12px 16px' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
