@@ -20,7 +20,8 @@
     "framer-motion": "^11.0.0",
     "jspdf": "^2.5.1",
     "qrcode": "^1.5.3",
-    "bwip-js": "^3.4.0"
+    "bwip-js": "^3.4.0",
+    "html-to-image": "^1.11.11"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
