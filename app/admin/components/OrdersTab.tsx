@@ -10,15 +10,15 @@ const COLUMNS = [
   { key: 'pending',   label: 'Pending',   color: '#633806', bg: '#FAEEDA', border: '#EF9F27' },
   { key: 'approved',  label: 'Approved',  color: '#185FA5', bg: '#E6F1FB', border: '#5B9FD4' },
   { key: 'printing',  label: 'Printing',  color: '#5B3FA5', bg: '#EEE6FB', border: '#9B7FD4' },
-  { key: 'delivered', label: 'Delivered', color: '#0F6E56', bg: '#E1F5EE', border: '#5DCAA5' },
+  { key: 'completed', label: 'Delivered', color: '#0F6E56', bg: '#E1F5EE', border: '#5DCAA5' },
 ]
 
-const ALL_STATUSES = ['pending', 'approved', 'printing', 'delivered', 'rejected']
+const ALL_STATUSES = ['pending', 'approved', 'printing', 'ready', 'completed', 'rejected']
 
 const NEXT_STATUS: Record<string, string> = {
   pending:  'approved',
   approved: 'printing',
-  printing: 'delivered',
+  printing: 'completed',
 }
 
 const NEXT_LABEL: Record<string, string> = {
@@ -58,7 +58,7 @@ function KanbanCard({ order, onStatusChange, onViewInvoice, onViewSlip, onPrintL
   async function moveTo(newStatus: string) {
     if (newStatus === order.status || updating) return
     setUpdating(true)
-    const shouldNotify = sendEmail && newStatus === 'delivered'
+    const shouldNotify = sendEmail && newStatus === 'completed'
     const res = await fetch('/api/orders/status', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -336,7 +336,7 @@ export function OrdersTab({ onBadgeRefresh }: { onBadgeRefresh: () => void }) {
   const pending   = orders.filter(o => o.status === 'pending').length
   const approved  = orders.filter(o => o.status === 'approved').length
   const printing  = orders.filter(o => o.status === 'printing').length
-  const delivered = orders.filter(o => o.status === 'delivered').length
+  const delivered = orders.filter(o => o.status === 'completed').length
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--color-text-muted)' }}>Loading orders...</div>
 
