@@ -60,3 +60,9 @@ export function getFromPrice(
   const prices    = calculatePrices(artistPrice, offerPct, null, 'delivery', minSize, paperAddOnFn(minSize))
   return prices.artworkLineItem
 }
+
+export const SIZES = ['A4', 'A3', 'A2', '12x16']
+
+export function buildOrderSKU(artworkSku: string, printSize: string): string {
+  return artworkSku + '-' + printSize
+}
