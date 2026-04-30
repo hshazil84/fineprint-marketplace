@@ -19,13 +19,14 @@ export function formatMVR(amount: number): string {
 // Artist enters price = what they receive
 // Platform fee added ON TOP → buyer pays more, artist gets exactly what they set
 export function calculatePrices(
+export function calculatePrices(
   artistPrice:    number,
   offerPct:       number      = 0,
   offerLabel:     string|null = null,
   deliveryMethod: string      = 'delivery',
   printSize:      string      = 'A4',
+  _paperType:     string      = '',   // kept for API compatibility
   paperAddOnAmt:  number      = 0,
-  _paperType:     string      = '',   // kept for API compatibility, unused
 ) {
   const printingFee     = (PRINTING_FEES[printSize] || PRINTING_FEES['A4']) + paperAddOnAmt
   const platformFeeAmt  = Math.round(artistPrice * PLATFORM_FEE_PCT / 100)
