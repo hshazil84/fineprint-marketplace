@@ -1,134 +1,62 @@
-export const PLATFORM_FEE_PCT = 5
-export const HANDLING_FEE     = 100
-export const COMMISSION_PCT   = 5
+import { DEFAULT_PRINTING_FEES, DEFAULT_PLATFORM_FEE_PCT, DEFAULT_HANDLING_FEE } from '@/lib/settings'
 
-export const PRINTING_FEES: Record<string, number> = {
-  'A4':    200,
-  'A3':    350,
-  'A2':    500,
-  '12x16': 450,
-}
-
-export const SIZES = ['A4', 'A3']
+// Re-export for convenience
+export const PRINTING_FEES    = DEFAULT_PRINTING_FEES
+export const PLATFORM_FEE_PCT = DEFAULT_PLATFORM_FEE_PCT
+export const HANDLING_FEE     = DEFAULT_HANDLING_FEE
 
 export const SIZE_DIMENSIONS: Record<string, string> = {
-  'A4':    '210 × 297 mm',
-  'A3':    '297 × 420 mm',
-  'A2':    '420 × 594 mm',
-  '12x16': '305 × 406 mm',
+  'A4':    '21 × 29.7 cm',
+  'A3':    '29.7 × 42 cm',
+  'A2':    '42 × 59.4 cm',
+  '12x16': '30.5 × 40.6 cm',
 }
-
-export const DEFAULT_PAPER = 'Photo Luster'
 
 export function formatMVR(amount: number): string {
-  return `MVR ${amount.toLocaleString()}`
+  return 'MVR ' + Math.round(amount).toLocaleString()
 }
 
-export function buildOrderSKU(artworkSKU: string, size: string): string {
-  return `${artworkSKU}-${size.replace(/[^A-Za-z0-9]/g, '')}`
-}
-
-// ─── Price calculation ───────────────────────────────────────────────────────
-// Artist enters the amount they WANT TO RECEIVE.
-// Platform fee (5%) is added ON TOP of artist price.
-// artistEarnings = artistPrice (exactly what they entered)
-// grossPrice     = artistPrice + 5% of artistPrice
-// buyer pays     = grossPrice + printingFee + paperAddOn + handlingFee
-
-export interface PriceBreakdown {
-  artistPrice:     number
-  grossPrice:      number
-  platformFeePct:  number
-  platformFeeAmt:  number
-  artistEarnings:  number
-  printSize:       string
-  printingFee:     number
-  paperAddOn:      number
-  totalPrintFee:   number
-  paperType:       string
-  deliveryMethod:  'delivery' | 'pickup'
-  handlingFee:     number
-  artworkLineItem: number
-  totalPaid:       number
-  offerLabel:      string | null
-  offerPct:        number
-  discountAmount:  number
-  fpTotal:         number
-  originalPrice:   number
-  printPrice:      number
-  fpCommission:    number
-}
-
+// Artist enters price = what they receive
+// Platform fee added ON TOP → buyer pays more, artist gets exactly what they set
 export function calculatePrices(
-  artistPrice:    number,
-  offerPct:       number = 0,
-  offerLabel:     string | null = null,
-  deliveryMethod: 'delivery' | 'pickup' = 'delivery',
-  printSize:      string = 'A4',
-  paperType:      string = DEFAULT_PAPER,
-  paperAddOnAmt:  number = 0,
-): PriceBreakdown {
-  // Platform fee added on top — artist receives exactly artistPrice
-  const platformFeeAmt = Math.round(artistPrice * PLATFORM_FEE_PCT / 100)
-  const grossPrice     = artistPrice + platformFeeAmt
-  const artistEarnings = artistPrice
-
-  // Apply offer discount on gross price
-  const discountAmount     = Math.round(grossPrice * offerPct / 100)
-  const discountedGross    = grossPrice - discountAmount
-  const discountedEarnings = Math.round(discountedGross * (100 - PLATFORM_FEE_PCT) / 100)
-
-  const printingFee     = PRINTING_FEES[printSize] || PRINTING_FEES['A4']
-  const totalPrintFee   = printingFee + paperAddOnAmt
-  const handlingFee     = deliveryMethod === 'delivery' ? HANDLING_FEE : 0
-  const artworkLineItem = discountedGross + totalPrintFee
-  const totalPaid       = artworkLineItem + handlingFee
-  const fpTotal         = platformFeeAmt + totalPrintFee + handlingFee
+  artistPrice:   number,
+  offerPct:      number      = 0,
+  offerLabel:    string|null = null,
+  deliveryMethod: string     = 'delivery',
+  printSize:     string      = 'A4',
+  paperAddOnAmt: number      = 0,
+) {
+  const printingFee     = (PRINTING_FEES[printSize] || PRINTING_FEES['A4']) + paperAddOnAmt
+  const platformFeeAmt  = Math.round(artistPrice * PLATFORM_FEE_PCT / 100)
+  const grossPrice      = artistPrice + platformFeeAmt  // buyer-facing artwork price before offer
+  const discountAmount  = offerPct > 0 ? Math.round(grossPrice * offerPct / 100) : 0
+  const discountedPrice = grossPrice - discountAmount
+  const artworkLineItem = discountedPrice + printingFee
+  const artistEarnings  = artistPrice                   // always exact
 
   return {
     artistPrice,
-    grossPrice,
-    platformFeePct:  PLATFORM_FEE_PCT,
     platformFeeAmt,
-    artistEarnings:  offerPct > 0 ? discountedEarnings : artistEarnings,
-    printSize,
+    grossPrice,
+    discountAmount,
+    discountedPrice,
     printingFee,
-    paperAddOn:      paperAddOnAmt,
-    totalPrintFee,
-    paperType,
-    deliveryMethod,
-    handlingFee,
     artworkLineItem,
-    totalPaid,
+    artistEarnings,
     offerLabel,
     offerPct,
-    discountAmount,
-    fpTotal,
-    originalPrice:  grossPrice,
-    printPrice:     discountedGross,
-    fpCommission:   platformFeeAmt,
   }
 }
 
 export function getFromPrice(
-  artistPrice:    number,
-  sizes:          string[],
-  offerPct:       number = 0,
-  paperAddOnFn?:  (size: string) => number,
+  artistPrice:  number,
+  offerPct:     number = 0,
+  paperAddOnFn: (size: string) => number = () => 0,
 ): number {
-  if (!sizes || sizes.length === 0) sizes = ['A4']
-  const platformFeeAmt  = Math.round(artistPrice * PLATFORM_FEE_PCT / 100)
-  const grossPrice      = artistPrice + platformFeeAmt
-  const discountedGross = grossPrice - Math.round(grossPrice * offerPct / 100)
-  const lowestPrintFee  = Math.min(...sizes.map(s => {
-    const base  = PRINTING_FEES[s] || PRINTING_FEES['A4']
-    const addOn = paperAddOnFn ? paperAddOnFn(s) : 0
-    return base + addOn
-  }))
-  return discountedGross + lowestPrintFee
-}
-
-// Legacy compat — returns 0, callers should use usePapers().getPaperAddOn()
-export function getPaperAddOn(paperType: string, printSize: string): number {
-  return 0
+  const sizes     = Object.keys(PRINTING_FEES)
+  const minSize   = sizes.reduce((min, s) =>
+    (PRINTING_FEES[s] + paperAddOnFn(s)) < (PRINTING_FEES[min] + paperAddOnFn(min)) ? s : min
+  )
+  const prices    = calculatePrices(artistPrice, offerPct, null, 'delivery', minSize, paperAddOnFn(minSize))
+  return prices.artworkLineItem
 }
