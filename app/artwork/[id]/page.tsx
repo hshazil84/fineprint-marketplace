@@ -147,7 +147,7 @@ export default function ArtworkPage() {
         artistId:     artwork.artist_id,
         printSize:    selectedSize,
         artistPrice:  artwork.price,
-        printingFee:  prices.totalPrintFee,
+        printingFee:  prices.printingFee,
         offerLabel:   artwork.offer_label,
         offerPct:     artwork.offer_pct,
         previewUrl:   artwork.preview_url,
