@@ -21,7 +21,7 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
     supabase
       .from('artwork_images')
       .select('*')
-      .eq('artwork_id', params.id)
+      .eq('artwork_id', parseInt(params.id)
       .order('sort_order', { ascending: true }),
   ])
 
