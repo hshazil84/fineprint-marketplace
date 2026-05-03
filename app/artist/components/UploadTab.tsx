@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
@@ -57,13 +57,23 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [isLimited, setIsLimited]         = useState(false)
   const [editionSize, setEditionSize]     = useState<string>('50')
   const [hiresFile, setHiresFile]         = useState<File | null>(null)
-  const [previewFile, setPreviewFile]     = useState<File | null>(null)
-  const [previewThumb, setPreviewThumb]   = useState<string | null>(null)
-  const [galleryFiles, setGalleryFiles]   = useState<(File | null)[]>([null, null, null])
-  const [galleryThumbs, setGalleryThumbs] = useState<(string | null)[]>([null, null, null])
-  const [activeThumb, setActiveThumb]     = useState<number>(0)
-  const [uploading, setUploading]         = useState(false)
-  const [detailPaper, setDetailPaper]     = useState<any>(null)
+
+  // Images — slot 0 = main preview, slots 1-2 = gallery
+  const [imageFiles, setImageFiles]   = useState<(File | null)[]>([null, null, null])
+  const [imageThumbs, setImageThumbs] = useState<(string | null)[]>([null, null, null])
+  const [activeSlot, setActiveSlot]   = useState<number>(0)
+
+  // Series / variants
+  const [isSeries, setIsSeries]           = useState(false)
+  const [seriesMode, setSeriesMode]       = useState<'new' | 'existing'>('new')
+  const [newSeriesName, setNewSeriesName] = useState('')
+  const [existingSeries, setExistingSeries] = useState<any[]>([])
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string>('')
+  const [seriesLabel, setSeriesLabel]     = useState('')
+  const [isPrimary, setIsPrimary]         = useState(true)
+
+  const [uploading, setUploading]   = useState(false)
+  const [detailPaper, setDetailPaper] = useState<any>(null)
 
   const effectivePaperType = paperType || getDefaultPaper(form.category)
   const nextSku            = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
@@ -73,6 +83,23 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const papersByCategory   = getPapersByCategory()
   const selectedPaper      = papers.find(p => p.name === effectivePaperType)
   const bestForKey         = CATEGORY_TO_BEST_FOR[form.category]
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    if (isSeries && seriesMode === 'existing') fetchExistingSeries()
+  }, [isSeries, seriesMode])
+
+  async function fetchExistingSeries() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('artwork_series')
+      .select('*, artworks!artwork_series_primary_artwork_id_fkey(title)')
+      .eq('artist_id', user.id)
+      .order('created_at', { ascending: false })
+    setExistingSeries(data || [])
+  }
 
   function toggleSize(size: string) {
     setSelectedSizes(prev =>
@@ -85,42 +112,32 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     setPaperType('')
   }
 
-  function handlePreviewSelect(file: File | null) {
-    setPreviewFile(file)
-    if (file?.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onload = ev => { setPreviewThumb(ev.target?.result as string); setActiveThumb(0) }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  function clearPreview() { setPreviewFile(null); setPreviewThumb(null); setActiveThumb(0) }
-
-  function handleGallerySelect(index: number, file: File | null) {
+  function handleImageSelect(slotIdx: number, file: File | null) {
     if (!file) return
-    const newFiles = [...galleryFiles]; newFiles[index] = file; setGalleryFiles(newFiles)
+    const newFiles = [...imageFiles]; newFiles[slotIdx] = file; setImageFiles(newFiles)
     const reader = new FileReader()
     reader.onload = ev => {
-      const newThumbs = [...galleryThumbs]; newThumbs[index] = ev.target?.result as string
-      setGalleryThumbs(newThumbs); setActiveThumb(index + 1)
+      const newThumbs = [...imageThumbs]; newThumbs[slotIdx] = ev.target?.result as string
+      setImageThumbs(newThumbs); setActiveSlot(slotIdx)
     }
     reader.readAsDataURL(file)
   }
 
-  function clearGallerySlot(index: number) {
-    const newFiles  = [...galleryFiles];  newFiles[index]  = null; setGalleryFiles(newFiles)
-    const newThumbs = [...galleryThumbs]; newThumbs[index] = null; setGalleryThumbs(newThumbs)
-    if (activeThumb === index + 1) setActiveThumb(0)
+  function clearImageSlot(slotIdx: number) {
+    const newFiles  = [...imageFiles];  newFiles[slotIdx]  = null; setImageFiles(newFiles)
+    const newThumbs = [...imageThumbs]; newThumbs[slotIdx] = null; setImageThumbs(newThumbs)
+    if (activeSlot === slotIdx) setActiveSlot(0)
   }
 
-  const bigImage = activeThumb === 0 ? previewThumb : galleryThumbs[activeThumb - 1]
-
   async function handleUpload() {
-    if (!form.title)                        { toast.error('Please fill in the title'); return }
-    if (!form.price || price < 1)           { toast.error('Please set a price'); return }
-    if (selectedSizes.length === 0)         { toast.error('Please select at least one print size'); return }
-    if (!hiresFile)                         { toast.error('Please upload your hi-res print file'); return }
-    if (!previewFile)                       { toast.error('Please upload a preview image'); return }
+    if (!form.title)                { toast.error('Please fill in the title'); return }
+    if (!form.price || price < 1)   { toast.error('Please set a price'); return }
+    if (selectedSizes.length === 0) { toast.error('Please select at least one print size'); return }
+    if (!hiresFile)                 { toast.error('Please upload your hi-res print file'); return }
+    if (!imageFiles[0])             { toast.error('Please upload a main preview image'); return }
+    if (isSeries && seriesMode === 'new' && !newSeriesName.trim()) { toast.error('Please enter a series name'); return }
+    if (isSeries && seriesMode === 'existing' && !selectedSeriesId) { toast.error('Please select a series'); return }
+    if (isSeries && !seriesLabel.trim()) { toast.error('Please enter a variant label (e.g. Sunset)'); return }
     if (isLimited && (!editionSize || parseInt(editionSize) < 1)) { toast.error('Please set a valid edition size'); return }
 
     const dimError = await validateHiRes(hiresFile, selectedSizes)
@@ -128,7 +145,6 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
 
     setUploading(true)
     try {
-      const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not logged in')
 
@@ -139,20 +155,39 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       const seq = String((count || 0) + 1).padStart(3, '0')
       const sku = 'FP-' + prof.artist_code + '-' + seq
 
+      // Upload hi-res
       toast.loading('Uploading hi-res file...', { id: 'upload' })
       const hiresExt  = hiresFile.name.split('.').pop()
       const hiresPath = sku + '-hires.' + hiresExt
       const { error: hiresError } = await supabase.storage.from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type })
       if (hiresError) throw hiresError
 
+      // Upload main preview (slot 0)
       toast.loading('Uploading preview...', { id: 'upload' })
+      const previewFile = imageFiles[0]!
       const previewExt  = previewFile.name.split('.').pop()
       const previewPath = sku + '-preview.' + previewExt
       const { error: previewError } = await supabase.storage.from('artwork-previews').upload(previewPath, previewFile, { contentType: previewFile.type })
       if (previewError) throw previewError
-
       const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
 
+      // Handle series
+      let seriesId: string | null = null
+      if (isSeries) {
+        if (seriesMode === 'new') {
+          const { data: newSeries, error: seriesError } = await supabase
+            .from('artwork_series')
+            .insert({ name: newSeriesName.trim(), artist_id: user.id })
+            .select()
+            .single()
+          if (seriesError) throw seriesError
+          seriesId = newSeries.id
+        } else {
+          seriesId = selectedSeriesId
+        }
+      }
+
+      // Save artwork
       toast.loading('Saving listing...', { id: 'upload' })
       const { data: artwork, error: dbError } = await supabase.from('artworks').insert({
         sku,
@@ -169,21 +204,30 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         paper_type:    effectivePaperType,
         edition_size:  isLimited ? parseInt(editionSize) : null,
         editions_sold: 0,
+        series_id:     seriesId,
+        series_label:  isSeries ? seriesLabel.trim() : null,
       }).select().single()
       if (dbError) throw dbError
 
-      if (galleryFiles.some(Boolean) && artwork) {
-        toast.loading('Uploading gallery...', { id: 'upload' })
-        for (let i = 0; i < galleryFiles.length; i++) {
-          const gFile = galleryFiles[i]
-          if (!gFile) continue
-          const gExt  = gFile.name.split('.').pop()
-          const gPath = 'gallery/' + sku + '-gallery-' + (i + 1) + '.' + gExt
-          const { error: gError } = await supabase.storage.from('artwork-previews').upload(gPath, gFile, { contentType: gFile.type })
-          if (gError) { console.error(gError); continue }
-          const { data: gUrl } = supabase.storage.from('artwork-previews').getPublicUrl(gPath)
-          await supabase.from('artwork_images').insert({ artwork_id: artwork.id, url: gUrl.publicUrl, sort_order: i + 1 })
-        }
+      // If new series and this is primary — update series primary_artwork_id
+      if (isSeries && isPrimary && seriesId) {
+        await supabase
+          .from('artwork_series')
+          .update({ primary_artwork_id: artwork.id })
+          .eq('id', seriesId)
+      }
+
+      // Upload gallery images (slots 1 and 2)
+      toast.loading('Uploading gallery...', { id: 'upload' })
+      for (let i = 1; i <= 2; i++) {
+        const gFile = imageFiles[i]
+        if (!gFile) continue
+        const gExt  = gFile.name.split('.').pop()
+        const gPath = 'gallery/' + sku + '-gallery-' + i + '.' + gExt
+        const { error: gError } = await supabase.storage.from('artwork-previews').upload(gPath, gFile, { contentType: gFile.type })
+        if (gError) { console.error(gError); continue }
+        const { data: gUrl } = supabase.storage.from('artwork-previews').getPublicUrl(gPath)
+        await supabase.from('artwork_images').insert({ artwork_id: artwork.id, url: gUrl.publicUrl, sort_order: i })
       }
 
       await fetch('/api/notify/artwork', {
@@ -205,7 +249,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
     <div className="card" style={{ maxWidth: 560 }}>
       <p style={{ fontSize: 15, fontWeight: 500, marginBottom: 2 }}>Upload new artwork</p>
       <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 24 }}>
-        Upload your hi-res print file and a watermarked preview for buyers.
+        Upload your hi-res print file and preview images for buyers.
       </p>
 
       {/* ── HI-RES FILE ───────────────────────────────────────── */}
@@ -233,9 +277,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
           <button
             onClick={() => document.getElementById('hires-input')?.click()}
             style={{ fontSize: 11, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', display: 'block' }}
-          >
-            Change file
-          </button>
+          >Change file</button>
         )}
       </div>
       <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 24 }}>
@@ -244,64 +286,94 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       <input type="file" id="hires-input" accept="image/*" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) setHiresFile(e.target.files[0]) }} />
 
       {/* ── PREVIEW IMAGES ────────────────────────────────────── */}
-      <SectionLabel hint="Shown to buyers — add your watermark before uploading.">Preview image</SectionLabel>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 6 }}>
-        <div
-          onClick={() => !bigImage && document.getElementById('preview-input')?.click()}
-          style={{ aspectRatio: '4/3', borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: bigImage ? 'default' : 'pointer' }}
-        >
-          {bigImage ? (
-            <>
-              <img src={bigImage} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-              {activeThumb === 0 && (
-                <>
-                  <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 20, pointerEvents: 'none' }}>Main</div>
-                  <button onClick={e => { e.stopPropagation(); clearPreview() }}
-                    style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-                </>
-              )}
-              {activeThumb > 0 && galleryThumbs[activeThumb - 1] && (
-                <button onClick={e => { e.stopPropagation(); clearGallerySlot(activeThumb - 1) }}
-                  style={{ position: 'absolute', top: 8, right: 8, width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 15, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
-              )}
-            </>
-          ) : (
-            <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              <div style={{ fontSize: 24, marginBottom: 4 }}>+</div>
-              <p style={{ fontSize: 11 }}>Tap to upload main preview</p>
-            </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[0, 1, 2].map(i => {
-            const thumb    = galleryThumbs[i]
-            const isActive = activeThumb === i + 1
-            return (
-              <div key={i} style={{ position: 'relative', flex: 1 }}>
-                <div
-                  onClick={() => { if (thumb) setActiveThumb(i + 1); else document.getElementById('gallery-input-' + i)?.click() }}
-                  style={{ aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', border: isActive ? '2px solid #1a1a1a' : thumb ? '0.5px solid var(--color-border)' : '0.5px dashed var(--color-border)', background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'border-color 0.15s' }}
-                >
-                  {thumb
-                    ? <img src={thumb} alt={'g' + i} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
-                    : <span style={{ fontSize: 16, color: 'var(--color-border)' }}>+</span>
-                  }
-                </div>
-                {thumb && (
-                  <button onClick={() => clearGallerySlot(i)}
-                    style={{ position: 'absolute', top: 3, right: 3, width: 16, height: 16, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}>×</button>
+      <SectionLabel hint="Shown to buyers. First image appears on the storefront. Add your watermark before uploading.">
+        Preview images
+      </SectionLabel>
+
+      {/* 3 equal slots */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 10 }}>
+        {[0, 1, 2].map(slotIdx => {
+          const thumb   = imageThumbs[slotIdx]
+          const isActive = activeSlot === slotIdx && !!thumb
+          const inputId  = 'image-input-' + slotIdx
+
+          return (
+            <div key={slotIdx} style={{ position: 'relative' }}>
+              <div
+                onClick={() => {
+                  if (thumb) setActiveSlot(slotIdx)
+                  else document.getElementById(inputId)?.click()
+                }}
+                style={{
+                  aspectRatio: '1',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  border: isActive
+                    ? '2px solid #1a1a1a'
+                    : thumb
+                    ? '0.5px solid var(--color-border)'
+                    : '0.5px dashed var(--color-border)',
+                  background: 'var(--color-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  transition: 'border-color 0.15s',
+                }}
+              >
+                {thumb ? (
+                  <img src={thumb} alt={'Slot ' + (slotIdx + 1)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+                ) : (
+                  <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                    <div style={{ fontSize: 22, marginBottom: 2 }}>+</div>
+                    <p style={{ fontSize: 10 }}>{slotIdx === 0 ? 'Main image' : 'Add image'}</p>
+                  </div>
                 )}
-                <input type="file" id={'gallery-input-' + i} accept="image/*" style={{ display: 'none' }} onChange={e => handleGallerySelect(i, e.target.files?.[0] || null)} />
+                {slotIdx === 0 && thumb && (
+                  <div style={{ position: 'absolute', top: 5, left: 5, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, fontWeight: 500, padding: '2px 7px', borderRadius: 20 }}>
+                    Primary
+                  </div>
+                )}
+                {thumb && (
+                  <button
+                    onClick={e => { e.stopPropagation(); clearImageSlot(slotIdx) }}
+                    style={{ position: 'absolute', top: 5, right: 5, width: 20, height: 20, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                  >×</button>
+                )}
               </div>
-            )
-          })}
-        </div>
+              {thumb && (
+                <button
+                  onClick={() => document.getElementById(inputId)?.click()}
+                  style={{ fontSize: 10, color: 'var(--color-teal)', background: 'none', border: 'none', cursor: 'pointer', padding: '3px 0', display: 'block', width: '100%', textAlign: 'center' }}
+                >Change</button>
+              )}
+              <input
+                type="file"
+                id={inputId}
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={e => handleImageSelect(slotIdx, e.target.files?.[0] || null)}
+              />
+            </div>
+          )
+        })}
       </div>
-      <input type="file" id="preview-input" accept="image/*" style={{ display: 'none' }} onChange={e => handlePreviewSelect(e.target.files?.[0] || null)} />
+
+      {/* Large preview of active slot */}
+      {imageThumbs[activeSlot] && (
+        <div style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--color-surface)', marginBottom: 10, border: '0.5px solid var(--color-border)' }}>
+          <img
+            src={imageThumbs[activeSlot]!}
+            alt="Preview"
+            style={{ width: '100%', display: 'block', maxHeight: 280, objectFit: 'contain', pointerEvents: 'none' }}
+          />
+        </div>
+      )}
 
       <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 14px', marginBottom: 24 }}>
         <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
-          💡 Artworks with room mockups and close-up shots sell significantly better.
+          Artworks with room mockups and close-up detail shots sell significantly better.
         </p>
       </div>
 
@@ -364,7 +436,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </SectionLabel>
       <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '12px 14px', marginBottom: 12 }}>
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-          🖨 By default, all FinePrint Studio prints are produced on <strong>Hahnemühle museum-grade archival papers</strong> at no extra cost. If you have a specific preference for your artwork, select below.
+          🖨 By default, all FinePrint Studio prints are produced on <strong>Hahnemühle museum-grade archival papers</strong> at no extra cost.
         </p>
       </div>
 
@@ -393,28 +465,13 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <p style={{ fontSize: 13, fontWeight: 500 }}>{paper.name}</p>
-                          {isRecommended && !isOutOfStock && (
-                            <span style={{ fontSize: 10, background: '#185FA5', color: '#fff', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>✓ Recommended</span>
-                          )}
-                          {isOutOfStock && (
-                            <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Out of stock</span>
-                          )}
-                          {paper.stock_status === 'backorder' && (
-                            <span style={{ fontSize: 10, background: '#E6F1FB', color: '#185FA5', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Backorder</span>
-                          )}
-                          {!hasPremium && !isOutOfStock && (
-                            <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>
-                          )}
-                          {hasPremium && !isOutOfStock && (
-                            <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>
-                              +{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3
-                            </span>
-                          )}
+                          {isRecommended && !isOutOfStock && <span style={{ fontSize: 10, background: '#185FA5', color: '#fff', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>✓ Recommended</span>}
+                          {isOutOfStock && <span style={{ fontSize: 10, background: '#FCEBEB', color: '#A32D2D', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Out of stock</span>}
+                          {paper.stock_status === 'backorder' && <span style={{ fontSize: 10, background: '#E6F1FB', color: '#185FA5', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Backorder</span>}
+                          {!hasPremium && !isOutOfStock && <span style={{ fontSize: 10, background: '#E1F5EE', color: '#0F6E56', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>Included</span>}
+                          {hasPremium && !isOutOfStock && <span style={{ fontSize: 10, background: '#FAEEDA', color: '#633806', padding: '1px 8px', borderRadius: 20, fontWeight: 500 }}>+{formatMVR(addOnA4)} A4 · +{formatMVR(addOnA3)} A3</span>}
                         </div>
-                        <button
-                          onClick={e => { e.stopPropagation(); setDetailPaper(paper) }}
-                          style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', textDecoration: 'underline', display: 'block' }}
-                        >
+                        <button onClick={e => { e.stopPropagation(); setDetailPaper(paper) }} style={{ fontSize: 11, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0', textDecoration: 'underline', display: 'block' }}>
                           View details
                         </button>
                       </div>
@@ -431,8 +488,8 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         <div style={{ background: '#FAEEDA', border: '0.5px solid #EF9F27', borderRadius: 8, padding: '10px 14px', marginBottom: 24 }}>
           <p style={{ fontSize: 12, color: '#633806', lineHeight: 1.6 }}>
             ℹ️ <strong>{selectedPaper.name}</strong> adds a paper upgrade fee to the buyer's total:
-            {selectedSizes.includes('A4') && ` A4 +${formatMVR(selectedPaper.addOn['A4'])}`}
-            {selectedSizes.includes('A3') && ` · A3 +${formatMVR(selectedPaper.addOn['A3'])}`}.
+            {selectedSizes.includes('A4') && ' A4 +' + formatMVR(selectedPaper.addOn['A4'])}
+            {selectedSizes.includes('A3') && ' · A3 +' + formatMVR(selectedPaper.addOn['A3'])}.
             This does not affect your earnings.
           </p>
         </div>
@@ -463,7 +520,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
                 </div>
                 {addOn > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#633806', marginBottom: 2 }}>
-                    <span>{size} — Paper upgrade ({effectivePaperType})</span><span>+{formatMVR(addOn)}</span>
+                    <span>{size} — Paper upgrade</span><span>+{formatMVR(addOn)}</span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 2 }}>
@@ -488,29 +545,100 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <div>
             <p style={{ fontSize: 13, fontWeight: 500 }}>Limited edition</p>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Cap how many prints can be sold. Creates scarcity and value.</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Cap how many prints can be sold.</p>
           </div>
-          <div
-            onClick={() => setIsLimited(v => !v)}
-            style={{ width: 44, height: 26, borderRadius: 13, background: isLimited ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}
-          >
+          <div onClick={() => setIsLimited(v => !v)} style={{ width: 44, height: 26, borderRadius: 13, background: isLimited ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
             <div style={{ position: 'absolute', top: 3, left: isLimited ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
           </div>
         </div>
         {isLimited && (
           <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginTop: 10 }}>
             <label className="form-label" style={{ marginBottom: 6 }}>Edition size</label>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 10 }}>
-              How many prints total? Once this number of orders is approved, the artwork shows as sold out.
-            </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <input className="form-input" type="number" min="1" max="999" value={editionSize} onChange={e => setEditionSize(e.target.value)} style={{ maxWidth: 100 }} />
               <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>prints</span>
             </div>
-            <div style={{ marginTop: 12, padding: '10px 0 0', borderTop: '0.5px solid var(--color-border)' }}>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
-                📦 When sold out, buyers see <strong>"Out of stock"</strong> and can register their email to be notified if you restock.
-              </p>
+          </div>
+        )}
+      </div>
+
+      <Divider />
+
+      {/* ── SERIES / VARIANTS ─────────────────────────────────── */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div>
+            <p style={{ fontSize: 13, fontWeight: 500 }}>Part of a series?</p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Link this artwork with related variants — e.g. same subject, different mood or colour.</p>
+          </div>
+          <div onClick={() => setIsSeries(v => !v)} style={{ width: 44, height: 26, borderRadius: 13, background: isSeries ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', top: 3, left: isSeries ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+          </div>
+        </div>
+
+        {isSeries && (
+          <div style={{ background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', borderRadius: 10, padding: '14px 16px', marginTop: 10 }}>
+
+            {/* New or existing */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <button
+                onClick={() => setSeriesMode('new')}
+                className="btn"
+                style={seriesMode === 'new' ? { background: 'var(--color-text)', color: '#fff', borderColor: 'var(--color-text)', fontSize: 12 } : { fontSize: 12 }}
+              >
+                Create new series
+              </button>
+              <button
+                onClick={() => setSeriesMode('existing')}
+                className="btn"
+                style={seriesMode === 'existing' ? { background: 'var(--color-text)', color: '#fff', borderColor: 'var(--color-text)', fontSize: 12 } : { fontSize: 12 }}
+              >
+                Add to existing series
+              </button>
+            </div>
+
+            {seriesMode === 'new' ? (
+              <div className="form-group">
+                <label className="form-label">Series name</label>
+                <input
+                  className="form-input"
+                  value={newSeriesName}
+                  onChange={e => setNewSeriesName(e.target.value)}
+                  placeholder="e.g. Eiffel Tower, Maldives Sunsets"
+                />
+              </div>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">Select series</label>
+                <select className="form-input" value={selectedSeriesId} onChange={e => setSelectedSeriesId(e.target.value)}>
+                  <option value="">— choose a series —</option>
+                  {existingSeries.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Variant label</label>
+              <input
+                className="form-input"
+                value={seriesLabel}
+                onChange={e => setSeriesLabel(e.target.value)}
+                placeholder="e.g. Sunset, Blue, Version 1"
+              />
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>This is what buyers see when choosing between variants.</p>
+            </div>
+
+            {/* Primary toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 10, borderTop: '0.5px solid var(--color-border)' }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>Show this variant on the storefront</p>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>Only one variant per series appears on the storefront grid. Others are accessible from the artwork page.</p>
+              </div>
+              <div onClick={() => setIsPrimary(v => !v)} style={{ width: 44, height: 26, borderRadius: 13, background: isPrimary ? '#1a1a1a' : 'var(--color-border)', cursor: 'pointer', position: 'relative', transition: 'background 0.2s', flexShrink: 0, marginLeft: 12 }}>
+                <div style={{ position: 'absolute', top: 3, left: isPrimary ? 21 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+              </div>
             </div>
           </div>
         )}
@@ -527,10 +655,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       </button>
 
       {detailPaper && (
-        <PaperDetailModal
-          paper={detailPaper}
-          onClose={() => setDetailPaper(null)}
-        />
+        <PaperDetailModal paper={detailPaper} onClose={() => setDetailPaper(null)} />
       )}
     </div>
   )
