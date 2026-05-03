@@ -4,7 +4,6 @@
 
 import { createRouteClient } from '@/lib/supabase'
 import { formatMVR } from '@/lib/pricing'
-import { AvatarDisplay } from '@/app/artist/components/ProfileTab'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
 import ArtworkGallery from './ArtworkGallery'
@@ -13,7 +12,6 @@ import ArtworkActions from './ArtworkActions'
 export default async function ArtworkPage({ params }: { params: { id: string } }) {
   const supabase = createRouteClient()
 
-  // All three fetches happen in parallel on the server
   const [artworkRes, galleryRes] = await Promise.all([
     supabase
       .from('artworks')
@@ -40,7 +38,6 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
   const artist        = artwork.profiles
   const galleryImages = galleryRes.data || []
 
-  // Related artworks
   const { data: related } = await supabase
     .from('artworks')
     .select('*, profiles:artist_id(full_name)')
@@ -84,9 +81,8 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
 
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
 
-          {/* LEFT — gallery (client component for interactivity) */}
+          {/* LEFT — gallery */}
           <div>
-            {/* Offer / edition badges */}
             {(artwork.offer_pct || isSoldOut || isLowStock || isLimited) && (
               <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
                 {artwork.offer_pct && (
@@ -112,7 +108,6 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
               </div>
             )}
 
-            {/* Gallery — hero + thumbnails below */}
             <ArtworkGallery
               mainImage={artwork.preview_url}
               galleryImages={galleryImages}
@@ -120,15 +115,18 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
             />
           </div>
 
-          {/* RIGHT — static info + client actions */}
+          {/* RIGHT — info + actions */}
           <div>
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>
               {artwork.title}
             </h1>
 
-            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+            <Link
+              href={'/artist/' + artist?.artist_code}
+              style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, display: 'block', textDecoration: 'underline' }}
+            >
               by {artist?.display_name || artist?.full_name}
-            </p>
+            </Link>
 
             {isLimited && (
               <div style={{ marginBottom: 12 }}>
@@ -161,12 +159,10 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
 
             <div className="divider" />
 
-            {/* All interactive parts — client component */}
             <ArtworkActions artwork={artwork} artist={artist} />
           </div>
         </div>
 
-        {/* Related artworks */}
         {related && related.length > 0 && (
           <div style={{ marginTop: 60 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 20 }}>
