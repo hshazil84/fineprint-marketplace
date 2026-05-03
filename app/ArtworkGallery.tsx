@@ -20,22 +20,21 @@ export default function ArtworkGallery({ mainImage, galleryImages, title }: Prop
         background: 'var(--color-surface)',
         position: 'relative',
         marginBottom: allImages.length > 1 ? 10 : 0,
+        aspectRatio: '1',
       }}>
         <img
           src={allImages[active]}
           alt={title}
           style={{
             width: '100%',
+            height: '100%',
             display: 'block',
             pointerEvents: 'none',
             userSelect: 'none',
             objectFit: 'contain',
-            maxHeight: 520,
+            position: 'absolute',
+            inset: 0,
           }}
-        />
-        <div
-          style={{ position: 'absolute', inset: 0, zIndex: 10, cursor: 'default' }}
-          onContextMenu={e => e.preventDefault()}
         />
       </div>
 
