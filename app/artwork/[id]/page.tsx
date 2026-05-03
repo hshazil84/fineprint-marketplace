@@ -1,48 +1,121 @@
-// app/artwork/[id]/page.tsx
-import { createRouteClient } from '@/lib/supabase'
-import { formatMVR } from '@/lib/pricing'
+'use client'
+import { useEffect, useState } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase'
+import { calculatePrices, formatMVR, buildOrderSKU, PRINTING_FEES, SIZES } from '@/lib/pricing'
+import { usePapers } from '@/lib/usePapers'
+import { useCart } from '@/lib/cart'
+import toast from 'react-hot-toast'
 import Link from 'next/link'
 import Header from '@/app/components/Header'
-import ArtworkGallery from './ArtworkGallery'
-import ArtworkActions from './ArtworkActions'
 
-export default async function ArtworkPage({ params }: { params: { id: string } }) {
-  const supabase  = createRouteClient()
-  const artworkId = parseInt(params.id)
+function AnimatedMVR({ amount, size = 16 }: { amount: number; size?: number }) {
+  const [animKey, setAnimKey] = useState(0)
+  useEffect(() => { setAnimKey(k => k + 1) }, [amount])
+  const digits = amount.toLocaleString()
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, fontSize: size, fontWeight: 500 }}>
+      <span>MVR </span>
+      <span key={animKey} className="t-digit-group is-animating">
+        {digits.split('').map((char, i) => (
+          <span key={i} className="t-digit"
+            {...(i >= 2 && i < 4 ? { 'data-stagger': '1' } : {})}
+            {...(i >= 4 ? { 'data-stagger': '2' } : {})}
+          >{char}</span>
+        ))}
+      </span>
+    </span>
+  )
+}
 
-  const [artworkRes, galleryRes] = await Promise.all([
-    supabase
+export default function ArtworkPage() {
+  const { id }   = useParams()
+  const router   = useRouter()
+  const { papers, getDefaultPaper, getPaperAddOn } = usePapers()
+
+  const [artwork, setArtwork]             = useState<any>(null)
+  const [artist, setArtist]               = useState<any>(null)
+  const [related, setRelated]             = useState<any[]>([])
+  const [galleryImages, setGalleryImages] = useState<any[]>([])
+  const [activeIdx, setActiveIdx]         = useState(0)
+  const [selectedSize, setSelectedSize]   = useState('A4')
+  const [qty, setQty]                     = useState(1)
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistDone, setWaitlistDone]   = useState(false)
+  const [waitlistLoading, setWaitlistLoading] = useState(false)
+  const { add, has } = useCart()
+  const supabase = createClient()
+
+  useEffect(() => { fetchArtwork() }, [id])
+  useEffect(() => { setQty(1) }, [selectedSize])
+
+  async function fetchArtwork() {
+    const { data } = await supabase
       .from('artworks')
       .select('*, profiles:artist_id(*)')
-      .eq('id', artworkId)
-      .single(),
-    supabase
+      .eq('id', id)
+      .single()
+    if (!data) return
+    setArtwork(data)
+    setArtist(data.profiles)
+    setActiveIdx(0)
+    if (data.sizes && data.sizes.length > 0) setSelectedSize(data.sizes[0])
+
+    const { data: gallery } = await supabase
       .from('artwork_images')
       .select('*')
-      .eq('artwork_id', artworkId)
-      .order('sort_order', { ascending: true }),
-  ])
+      .eq('artwork_id', parseInt(String(id)))
+      .order('sort_order', { ascending: true })
+    setGalleryImages(gallery || [])
 
-  const artwork = artworkRes.data
+    const { data: rel } = await supabase
+      .from('artworks')
+      .select('*, profiles:artist_id(full_name)')
+      .eq('artist_id', data.artist_id)
+      .eq('status', 'approved')
+      .neq('id', id)
+      .limit(3)
+    setRelated(rel || [])
+  }
+
+  async function joinWaitlist() {
+    if (!waitlistEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(waitlistEmail)) {
+      toast.error('Please enter a valid email'); return
+    }
+    setWaitlistLoading(true)
+    try {
+      const res  = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ artworkId: artwork.id, email: waitlistEmail }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      setWaitlistDone(true)
+      toast.success("We'll notify you when this is back in stock!")
+    } catch (err: any) {
+      toast.error(err.message || 'Something went wrong')
+    } finally {
+      setWaitlistLoading(false)
+    }
+  }
+
   if (!artwork) return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
       <Header />
-      <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>
-        Artwork not found.
-      </div>
+      <div style={{ padding: 60, textAlign: 'center', color: 'var(--color-text-hint)' }}>Loading...</div>
     </div>
   )
 
-  const artist        = artwork.profiles
-  const galleryImages = galleryRes.data || []
-
-  const { data: related } = await supabase
-    .from('artworks')
-    .select('*, profiles:artist_id(full_name)')
-    .eq('artist_id', artwork.artist_id)
-    .eq('status', 'approved')
-    .neq('id', artworkId)
-    .limit(3)
+  const paperType      = artwork.paper_type || getDefaultPaper(artwork.category)
+  const paperOption    = papers.find(p => p.name === paperType)
+  const paperAddOn     = getPaperAddOn(paperType, selectedSize)
+  const isPremium      = paperOption ? (paperOption.addOn['A4'] > 0 || paperOption.addOn['A3'] > 0) : false
+  const availableSizes = artwork.sizes || SIZES
+  const prices         = calculatePrices(artwork.price, artwork.offer_pct || 0, artwork.offer_label, 'delivery', selectedSize, paperType, paperAddOn)
+  const lineTotal      = prices.artworkLineItem * qty
+  const orderSKU       = buildOrderSKU(artwork.sku, selectedSize)
+  const alreadyInCart  = has(artwork.id, selectedSize)
 
   const editionSize  = artwork.edition_size
   const editionsSold = artwork.editions_sold || 0
@@ -50,6 +123,53 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
   const isLimited    = !!editionSize
   const isSoldOut    = isLimited && remaining === 0
   const isLowStock   = isLimited && remaining !== null && remaining > 0 && remaining <= 10
+  const maxQty       = remaining !== null ? Math.min(10, remaining) : 10
+
+  // Build all images array: main preview + gallery
+  const allImages: string[] = [artwork.preview_url]
+  for (let i = 0; i < galleryImages.length; i++) {
+    allImages.push(galleryImages[i].url)
+  }
+
+  function addToCart() {
+    if (isSoldOut) return
+    for (let i = 0; i < qty; i++) {
+      add({
+        artworkId:    artwork.id,
+        artworkSku:   artwork.sku,
+        artworkTitle: artwork.title,
+        artistName:   artist?.display_name || artist?.full_name,
+        artistId:     artwork.artist_id,
+        printSize:    selectedSize,
+        artistPrice:  artwork.price,
+        printingFee:  prices.printingFee,
+        offerLabel:   artwork.offer_label,
+        offerPct:     artwork.offer_pct,
+        previewUrl:   artwork.preview_url,
+      })
+    }
+    toast.success(qty > 1 ? qty + '× added to cart!' : 'Added to cart!')
+  }
+
+  function buyNow() {
+    if (isSoldOut) return
+    for (let i = 0; i < qty; i++) {
+      add({
+        artworkId:    artwork.id,
+        artworkSku:   artwork.sku,
+        artworkTitle: artwork.title,
+        artistName:   artist?.display_name || artist?.full_name,
+        artistId:     artwork.artist_id,
+        printSize:    selectedSize,
+        artistPrice:  artwork.price,
+        printingFee:  prices.printingFee,
+        offerLabel:   artwork.offer_label,
+        offerPct:     artwork.offer_pct,
+        previewUrl:   artwork.preview_url,
+      })
+    }
+    router.push('/checkout')
+  }
 
   return (
     <div style={{ backgroundColor: 'var(--color-bg)', minHeight: '100vh' }}>
@@ -76,49 +196,79 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
         <Link href="/storefront" className="btn btn-sm" style={{ marginBottom: 24, display: 'inline-flex' }}>
           Back
         </Link>
-
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
 
-          {/* LEFT */}
+          {/* LEFT — gallery */}
           <div>
-            {(artwork.offer_pct || isSoldOut || isLowStock || isLimited) && (
-              <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-                {artwork.offer_pct && (
-                  <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
-                    {artwork.offer_pct}% off
-                  </span>
-                )}
-                {isSoldOut && (
-                  <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>
-                    Sold out
-                  </span>
-                )}
-                {isLowStock && !isSoldOut && (
-                  <span style={{ background: '#FAEEDA', color: '#633806', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>
-                    Only {remaining} left
-                  </span>
-                )}
-                {isLimited && !isSoldOut && !isLowStock && (
-                  <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 11, fontWeight: 400, padding: '4px 10px', borderRadius: 20 }}>
-                    Limited edition
-                  </span>
-                )}
+            {/* Hero image — fixed square, no jump */}
+            <div style={{
+              width: '100%',
+              paddingBottom: '100%',
+              position: 'relative',
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              background: 'var(--color-surface)',
+              marginBottom: allImages.length > 1 ? 10 : 0,
+            }}>
+              <img
+                src={allImages[activeIdx]}
+                alt={artwork.title}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                }}
+                onContextMenu={e => e.preventDefault()}
+              />
+              <div style={{ position: 'absolute', inset: 0, zIndex: 10 }} onContextMenu={e => e.preventDefault()} />
+              {/* Badges */}
+              <div style={{ position: 'absolute', top: 14, left: 14, display: 'flex', gap: 6, zIndex: 20, pointerEvents: 'none', flexWrap: 'wrap' }}>
+                {artwork.offer_pct ? <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>{artwork.offer_pct}% off</span> : null}
+                {isSoldOut && <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>Sold out</span>}
+                {isLowStock && !isSoldOut && <span style={{ background: '#FAEEDA', color: '#633806', fontSize: 11, fontWeight: 500, padding: '4px 10px', borderRadius: 20, border: '0.5px solid #EF9F27' }}>Only {remaining} left</span>}
+                {isLimited && !isSoldOut && !isLowStock && <span style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', fontSize: 11, fontWeight: 400, padding: '4px 10px', borderRadius: 20 }}>Limited edition</span>}
+              </div>
+            </div>
+
+            {/* Thumbnails below — horizontal row */}
+            {allImages.length > 1 && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {allImages.map((img, i) => (
+                  <div
+                    key={i}
+                    onClick={() => setActiveIdx(i)}
+                    style={{
+                      width: 72,
+                      height: 72,
+                      flexShrink: 0,
+                      borderRadius: 'var(--radius-md)',
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      border: activeIdx === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                      transition: 'border-color 0.15s',
+                      background: 'var(--color-surface)',
+                    }}
+                  >
+                    <img
+                      src={img}
+                      alt={'View ' + (i + 1)}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                      onContextMenu={e => e.preventDefault()}
+                    />
+                  </div>
+                ))}
               </div>
             )}
-
-            <ArtworkGallery
-              mainImage={artwork.preview_url}
-              galleryImages={galleryImages}
-              title={artwork.title}
-            />
           </div>
 
           {/* RIGHT */}
           <div>
-            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>
-              {artwork.title}
-            </h1>
-
+            <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', marginBottom: 6 }}>{artwork.title}</h1>
             <Link
               href={'/artist/' + artist?.artist_code}
               style={{ fontSize: 14, color: 'var(--color-text-muted)', marginBottom: 12, display: 'block', textDecoration: 'underline' }}
@@ -147,21 +297,124 @@ export default async function ArtworkPage({ params }: { params: { id: string } }
               </div>
             )}
 
-            <div style={{ marginBottom: 16 }}>
-              <span className="sku-tag">Artwork SKU: {artwork.sku}</span>
-            </div>
-
-            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.7, marginBottom: 20 }}>
-              {artwork.description}
-            </p>
-
+            <div style={{ marginBottom: 16 }}><span className="sku-tag">Artwork SKU: {artwork.sku}</span></div>
+            <p style={{ fontSize: 14, color: 'var(--color-text-muted)', lineHeight: 1.7, marginBottom: 20 }}>{artwork.description}</p>
             <div className="divider" />
 
-            <ArtworkActions artwork={artwork} artist={artist} />
+            <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Select print size</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
+              {availableSizes.map((size: string) => (
+                <button key={size} onClick={() => setSelectedSize(size)} className="btn"
+                  style={selectedSize === size ? { background: 'var(--color-text)', color: '#fff', borderColor: 'var(--color-text)' } : {}}>
+                  {size}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
+              {artwork.offer_pct ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                    <span>Original artwork price</span><span style={{ textDecoration: 'line-through' }}>{formatMVR(prices.grossPrice)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-red)', marginBottom: 4 }}>
+                    <span>{artwork.offer_label} (-{artwork.offer_pct}%)</span><span>- {formatMVR(prices.discountAmount)}</span>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 4 }}>
+                  <span>Artwork price</span><span>{formatMVR(prices.grossPrice)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-text-muted)', marginBottom: paperAddOn > 0 ? 4 : 8 }}>
+                <span>{selectedSize} giclée printing</span><span>{formatMVR(prices.printingFee)}</span>
+              </div>
+              {paperAddOn > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#633806', marginBottom: 8 }}>
+                  <span>Paper upgrade · {paperType}</span><span>+{formatMVR(paperAddOn)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 500 }}>{qty > 1 ? 'Print price ×' + qty : 'Print price'}</span>
+                <AnimatedMVR amount={lineTotal} size={16} />
+              </div>
+              {qty > 1 && (
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4, textAlign: 'right' }}>{formatMVR(prices.artworkLineItem)} each</p>
+              )}
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 11 }}>🖨</span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Printed on <strong>Hahnemühle {paperType}</strong></span>
+                {paperOption && (
+                  <span style={{ fontSize: 9, fontWeight: 500, padding: '1px 7px', borderRadius: 20, background: isPremium ? '#2C2C2A' : '#D3D1C7', color: isPremium ? '#F1EFE8' : '#444441' }}>
+                    {isPremium ? 'Premium' : 'Standard'}
+                  </span>
+                )}
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
+                + MVR 100 delivery fee at checkout · or free pickup from Malé studio
+              </p>
+            </div>
+
+            <span className="sku-tag" style={{ marginBottom: 20, display: 'inline-block', fontSize: 13 }}>{orderSKU}</span>
+
+            {isSoldOut ? (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ background: '#FCEBEB', border: '0.5px solid #F09595', borderRadius: 12, padding: '16px 18px', marginBottom: 12 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#A32D2D', marginBottom: 4 }}>This edition is sold out</p>
+                  <p style={{ fontSize: 13, color: '#A32D2D', opacity: 0.8, lineHeight: 1.6 }}>All {editionSize} prints have been sold.</p>
+                </div>
+                {waitlistDone ? (
+                  <div style={{ background: '#E1F5EE', border: '0.5px solid #5DCAA5', borderRadius: 12, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 18 }}>✓</span>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 500, color: '#0F6E56' }}>You're on the waitlist</p>
+                      <p style={{ fontSize: 12, color: '#1D9E75', marginTop: 2 }}>We'll email {waitlistEmail} when restocked.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input type="email" value={waitlistEmail} onChange={e => setWaitlistEmail(e.target.value)} placeholder="your@email.com"
+                      onKeyDown={e => e.key === 'Enter' && joinWaitlist()}
+                      style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '0.5px solid var(--color-border)', fontSize: 13, background: 'var(--color-surface)', color: 'var(--color-text)', outline: 'none' }}
+                    />
+                    <button onClick={joinWaitlist} disabled={waitlistLoading}
+                      style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#1a1a1a', color: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', flexShrink: 0, opacity: waitlistLoading ? 0.6 : 1 }}>
+                      {waitlistLoading ? '...' : 'Notify me'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Quantity</span>
+                  <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
+                    <button onClick={() => setQty(q => Math.max(1, q - 1))} disabled={qty <= 1}
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty <= 1 ? 'default' : 'pointer', fontSize: 18, color: qty <= 1 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty <= 1 ? 0.35 : 1 }}>−</button>
+                    <span style={{ minWidth: 36, textAlign: 'center', fontSize: 14, fontWeight: 500, borderLeft: '0.5px solid var(--color-border)', borderRight: '0.5px solid var(--color-border)', padding: '6px 0', lineHeight: '24px' }}>{qty}</span>
+                    <button onClick={() => setQty(q => Math.min(maxQty, q + 1))} disabled={qty >= maxQty}
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty >= maxQty ? 'default' : 'pointer', fontSize: 18, color: qty >= maxQty ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty >= maxQty ? 0.35 : 1 }}>+</button>
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-full" onClick={alreadyInCart ? undefined : addToCart}
+                  style={alreadyInCart ? { opacity: 0.5, cursor: 'default' } : {}} disabled={alreadyInCart}>
+                  {alreadyInCart ? 'Added to cart ✓' : qty > 1 ? 'Add ' + qty + ' to cart' : 'Add to cart'}
+                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="btn btn-full" onClick={buyNow} style={{ flex: 1 }}>Checkout</button>
+                  <button className="btn btn-full" onClick={() => router.push('/storefront')} style={{ flex: 1 }}>Continue shopping</button>
+                </div>
+                {isLowStock && (
+                  <p style={{ fontSize: 12, color: '#633806', textAlign: 'center', marginTop: 4 }}>
+                    Only {remaining} prints left — order before they're gone!
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        {related && related.length > 0 && (
+        {related.length > 0 && (
           <div style={{ marginTop: 60 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.3rem', marginBottom: 20 }}>
               More by {artist?.display_name || artist?.full_name}
