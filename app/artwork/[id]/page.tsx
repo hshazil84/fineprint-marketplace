@@ -203,7 +203,7 @@ export default function ArtworkPage() {
         </Link>
         <div className="grid-2" style={{ gap: 40, alignItems: 'start' }}>
 
-          {/* LEFT */}
+          {/* LEFT — gallery (client component for interactivity) */}
           <div>
             <div style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-surface)', position: 'relative', marginBottom: galleryImages.length > 0 ? 10 : 0 }}>
               {activeImage ? (
