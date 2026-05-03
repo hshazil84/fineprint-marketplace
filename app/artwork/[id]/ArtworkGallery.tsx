@@ -8,8 +8,8 @@ interface Props {
 }
 
 export default function ArtworkGallery({ mainImage, galleryImages, title }: Props) {
-  const urls = galleryImages.map(g => g.url)
-  const allImages = [mainImage, ...urls]
+  const urls = galleryImages.map(function(g) { return g.url })
+  const allImages = [mainImage].concat(urls)
   const [active, setActive] = useState(0)
 
   return (
@@ -37,37 +37,39 @@ export default function ArtworkGallery({ mainImage, galleryImages, title }: Prop
             pointerEvents: 'none',
             userSelect: 'none',
           }}
-          onContextMenu={e => e.preventDefault()}
+          onContextMenu={function(e) { e.preventDefault() }}
         />
-        <div style={{ position: 'absolute', inset: 0, zIndex: 10 }} onContextMenu={e => e.preventDefault()} />
+        <div style={{ position: 'absolute', inset: 0, zIndex: 10 }} onContextMenu={function(e) { e.preventDefault() }} />
       </div>
 
       {allImages.length > 1 && (
         <div style={{ display: 'flex', gap: 8 }}>
-          {allImages.map((img, i) => (
-            <div
-              key={i}
-              onClick={() => setActive(i)}
-              style={{
-                width: 72,
-                height: 72,
-                flexShrink: 0,
-                borderRadius: 'var(--radius-md)',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                border: active === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
-                transition: 'border-color 0.15s',
-                background: 'var(--color-surface)',
-              }}
-            >
-              <img
-                src={img}
-                alt={'View ' + (i + 1)}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
-                onContextMenu={e => e.preventDefault()}
-              />
-            </div>
-          ))}
+          {allImages.map(function(img, i) {
+            return (
+              <div
+                key={i}
+                onClick={function() { setActive(i) }}
+                style={{
+                  width: 72,
+                  height: 72,
+                  flexShrink: 0,
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  border: active === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                  transition: 'border-color 0.15s',
+                  background: 'var(--color-surface)',
+                }}
+              >
+                <img
+                  src={img}
+                  alt={'View ' + (i + 1)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
+                  onContextMenu={function(e) { e.preventDefault() }}
+                />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
