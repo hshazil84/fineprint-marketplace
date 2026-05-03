@@ -62,7 +62,7 @@ export default function ArtworkGallery({ mainImage, galleryImages, title }: Prop
                 cursor: 'pointer',
                 border: active === i
                   ? '2px solid #1a1a1a'
-                  : '0.5px solid var(--color-border)',
+                  : '0.1px solid var(--color-border)',
                 transition: 'border-color 0.15s',
                 background: 'var(--color-surface)',
                 position: 'relative',
