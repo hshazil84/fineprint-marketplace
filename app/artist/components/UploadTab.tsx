@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase'
+import { createClient, createAdminClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
 import { PaperDetailModal } from './PaperDetailModal'
@@ -102,6 +102,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [detailPaper, setDetailPaper] = useState<any>(null)
 
   const supabase = createClient()
+  const supabaseAdmin = createAdminClient()
 
   const effectivePaperType = paperType || getDefaultPaper(form.category)
   const nextSku            = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
@@ -218,7 +219,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       let seriesId: string | null = null
       if (isSeries) {
         if (seriesMode === 'new') {
-          const { data: newSeries, error: seriesError } = await supabase
+          const { data: newSeries, error: seriesError } = await supabaseAdmin
             .from('artwork_series')
             .insert({ name: newSeriesName.trim(), artist_id: user.id })
             .select()
@@ -231,7 +232,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       }
 
       toast.loading('Saving listing...', { id: 'upload' })
-      const { data: artwork, error: dbError } = await supabase.from('artworks').insert({
+      const { data: artwork, error: dbError } = await supabaseAdmin.from('artworks').insert({
         sku,
         artist_id:     user.id,
         title:         form.title,
@@ -252,7 +253,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       if (dbError) throw dbError
 
       if (isSeries && isPrimary && seriesId) {
-        await supabase.from('artwork_series').update({ primary_artwork_id: artwork.id }).eq('id', seriesId)
+        await supabaseAdmin.from('artwork_series').update({ primary_artwork_id: artwork.id }).eq('id', seriesId)
       }
 
       toast.loading('Uploading gallery...', { id: 'upload' })
@@ -264,7 +265,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         const { error: gError } = await supabase.storage.from('artwork-previews').upload(gPath, gFile, { contentType: gFile.type })
         if (gError) { console.error(gError); continue }
         const { data: gUrl } = supabase.storage.from('artwork-previews').getPublicUrl(gPath)
-        await supabase.from('artwork_images').insert({ artwork_id: artwork.id, url: gUrl.publicUrl, sort_order: i })
+        await supabaseAdmin.from('artwork_images').insert({ artwork_id: artwork.id, url: gUrl.publicUrl, sort_order: i })
       }
 
       await fetch('/api/notify/artwork', {
