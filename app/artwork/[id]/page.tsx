@@ -218,7 +218,7 @@ export default function ArtworkPage() {
                   inset: 0,
                   width: '100%',
                   height: '100%',
-                  objectFit: 'contain',
+                  objectFit: 'cover',
                   display: 'block',
                   pointerEvents: 'none',
                   userSelect: 'none',
