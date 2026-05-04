@@ -249,7 +249,7 @@ export default function ArtworkPage() {
                       borderRadius: 'var(--radius-md)',
                       overflow: 'hidden',
                       cursor: 'pointer',
-                      border: activeIdx === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                      border: activeIdx === i ? '0.5px solid #1a1a1a' : '0.25px solid var(--color-border)',
                       transition: 'border-color 0.15s',
                       background: 'var(--color-surface)',
                     }}
