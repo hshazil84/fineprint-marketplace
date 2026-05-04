@@ -204,14 +204,14 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       toast.loading('Uploading hi-res file...', { id: 'upload' })
       const hiresExt  = hiresFile.name.split('.').pop()
       const hiresPath = sku + '-hires.' + hiresExt
-      const { error: hiresError } = await supabase.storage.from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type })
+      const { error: hiresError } = await supabase.storage.from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type, upsert: true })
       if (hiresError) throw hiresError
 
       toast.loading('Uploading preview...', { id: 'upload' })
       const previewFile = imageFiles[0]!
       const previewExt  = previewFile.name.split('.').pop()
       const previewPath = sku + '-preview.' + previewExt
-      const { error: previewError } = await supabase.storage.from('artwork-previews').upload(previewPath, previewFile, { contentType: previewFile.type })
+      const { error: previewError } = await supabase.storage.from('artwork-previews').upload(previewPath, previewFile, { contentType: previewFile.type, upsert: true })
       if (previewError) throw previewError
       const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
 
