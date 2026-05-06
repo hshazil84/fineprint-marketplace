@@ -37,6 +37,7 @@ export default function ArtworkPage() {
   const [artist, setArtist]               = useState<any>(null)
   const [related, setRelated]             = useState<any[]>([])
   const [galleryImages, setGalleryImages] = useState<any[]>([])
+  const [variants, setVariants]           = useState<any[]>([])
   const [activeIdx, setActiveIdx]         = useState(0)
   const [selectedSize, setSelectedSize]   = useState('A4')
   const [qty, setQty]                     = useState(1)
@@ -68,12 +69,26 @@ export default function ArtworkPage() {
       .order('sort_order', { ascending: true })
     setGalleryImages(gallery || [])
 
+    // Fetch series variants if this artwork is part of a series
+    if (data.series_id) {
+      const { data: seriesVariants } = await supabase
+        .from('artworks')
+        .select('id, title, series_label, preview_url, price, status')
+        .eq('series_id', data.series_id)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: true })
+      setVariants(seriesVariants || [])
+    } else {
+      setVariants([])
+    }
+
     const { data: rel } = await supabase
       .from('artworks')
       .select('*, profiles:artist_id(full_name)')
       .eq('artist_id', data.artist_id)
       .eq('status', 'approved')
       .neq('id', id)
+      .is('series_id', null)
       .limit(3)
     setRelated(rel || [])
   }
@@ -125,7 +140,6 @@ export default function ArtworkPage() {
   const isLowStock   = isLimited && remaining !== null && remaining > 0 && remaining <= 10
   const maxQty       = remaining !== null ? Math.min(10, remaining) : 10
 
-  // Build all images array: main preview + gallery
   const allImages: string[] = [artwork.preview_url]
   for (let i = 0; i < galleryImages.length; i++) {
     allImages.push(galleryImages[i].url)
@@ -148,7 +162,7 @@ export default function ArtworkPage() {
         previewUrl:   artwork.preview_url,
       })
     }
-    toast.success(qty > 1 ? qty + '× added to cart!' : 'Added to cart!')
+    toast.success(qty > 1 ? qty + 'x added to cart!' : 'Added to cart!')
   }
 
   function buyNow() {
@@ -200,7 +214,6 @@ export default function ArtworkPage() {
 
           {/* LEFT — gallery */}
           <div>
-            {/* Hero image — fixed square, no jump */}
             <div style={{
               width: '100%',
               paddingBottom: '100%',
@@ -226,7 +239,6 @@ export default function ArtworkPage() {
                 onContextMenu={e => e.preventDefault()}
               />
               <div style={{ position: 'absolute', inset: 0, zIndex: 10 }} onContextMenu={e => e.preventDefault()} />
-              {/* Badges */}
               <div style={{ position: 'absolute', top: 14, left: 14, display: 'flex', gap: 6, zIndex: 20, pointerEvents: 'none', flexWrap: 'wrap' }}>
                 {artwork.offer_pct ? <span style={{ background: 'var(--color-red)', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>{artwork.offer_pct}% off</span> : null}
                 {isSoldOut && <span style={{ background: '#1a1a1a', color: '#fff', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 20 }}>Sold out</span>}
@@ -235,7 +247,6 @@ export default function ArtworkPage() {
               </div>
             </div>
 
-            {/* Thumbnails below — horizontal row */}
             {allImages.length > 1 && (
               <div style={{ display: 'flex', gap: 8 }}>
                 {allImages.map((img, i) => (
@@ -249,7 +260,7 @@ export default function ArtworkPage() {
                       borderRadius: 'var(--radius-md)',
                       overflow: 'hidden',
                       cursor: 'pointer',
-                      border: activeIdx === i ? '0.5px solid #1a1a1a' : '0.25px solid var(--color-border)',
+                      border: activeIdx === i ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
                       transition: 'border-color 0.15s',
                       background: 'var(--color-surface)',
                     }}
@@ -275,6 +286,49 @@ export default function ArtworkPage() {
             >
               by {artist?.display_name || artist?.full_name}
             </Link>
+
+            {/* ── Variant chips ── */}
+            {variants.length > 1 && (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  Series — {variants.length} variants
+                </p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {variants.map((v: any) => {
+                    const isActive = String(v.id) === String(id)
+                    return (
+                      <button
+                        key={v.id}
+                        onClick={() => !isActive && router.push('/artwork/' + v.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 12px',
+                          borderRadius: 20,
+                          border: isActive ? '2px solid #1a1a1a' : '0.5px solid var(--color-border)',
+                          background: isActive ? '#1a1a1a' : 'var(--color-background-primary)',
+                          color: isActive ? '#fff' : 'var(--color-text)',
+                          fontSize: 13,
+                          cursor: isActive ? 'default' : 'pointer',
+                          fontWeight: isActive ? 500 : 400,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {v.preview_url && (
+                          <img
+                            src={v.preview_url}
+                            alt={v.series_label || v.title}
+                            style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '0.5px solid rgba(255,255,255,0.2)' }}
+                          />
+                        )}
+                        {v.series_label || v.title}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {isLimited && (
               <div style={{ marginBottom: 12 }}>
@@ -335,7 +389,7 @@ export default function ArtworkPage() {
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '0.5px solid var(--color-border)', paddingTop: 8 }}>
-                <span style={{ fontSize: 16, fontWeight: 500 }}>{qty > 1 ? 'Print price ×' + qty : 'Print price'}</span>
+                <span style={{ fontSize: 16, fontWeight: 500 }}>{qty > 1 ? 'Print price x' + qty : 'Print price'}</span>
                 <AnimatedMVR amount={lineTotal} size={16} />
               </div>
               {qty > 1 && (
@@ -343,7 +397,7 @@ export default function ArtworkPage() {
               )}
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: '0.5px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 11 }}>🖨</span>
-                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Printed on <strong>Hahnemühle {paperType}</strong></span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>Printed on <strong>Hahnemuhle {paperType}</strong></span>
                 {paperOption && (
                   <span style={{ fontSize: 9, fontWeight: 500, padding: '1px 7px', borderRadius: 20, background: isPremium ? '#2C2C2A' : '#D3D1C7', color: isPremium ? '#F1EFE8' : '#444441' }}>
                     {isPremium ? 'Premium' : 'Standard'}
@@ -351,7 +405,7 @@ export default function ArtworkPage() {
                 )}
               </div>
               <p style={{ fontSize: 11, color: 'var(--color-text-hint)', marginTop: 6 }}>
-                + MVR 100 delivery fee at checkout · or free pickup from Malé studio
+                + MVR 100 delivery fee at checkout · or free pickup from Male studio
               </p>
             </div>
 
@@ -390,7 +444,7 @@ export default function ArtworkPage() {
                   <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Quantity</span>
                   <div style={{ display: 'flex', alignItems: 'center', border: '0.5px solid var(--color-border)', borderRadius: 10, overflow: 'hidden' }}>
                     <button onClick={() => setQty(q => Math.max(1, q - 1))} disabled={qty <= 1}
-                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty <= 1 ? 'default' : 'pointer', fontSize: 18, color: qty <= 1 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty <= 1 ? 0.35 : 1 }}>−</button>
+                      style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty <= 1 ? 'default' : 'pointer', fontSize: 18, color: qty <= 1 ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty <= 1 ? 0.35 : 1 }}>-</button>
                     <span style={{ minWidth: 36, textAlign: 'center', fontSize: 14, fontWeight: 500, borderLeft: '0.5px solid var(--color-border)', borderRight: '0.5px solid var(--color-border)', padding: '6px 0', lineHeight: '24px' }}>{qty}</span>
                     <button onClick={() => setQty(q => Math.min(maxQty, q + 1))} disabled={qty >= maxQty}
                       style={{ width: 36, height: 36, background: 'none', border: 'none', cursor: qty >= maxQty ? 'default' : 'pointer', fontSize: 18, color: qty >= maxQty ? 'var(--color-text-muted)' : 'var(--color-text)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: qty >= maxQty ? 0.35 : 1 }}>+</button>
