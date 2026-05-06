@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { createClient, createAdminClient } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { formatMVR, PRINTING_FEES } from '@/lib/pricing'
 import { usePapers, CATEGORY_TO_BEST_FOR } from '@/lib/usePapers'
 import { PaperDetailModal } from './PaperDetailModal'
@@ -94,15 +94,14 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   const [primaryArtwork, setPrimaryArtwork]     = useState<any>(null)
 
   // Inheritance toggles (true = inherit from series, false = override)
-  const [inheritPrice, setInheritPrice]   = useState(true)
-  const [inheritSizes, setInheritSizes]   = useState(true)
-  const [inheritPaper, setInheritPaper]   = useState(true)
+  const [inheritPrice, setInheritPrice] = useState(true)
+  const [inheritSizes, setInheritSizes] = useState(true)
+  const [inheritPaper, setInheritPaper] = useState(true)
 
   const [uploading, setUploading]     = useState(false)
   const [detailPaper, setDetailPaper] = useState<any>(null)
 
   const supabase = createClient()
-  const supabaseAdmin = createAdminClient()
 
   const effectivePaperType = paperType || getDefaultPaper(form.category)
   const nextSku            = 'FP-' + profile?.artist_code + '-' + String(nextSeq).padStart(3, '0')
@@ -130,12 +129,12 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
   }, [selectedSeriesId])
 
   async function fetchExistingSeries() {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
     const { data } = await supabase
       .from('artwork_series')
       .select('id, name, primary_artwork_id')
-      .eq('artist_id', user.id)
+      .eq('artist_id', session.user.id)
       .order('created_at', { ascending: false })
     setExistingSeries(data || [])
   }
@@ -192,8 +191,10 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
 
     setUploading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Not logged in')
+      // Use getSession() to ensure session is fresh
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Not logged in')
+      const user = session.user
 
       const { data: prof } = await supabase.from('profiles').select('artist_code, full_name').eq('id', user.id).single()
       if (!prof?.artist_code) throw new Error('Artist code not found')
@@ -202,12 +203,14 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       const seq = String((count || 0) + 1).padStart(3, '0')
       const sku = 'FP-' + prof.artist_code + '-' + seq
 
+      // Upload hi-res file
       toast.loading('Uploading hi-res file...', { id: 'upload' })
       const hiresExt  = hiresFile.name.split('.').pop()
       const hiresPath = sku + '-hires.' + hiresExt
       const { error: hiresError } = await supabase.storage.from('artwork-hires').upload(hiresPath, hiresFile, { contentType: hiresFile.type, upsert: true })
       if (hiresError) throw hiresError
 
+      // Upload main preview
       toast.loading('Uploading preview...', { id: 'upload' })
       const previewFile = imageFiles[0]!
       const previewExt  = previewFile.name.split('.').pop()
@@ -216,47 +219,9 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
       if (previewError) throw previewError
       const { data: urlData } = supabase.storage.from('artwork-previews').getPublicUrl(previewPath)
 
-      let seriesId: string | null = null
-      if (isSeries) {
-        if (seriesMode === 'new') {
-          const { data: newSeries, error: seriesError } = await supabaseAdmin
-            .from('artwork_series')
-            .insert({ name: newSeriesName.trim(), artist_id: user.id })
-            .select()
-            .single()
-          if (seriesError) throw seriesError
-          seriesId = newSeries.id
-        } else {
-          seriesId = selectedSeriesId
-        }
-      }
-
-      toast.loading('Saving listing...', { id: 'upload' })
-      const { data: artwork, error: dbError } = await supabaseAdmin.from('artworks').insert({
-        sku,
-        artist_id:     user.id,
-        title:         form.title,
-        description:   form.description,
-        price:         resolvedPrice,
-        hires_path:    hiresPath,
-        preview_url:   urlData.publicUrl,
-        sizes:         resolvedSizes,
-        status:        'pending',
-        category:      form.category,
-        painting_by:   form.paintingBy || null,
-        paper_type:    resolvedPaper,
-        edition_size:  isLimited ? parseInt(editionSize) : null,
-        editions_sold: 0,
-        series_id:     seriesId,
-        series_label:  isSeries ? seriesLabel.trim() : null,
-      }).select().single()
-      if (dbError) throw dbError
-
-      if (isSeries && isPrimary && seriesId) {
-        await supabaseAdmin.from('artwork_series').update({ primary_artwork_id: artwork.id }).eq('id', seriesId)
-      }
-
+      // Upload gallery images and collect their public URLs
       toast.loading('Uploading gallery...', { id: 'upload' })
+      const galleryUrls: string[] = []
       for (let i = 1; i <= 2; i++) {
         const gFile = imageFiles[i]
         if (!gFile) continue
@@ -265,9 +230,42 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
         const { error: gError } = await supabase.storage.from('artwork-previews').upload(gPath, gFile, { contentType: gFile.type })
         if (gError) { console.error(gError); continue }
         const { data: gUrl } = supabase.storage.from('artwork-previews').getPublicUrl(gPath)
-        await supabaseAdmin.from('artwork_images').insert({ artwork_id: artwork.id, url: gUrl.publicUrl, sort_order: i })
+        galleryUrls.push(gUrl.publicUrl)
       }
 
+      // All DB writes go through the server API route (admin client is server-only)
+      toast.loading('Saving listing...', { id: 'upload' })
+      const res = await fetch('/api/artwork/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          seriesMode:      isSeries ? seriesMode : null,
+          newSeriesName:   newSeriesName.trim(),
+          selectedSeriesId,
+          isPrimary,
+          galleryUrls,
+          artwork: {
+            sku,
+            title:         form.title,
+            description:   form.description,
+            price:         resolvedPrice,
+            hires_path:    hiresPath,
+            preview_url:   urlData.publicUrl,
+            sizes:         resolvedSizes,
+            status:        'pending',
+            category:      form.category,
+            painting_by:   form.paintingBy || null,
+            paper_type:    resolvedPaper,
+            edition_size:  isLimited ? parseInt(editionSize) : null,
+            editions_sold: 0,
+            series_label:  isSeries ? seriesLabel.trim() : null,
+          }
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to save listing')
+
+      // Notify via Telegram
       await fetch('/api/notify/artwork', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -403,7 +401,7 @@ export function UploadTab({ profile, nextSeq, onSuccess }: any) {
 
       <Divider />
 
-      {/* SERIES SECTION — shown early so inheritance can collapse below sections */}
+      {/* SERIES SECTION */}
       <div style={{ marginBottom: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <div>
