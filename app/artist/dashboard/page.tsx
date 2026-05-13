@@ -243,6 +243,7 @@ export default function ArtistDashboard() {
             onDelete={deleteArtwork}
             onSaveEdit={saveEdit}
             onUpload={() => setTab('upload')}
+            onRefresh={() => profile && fetchArtworks(profile.id)}
           />
         )}
 
