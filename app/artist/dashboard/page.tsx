@@ -27,6 +27,7 @@ export default function ArtistDashboard() {
   const [artworks, setArtworks]               = useState<any[]>([])
   const [orders, setOrders]                   = useState<any[]>([])
   const [payouts, setPayouts]                 = useState<any[]>([])
+  const [draftCount, setDraftCount]           = useState(0)
   const [loading, setLoading]                 = useState(true)
   const [selectedOrder, setSelectedOrder]     = useState<any>(null)
   const [selectedPayout, setSelectedPayout]   = useState<any>(null)
@@ -43,7 +44,12 @@ export default function ArtistDashboard() {
     if (!prof || prof.role !== 'artist') { router.push('/storefront'); return }
     if (!prof.onboarding_complete) { router.push('/artist/onboarding'); return }
     setProfile(prof)
-    await Promise.all([fetchArtworks(user.id), fetchOrders(user.id), fetchPayouts(user.id)])
+    await Promise.all([
+      fetchArtworks(user.id),
+      fetchOrders(user.id),
+      fetchPayouts(user.id),
+      fetchDrafts(),
+    ])
     setLoading(false)
   }
 
@@ -73,6 +79,16 @@ export default function ArtistDashboard() {
       .eq('artist_id', artistId)
       .order('created_at', { ascending: false })
     setPayouts(data || [])
+  }
+
+  async function fetchDrafts() {
+    try {
+      const res  = await fetch('/api/artwork/draft')
+      const json = await res.json()
+      setDraftCount((json.drafts || []).length)
+    } catch {
+      setDraftCount(0)
+    }
   }
 
   async function handleExport(from: string, to: string) {
@@ -139,12 +155,10 @@ export default function ArtistDashboard() {
           <AvatarDisplay profile={profile} size={52} />
           <div style={{ flex: 1 }}>
 
-            {/* Greeting line */}
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', margin: '0 0 6px', lineHeight: 1.2 }}>
               {greetingMessage} {emoji}
             </h1>
 
-            {/* Artist code + shop status */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
               {profile?.shop_status === 'closed' ? (
@@ -154,25 +168,11 @@ export default function ArtistDashboard() {
               )}
             </div>
 
-            {/* Daily quote */}
             <div style={{ borderLeft: '2.5px solid var(--color-border)', paddingLeft: 14 }}>
-              <p style={{
-                fontSize:   13,
-                color:      'var(--color-text-muted)',
-                lineHeight: 1.75,
-                margin:     '0 0 5px',
-                fontStyle:  'italic',
-                fontFamily: 'Georgia, "Times New Roman", serif',
-              }}>
+              <p style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.75, margin: '0 0 5px', fontStyle: 'italic', fontFamily: 'Georgia, "Times New Roman", serif' }}>
                 &ldquo;{quote.text}&rdquo;
               </p>
-              <p style={{
-                fontSize:      11,
-                color:         'var(--color-text-muted)',
-                margin:        0,
-                letterSpacing: '0.03em',
-                opacity:       0.75,
-              }}>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0, letterSpacing: '0.03em', opacity: 0.75 }}>
                 — {quote.author}
               </p>
             </div>
@@ -219,6 +219,11 @@ export default function ArtistDashboard() {
                   {payouts.filter(p => p.status === 'pending').length}
                 </span>
               )}
+              {t === 'upload' && draftCount > 0 && (
+                <span style={{ marginLeft: 6, background: '#185FA5', color: '#fff', fontSize: 10, padding: '1px 6px', borderRadius: 20, fontWeight: 500 }}>
+                  {draftCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -240,7 +245,14 @@ export default function ArtistDashboard() {
         )}
 
         {tab === 'offers'  && <OffersTab artworks={artworks} onRefresh={() => init()} />}
-        {tab === 'upload'  && <UploadTab profile={profile} nextSeq={artworks.length + 1} onSuccess={() => { setTab('listings'); init() }} />}
+
+        {tab === 'upload'  && (
+          <UploadTab
+            profile={profile}
+            onDraftSaved={() => fetchDrafts()}
+            onSubmitted={() => { setTab('listings'); init() }}
+          />
+        )}
 
         {tab === 'orders' && (
           <ArtistOrdersTab
