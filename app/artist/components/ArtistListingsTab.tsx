@@ -275,9 +275,11 @@ function EditModal({ artwork, onSave, onCancel }: { artwork: any; onSave: (updat
 type GroupStep = 'type' | 'details' | 'pick'
 type GroupType = 'variant' | 'bundle'
 
+interface PickEntry { label: string; isPrimary: boolean }
+
 function CreateGroupFlow({ artworks, onClose, onSuccess }: {
-  artworks: any[]
-  onClose:  () => void
+  artworks:  any[]
+  onClose:   () => void
   onSuccess: () => void
 }) {
   const supabase = createClient()
@@ -287,7 +289,7 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
   const [groupCategory, setGroupCategory] = useState('Photography')
   const [bundlePrice,   setBundlePrice]   = useState('')
   const [indivListings, setIndivListings] = useState(true)
-  const [selected,      setSelected]      = useState<Map<number, { label: string; isPrimary: boolean }>>(new Map())
+  const [selected,      setSelected]      = useState<Map<number, PickEntry>>(new Map())
   const [saving,        setSaving]        = useState(false)
 
   function goBack() {
@@ -299,10 +301,11 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
     const next = new Map(selected)
     if (next.has(artwork.id)) {
       next.delete(artwork.id)
-      // if was primary, assign to first remaining
-      if ([...next.values()].every(v => !v.isPrimary) && next.size > 0) {
-        const firstKey = [...next.keys()][0]
-        next.set(firstKey, { ...next.get(firstKey)!, isPrimary: true })
+      // if no primary remains, assign to first remaining
+      const vals = Array.from(next.values())
+      const keys = Array.from(next.keys())
+      if (vals.every((v: PickEntry) => !v.isPrimary) && next.size > 0) {
+        next.set(keys[0], { ...next.get(keys[0])!, isPrimary: true })
       }
     } else {
       const isPrimary = next.size === 0 && groupType === 'variant'
@@ -320,18 +323,21 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
 
   function setPrimary(artworkId: number) {
     const next = new Map(selected)
-    next.forEach((v, k) => next.set(k, { ...v, isPrimary: k === artworkId }))
+    Array.from(next.keys()).forEach(k => {
+      next.set(k, { ...next.get(k)!, isPrimary: k === artworkId })
+    })
     setSelected(next)
   }
 
   async function handleConfirm() {
-    if (selected.size < 2) { toast.error('Select at least 2 artworks'); return }
-    if (!groupName.trim()) { toast.error('Please enter a name'); return }
-    for (const [, v] of selected) {
+    if (selected.size < 2)    { toast.error('Select at least 2 artworks'); return }
+    if (!groupName.trim())    { toast.error('Please enter a name'); return }
+    const vals = Array.from(selected.values())
+    for (const v of vals) {
       if (!v.label.trim()) { toast.error('Please fill in all labels'); return }
     }
     if (groupType === 'variant') {
-      const hasPrimary = [...selected.values()].some(v => v.isPrimary)
+      const hasPrimary = vals.some((v: PickEntry) => v.isPrimary)
       if (!hasPrimary) { toast.error('Please select which variant shows on the storefront'); return }
     }
 
@@ -340,7 +346,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not logged in')
 
-      // Create series
       const { data: series, error: seriesError } = await supabase
         .from('artwork_series')
         .insert({
@@ -354,8 +359,7 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
         .single()
       if (seriesError) throw seriesError
 
-      // Update each artwork
-      for (const [artworkId, v] of selected) {
+      for (const [artworkId, v] of Array.from(selected.entries())) {
         await supabase
           .from('artworks')
           .update({
@@ -382,7 +386,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: 'var(--color-background-primary)', borderRadius: 20, width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Nav */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px 10px', borderBottom: '0.5px solid var(--color-border)', flexShrink: 0 }}>
           {step !== 'type'
             ? <button onClick={goBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-teal)', fontSize: 14, padding: 0, fontFamily: 'inherit' }}>← Back</button>
@@ -391,7 +394,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
           <button onClick={onClose} style={{ background: 'var(--color-background-secondary)', border: 'none', borderRadius: 8, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}>Close</button>
         </div>
 
-        {/* Progress */}
         <div style={{ display: 'flex', gap: 5, justifyContent: 'center', padding: '12px 0 0' }}>
           {[0, 1, 2].map(i => (
             <div key={i} style={{ height: 4, borderRadius: 2, width: i === pips ? 28 : i < pips ? 20 : 14, background: i <= pips ? '#1a1a1a' : 'var(--color-border)', transition: 'all 0.3s' }} />
@@ -400,7 +402,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
 
         <div style={{ overflowY: 'auto', padding: '20px 20px 30px', flex: 1 }}>
 
-          {/* STEP 1: Type */}
           {step === 'type' && (
             <>
               <p style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Group type</p>
@@ -422,7 +423,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
             </>
           )}
 
-          {/* STEP 2: Details */}
           {step === 'details' && (
             <>
               <p style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>{groupType === 'bundle' ? 'Collection details' : 'Series details'}</p>
@@ -461,7 +461,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
             </>
           )}
 
-          {/* STEP 3: Artwork picker */}
           {step === 'pick' && (
             <>
               <p style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Select artworks</p>
@@ -476,12 +475,11 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
                 <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center', padding: '24px 0' }}>No artworks to group yet. Upload some first.</p>
               )}
 
-              {artworks.map(a => {
+              {artworks.map((a: any) => {
                 const isSelected = selected.has(a.id)
                 const entry      = selected.get(a.id)
                 return (
                   <div key={a.id} style={{ border: isSelected ? '1.5px solid #1a1a1a' : '0.5px solid var(--color-border)', borderRadius: 12, overflow: 'hidden', marginBottom: 8, background: isSelected ? 'var(--color-surface)' : 'transparent', transition: 'all 0.15s' }}>
-                    {/* Header row */}
                     <div onClick={() => toggleSelect(a)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', cursor: 'pointer' }}>
                       {a.preview_url
                         ? <img src={a.preview_url} alt={a.title} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
@@ -500,7 +498,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
                       </div>
                     </div>
 
-                    {/* Detail panel */}
                     {isSelected && (
                       <div style={{ borderTop: '0.5px solid var(--color-border)', padding: '12px 14px' }}>
                         {a.series_id && (
@@ -516,7 +513,6 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
                           onChange={e => updateLabel(a.id, e.target.value)}
                           placeholder={groupType === 'bundle' ? 'e.g. New York' : 'e.g. Colour, B&W'}
                           style={{ marginBottom: groupType === 'variant' ? 10 : 0 }} />
-
                         {groupType === 'variant' && (
                           <div onClick={() => setPrimary(a.id)}
                             style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--color-surface)', borderRadius: 10, cursor: 'pointer', marginTop: 4 }}>
@@ -547,30 +543,30 @@ function CreateGroupFlow({ artworks, onClose, onSuccess }: {
 // ─── Series Group Card ────────────────────────────────────────────────────────
 
 function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHide, onRefresh }: {
-  series:         SeriesGroup
-  profile:        any
-  onEditArtwork:  (a: any) => void
-  onDelete:       (id: number) => void
-  onToggleHide:   (a: any) => void
-  onRefresh:      () => void
+  series:        SeriesGroup
+  profile:       any
+  onEditArtwork: (a: any) => void
+  onDelete:      (id: number) => void
+  onToggleHide:  (a: any) => void
+  onRefresh:     () => void
 }) {
   const supabase = createClient()
-  const [open,        setOpen]        = useState(false)
-  const [qrArtwork,   setQrArtwork]   = useState<any>(null)
+  const [open,          setOpen]          = useState(false)
+  const [qrArtwork,     setQrArtwork]     = useState<any>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
 
-  const primary   = series.artworks.find(a => a.is_primary) || series.artworks[0]
-  const prices    = series.artworks.map(a => a.price).filter(Boolean)
-  const minPrice  = prices.length ? Math.min(...prices) : 0
-  const maxPrice  = prices.length ? Math.max(...prices) : 0
-  const priceStr  = minPrice === maxPrice ? formatMVR(minPrice) : `${formatMVR(minPrice)} – ${formatMVR(maxPrice)}`
-  const allStatus = series.artworks.every(a => a.status === 'approved') ? 'approved' : series.artworks.some(a => a.status === 'pending') ? 'pending' : 'mixed'
+  const primary  = series.artworks.find(a => a.is_primary) || series.artworks[0]
+  const prices   = series.artworks.map(a => a.price).filter(Boolean)
+  const minPrice = prices.length ? Math.min(...prices) : 0
+  const maxPrice = prices.length ? Math.max(...prices) : 0
+  const priceStr = minPrice === maxPrice ? formatMVR(minPrice) : `${formatMVR(minPrice)} – ${formatMVR(maxPrice)}`
+  const allStatus = series.artworks.every(a => a.status === 'approved') ? 'approved'
+    : series.artworks.some(a => a.status === 'pending') ? 'pending' : 'mixed'
+  const allHidden = series.artworks.every(a => a.status === 'hidden')
 
   async function handleDeleteSeries() {
     try {
-      // Remove series link from all artworks
       await supabase.from('artworks').update({ series_id: null, series_label: null, is_primary: false }).eq('series_id', series.id)
-      // Delete series
       await supabase.from('artwork_series').delete().eq('id', series.id)
       toast.success('Series deleted — artworks are now individual listings')
       onRefresh()
@@ -580,7 +576,6 @@ function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHid
   }
 
   async function handleHideAll() {
-    const allHidden = series.artworks.every(a => a.status === 'hidden')
     const newStatus = allHidden ? 'approved' : 'hidden'
     for (const a of series.artworks) {
       if (a.status !== 'pending') {
@@ -591,13 +586,9 @@ function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHid
     onRefresh()
   }
 
-  const allHidden = series.artworks.every(a => a.status === 'hidden')
-
   return (
     <>
       <div style={{ background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border)', borderRadius: 14, overflow: 'hidden', marginBottom: 10 }}>
-
-        {/* Header */}
         <div onClick={() => setOpen(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}>
           {primary?.preview_url
             ? <img src={primary.preview_url} alt={series.name} style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
@@ -616,14 +607,12 @@ function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHid
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-            {/* Series-level QR — links to primary/bundle storefront page */}
             <button onClick={e => { e.stopPropagation(); setQrArtwork(primary) }}
               className="btn btn-sm" style={{ fontSize: 11 }}>QR</button>
-            <span style={{ color: 'var(--color-text-muted)', fontSize: 18, transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'none' }}>›</span>
+            <span style={{ color: 'var(--color-text-muted)', fontSize: 18, transition: 'transform 0.2s', transform: open ? 'rotate(90deg)' : 'none', display: 'inline-block' }}>›</span>
           </div>
         </div>
 
-        {/* Pieces */}
         {open && (
           <div style={{ borderTop: '0.5px solid var(--color-border)' }}>
             {series.artworks.map((a, i) => (
@@ -644,13 +633,10 @@ function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHid
                 </div>
                 <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                   <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => onEditArtwork(a)}>Edit</button>
-                  {/* Per-piece QR */}
                   <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setQrArtwork(a)}>QR</button>
                 </div>
               </div>
             ))}
-
-            {/* Series actions */}
             <div style={{ display: 'flex', gap: 8, padding: '10px 16px', background: 'var(--color-surface)', borderTop: '0.5px solid var(--color-border)', flexWrap: 'wrap' }}>
               <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={handleHideAll}>
                 {allHidden ? 'Show all' : 'Hide all'}
@@ -667,7 +653,6 @@ function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHid
           </div>
         )}
       </div>
-
       {qrArtwork && <QRModal artwork={qrArtwork} profile={profile} onClose={() => setQrArtwork(null)} />}
     </>
   )
@@ -677,7 +662,7 @@ function SeriesGroupCard({ series, profile, onEditArtwork, onDelete, onToggleHid
 
 function SingleGridCard({ artwork, profile, onEdit, onDelete, onToggleHide, deleteConfirmId, setDeleteConfirmId }: any) {
   const [qrArtwork, setQrArtwork] = useState<any>(null)
-  const remaining = artwork.edition_size ? artwork.edition_size - (artwork.editions_sold || 0) : null
+  const remaining  = artwork.edition_size ? artwork.edition_size - (artwork.editions_sold || 0) : null
   const isDeleting = deleteConfirmId === artwork.id
 
   return (
@@ -777,18 +762,19 @@ function SingleListCard({ artwork, profile, onEdit, onDelete, onToggleHide, dele
 
 export function ArtistListingsTab({ artworks, profile, editingArtwork, deleteConfirmId, setEditingArtwork, setDeleteConfirmId, onToggleHide, onDelete, onSaveEdit, onUpload, onRefresh }: any) {
   const supabase = createClient()
-  const [search,       setSearch]       = useState('')
-  const [viewMode,     setViewMode]     = useState<'grid' | 'list'>('grid')
-  const [showGroup,    setShowGroup]    = useState(false)
-  const [seriesMap,    setSeriesMap]    = useState<Map<string, SeriesGroup>>(new Map())
-  const [page,         setPage]         = useState(1)
+  const [search,    setSearch]    = useState('')
+  const [viewMode,  setViewMode]  = useState<'grid' | 'list'>('grid')
+  const [showGroup, setShowGroup] = useState(false)
+  const [seriesMap, setSeriesMap] = useState<Map<string, SeriesGroup>>(new Map())
+  const [page,      setPage]      = useState(1)
 
-  // Fetch series data
   useEffect(() => { fetchSeries() }, [artworks])
 
   async function fetchSeries() {
     if (!artworks.length) return
-    const seriesIds = [...new Set(artworks.filter((a: any) => a.series_id).map((a: any) => a.series_id))] as string[]
+    const seriesIds = Array.from(new Set(
+      artworks.filter((a: any) => a.series_id).map((a: any) => a.series_id)
+    )) as string[]
     if (!seriesIds.length) { setSeriesMap(new Map()); return }
     const { data } = await supabase.from('artwork_series').select('*').in('id', seriesIds)
     const map = new Map<string, SeriesGroup>()
@@ -798,7 +784,7 @@ export function ArtistListingsTab({ artworks, profile, editingArtwork, deleteCon
     setSeriesMap(map)
   }
 
-  // Build flat list of listing items (singles + series groups, deduped)
+  // Build paginated flat list — singles + series groups (deduped)
   const seenSeriesIds = new Set<string>()
   const allItems: ListingItem[] = artworks
     .filter((a: any) => {
@@ -823,9 +809,9 @@ export function ArtistListingsTab({ artworks, profile, editingArtwork, deleteCon
       return acc
     }, [])
 
-  const totalItems  = allItems.length
-  const totalPages  = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
-  const paginated   = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalItems = allItems.length
+  const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE))
+  const paginated  = allItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   if (artworks.length === 0 && !search) return <EmptyListings onUpload={onUpload} />
 
@@ -841,7 +827,8 @@ export function ArtistListingsTab({ artworks, profile, editingArtwork, deleteCon
           <button onClick={() => setViewMode('grid')} style={{ padding: '7px 12px', border: 'none', cursor: 'pointer', fontSize: 13, background: viewMode === 'grid' ? '#1a1a1a' : 'transparent', color: viewMode === 'grid' ? '#fff' : 'var(--color-text-muted)' }}>Grid</button>
           <button onClick={() => setViewMode('list')} style={{ padding: '7px 12px', border: 'none', cursor: 'pointer', fontSize: 13, background: viewMode === 'list' ? '#1a1a1a' : 'transparent', color: viewMode === 'list' ? '#fff' : 'var(--color-text-muted)' }}>List</button>
         </div>
-        <button className="btn btn-sm" style={{ fontSize: 12, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none', flexShrink: 0 }}
+        <button className="btn btn-sm"
+          style={{ fontSize: 12, background: 'var(--color-teal-light)', color: 'var(--color-teal-dark)', border: 'none', flexShrink: 0 }}
           onClick={() => setShowGroup(true)}>
           + Create group
         </button>
@@ -850,7 +837,10 @@ export function ArtistListingsTab({ artworks, profile, editingArtwork, deleteCon
       {/* Grid view */}
       {viewMode === 'grid' && (
         <div>
-          {paginated.map((item, i) => {
+          {paginated.length === 0 && (
+            <p style={{ padding: 24, color: 'var(--color-text-muted)', textAlign: 'center' }}>No listings match your search.</p>
+          )}
+          {paginated.map(item => {
             if (item.kind === 'series' && item.series) {
               return (
                 <SeriesGroupCard
@@ -922,7 +912,12 @@ export function ArtistListingsTab({ artworks, profile, editingArtwork, deleteCon
         </div>
       )}
 
-      <Pagination page={page} totalPages={totalPages} total={totalItems} onPage={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={totalItems}
+        onPage={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+      />
 
       {editingArtwork && (
         <EditModal
@@ -982,7 +977,16 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
   async function handleSave() {
     setSaving(true)
     try {
-      const updates: any = { title: form.title, description: form.description, price: parseInt(form.price) || artwork.price, category: form.category, painting_by: form.paintingBy || null, sizes: form.sizes, paper_type: effectivePaperType, edition_size: isLimited ? parseInt(editionSize) || null : null }
+      const updates: any = {
+        title:        form.title,
+        description:  form.description,
+        price:        parseInt(form.price) || artwork.price,
+        category:     form.category,
+        painting_by:  form.paintingBy || null,
+        sizes:        form.sizes,
+        paper_type:   effectivePaperType,
+        edition_size: isLimited ? parseInt(editionSize) || null : null,
+      }
       for (const id of deletedGalleryIds) {
         const img = existingGallery.find(g => g.id === id)
         if (!img) continue
@@ -1032,10 +1036,13 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px', gap: 10, marginBottom: 6 }}>
           <div onClick={() => document.getElementById('edit-preview-' + artwork.id)?.click()}
             style={{ aspectRatio: '4/3', borderRadius: 10, overflow: 'hidden', background: 'var(--color-surface)', border: '0.5px solid var(--color-border)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            {previewThumb ? <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} /> : <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}><div style={{ fontSize: 22, marginBottom: 2 }}>+</div><p style={{ fontSize: 10 }}>Tap to upload</p></div>}
+            {previewThumb
+              ? <img src={previewThumb} alt="main" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} />
+              : <div style={{ textAlign: 'center', color: 'var(--color-text-muted)' }}><div style={{ fontSize: 22, marginBottom: 2 }}>+</div><p style={{ fontSize: 10 }}>Tap to upload</p></div>}
             <div style={{ position: 'absolute', top: 8, left: 8, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 9, fontWeight: 500, padding: '2px 8px', borderRadius: 20, pointerEvents: 'none' }}>{previewFile ? 'Changed' : 'Main'}</div>
             {previewThumb && <button onClick={e => { e.stopPropagation(); setPreviewFile(null); setPreviewThumb(null) }} style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
-            <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (!f) return; setPreviewFile(f); const r = new FileReader(); r.onload = ev => setPreviewThumb(ev.target?.result as string); r.readAsDataURL(f) }} />
+            <input type="file" id={'edit-preview-' + artwork.id} accept="image/*" style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (!f) return; setPreviewFile(f); const r = new FileReader(); r.onload = ev => setPreviewThumb(ev.target?.result as string); r.readAsDataURL(f) }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[0, 1, 2].map(i => {
@@ -1049,8 +1056,28 @@ function EditArtworkForm({ artwork, onSave, onCancel }: { artwork: any; onSave: 
                     style={{ aspectRatio: '4/3', borderRadius: 6, overflow: 'hidden', cursor: 'pointer', border: '0.5px solid var(--color-border)', background: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {thumbSrc ? <img src={thumbSrc} alt={'g' + i} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', pointerEvents: 'none' }} /> : <span style={{ fontSize: 16, color: 'var(--color-border)' }}>+</span>}
                   </div>
-                  {thumbSrc && <button onClick={e => { e.stopPropagation(); if (isExisting) setDeletedGalleryIds(prev => [...prev, existingImg.id]); else { const nf = [...galleryFiles]; nf[i - visibleGallery.length] = null; setGalleryFiles(nf); const nt = [...galleryThumbs]; nt[i - visibleGallery.length] = null; setGalleryThumbs(nt) } }} style={{ position: 'absolute', top: 2, right: 2, width: 14, height: 14, borderRadius: '50%', background: isExisting ? 'rgba(163,45,45,0.85)' : 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>}
-                  <input type="file" id={'edit-gallery-' + artwork.id + '-' + i} accept="image/*" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (!f) return; const ni = i - visibleGallery.length < 0 ? 0 : i - visibleGallery.length; const nf = [...galleryFiles]; nf[ni] = f; setGalleryFiles(nf); const r = new FileReader(); r.onload = ev => { const nt = [...galleryThumbs]; nt[ni] = ev.target?.result as string; setGalleryThumbs(nt) }; r.readAsDataURL(f) }} />
+                  {thumbSrc && (
+                    <button onClick={e => {
+                      e.stopPropagation()
+                      if (isExisting) {
+                        setDeletedGalleryIds(prev => [...prev, existingImg.id])
+                      } else {
+                        const ni = i - visibleGallery.length < 0 ? 0 : i - visibleGallery.length
+                        const nf = [...galleryFiles]; nf[ni] = null; setGalleryFiles(nf)
+                        const nt = [...galleryThumbs]; nt[ni] = null; setGalleryThumbs(nt)
+                      }
+                    }} style={{ position: 'absolute', top: 2, right: 2, width: 14, height: 14, borderRadius: '50%', background: isExisting ? 'rgba(163,45,45,0.85)' : 'rgba(0,0,0,0.55)', border: 'none', cursor: 'pointer', color: '#fff', fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                  )}
+                  <input type="file" id={'edit-gallery-' + artwork.id + '-' + i} accept="image/*" style={{ display: 'none' }}
+                    onChange={e => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      const ni = i - visibleGallery.length < 0 ? 0 : i - visibleGallery.length
+                      const nf = [...galleryFiles]; nf[ni] = f; setGalleryFiles(nf)
+                      const r = new FileReader()
+                      r.onload = ev => { const nt = [...galleryThumbs]; nt[ni] = ev.target?.result as string; setGalleryThumbs(nt) }
+                      r.readAsDataURL(f)
+                    }} />
                 </div>
               )
             })}
