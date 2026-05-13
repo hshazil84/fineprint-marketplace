@@ -56,15 +56,6 @@ export default function ArtistDashboard() {
   async function fetchArtworks(artistId: string) {
     const { data } = await supabase
       .from('artworks')
-      .select('*')
-      .eq('artist_id', artistId)
-      .order('created_at', { ascending: false })
-    setArtworks(data || [])
-  }
-
-  async function fetchArtworks(artistId: string) {
-    const { data } = await supabase
-      .from('artworks')
       .select('*, artwork_series(name)')
       .eq('artist_id', artistId)
       .order('created_at', { ascending: false })
@@ -72,6 +63,16 @@ export default function ArtistDashboard() {
       ...a,
       series_name: a.artwork_series?.name || null,
     })))
+  }
+
+  async function fetchOrders(artistId: string) {
+    const { data } = await supabase
+      .from('orders')
+      .select('*, artworks!inner(title, sku, artist_id)')
+      .eq('artworks.artist_id', artistId)
+      .neq('status', 'rejected')
+      .order('created_at', { ascending: false })
+    setOrders(data || [])
   }
 
   async function fetchPayouts(artistId: string) {
@@ -156,11 +157,9 @@ export default function ArtistDashboard() {
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
           <AvatarDisplay profile={profile} size={52} />
           <div style={{ flex: 1 }}>
-
             <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', margin: '0 0 6px', lineHeight: 1.2 }}>
               {greetingMessage} {emoji}
             </h1>
-
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <span className="sku-tag">{profile?.artist_code ? 'FP-' + profile.artist_code : ''}</span>
               {profile?.shop_status === 'closed' ? (
@@ -169,7 +168,6 @@ export default function ArtistDashboard() {
                 <span style={{ fontSize: 11, background: '#E1F5EE', color: '#0F6E56', padding: '2px 10px', borderRadius: 20, border: '0.5px solid #5DCAA5' }}>Shop open</span>
               )}
             </div>
-
             <div style={{ borderLeft: '2.5px solid var(--color-border)', paddingLeft: 14 }}>
               <p style={{ fontSize: 13, color: 'var(--color-text-muted)', lineHeight: 1.75, margin: '0 0 5px', fontStyle: 'italic', fontFamily: 'Georgia, "Times New Roman", serif' }}>
                 &ldquo;{quote.text}&rdquo;
@@ -178,7 +176,6 @@ export default function ArtistDashboard() {
                 — {quote.author}
               </p>
             </div>
-
           </div>
         </div>
 
@@ -248,8 +245,8 @@ export default function ArtistDashboard() {
         )}
 
         {tab === 'offers'  && <OffersTab artworks={artworks} onRefresh={() => init()} />}
-        
-        {tab === 'upload'  && (
+
+        {tab === 'upload' && (
           <UploadTab
             profile={profile}
             onDraftSaved={() => fetchDrafts()}
