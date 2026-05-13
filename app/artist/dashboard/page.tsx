@@ -62,14 +62,16 @@ export default function ArtistDashboard() {
     setArtworks(data || [])
   }
 
-  async function fetchOrders(artistId: string) {
+  async function fetchArtworks(artistId: string) {
     const { data } = await supabase
-      .from('orders')
-      .select('*, artworks!inner(title, sku, artist_id)')
-      .eq('artworks.artist_id', artistId)
-      .neq('status', 'rejected')
+      .from('artworks')
+      .select('*, artwork_series(name)')
+      .eq('artist_id', artistId)
       .order('created_at', { ascending: false })
-    setOrders(data || [])
+    setArtworks((data || []).map((a: any) => ({
+      ...a,
+      series_name: a.artwork_series?.name || null,
+    })))
   }
 
   async function fetchPayouts(artistId: string) {
