@@ -245,7 +245,7 @@ export default function ArtistDashboard() {
         )}
 
         {tab === 'offers'  && <OffersTab artworks={artworks} onRefresh={() => init()} />}
-
+        
         {tab === 'upload'  && (
           <UploadTab
             profile={profile}
