@@ -197,21 +197,25 @@ function DraftBanner({ drafts, onResume, onDiscard }: {
   if (!drafts.length) return null
   return (
     <div className="fade-in" style={{ marginBottom: 18 }}>
-      {drafts.map(d => (
-        <div key={d.id} className="fade-up"
-          style={{ background: '#EFF6FF', border: '0.25px solid #93C5FD', borderRadius: 12, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7, cursor: 'pointer', transition: 'background 0.15s ease' }}
-          onClick={() => onResume(d)}>
-          <span style={{ fontSize: 16 }}>🕐</span>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#185FA5' }}>Unfinished upload</p>
-            <p style={{ fontSize: 11, color: '#378ADD', marginTop: 2 }}>
-              {d.series_name || 'Untitled'} · {d.type === 'single' ? 'Single' : d.type === 'variant' ? 'Variants' : 'Bundle'} · {d.pieces.filter((p: any) => p.submitted).length} of {d.pieces.length} done
-            </p>
+      {drafts.map(d => {
+        const piecesArr = Array.isArray(d.pieces) ? d.pieces : JSON.parse(d.pieces || '[]')
+        const doneCount = piecesArr.filter((p: any) => p.submitted).length
+        return (
+          <div key={d.id} className="fade-up"
+            style={{ background: '#EFF6FF', border: '0.25px solid #93C5FD', borderRadius: 12, padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 7, cursor: 'pointer', transition: 'background 0.15s ease' }}
+            onClick={() => onResume(d)}>
+            <span style={{ fontSize: 16 }}>🕐</span>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: '#185FA5' }}>Unfinished upload</p>
+              <p style={{ fontSize: 11, color: '#378ADD', marginTop: 2 }}>
+                {d.series_name || 'Untitled'} · {d.type === 'single' ? 'Single' : d.type === 'variant' ? 'Variants' : 'Bundle'} · {doneCount} of {piecesArr.length} done
+              </p>
+            </div>
+            <button onClick={e => { e.stopPropagation(); onDiscard(d.id) }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 2px', lineHeight: 1 }}>×</button>
           </div>
-          <button onClick={e => { e.stopPropagation(); onDiscard(d.id) }}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)', fontSize: 18, padding: '0 2px', lineHeight: 1 }}>×</button>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -581,7 +585,12 @@ export function UploadTab({ profile, onDraftSaved, onSubmitted }: {
     setBundlePrice(draft.bundle_price ? String(draft.bundle_price) : '')
     setIndividualListings(draft.individual_listings ?? true)
     setDraftId(draft.id)
-    const resumed = (draft.pieces || []).map((p: any) => newPiece({ label: p.label || '', done: p.submitted || false, sku: p.sku || null }))
+    const piecesArr = Array.isArray(draft.pieces) ? draft.pieces : JSON.parse(draft.pieces || '[]')
+    const resumed = piecesArr.map((p: any) => newPiece({
+      label: p.label || '',
+      done:  p.submitted || false,
+      sku:   p.sku || null,
+    }))
     setPieces(resumed.length > 0 ? resumed : [newPiece()])
     goTo(draft.type === 'single' ? 'piece-detail' : 'pieces')
   }
