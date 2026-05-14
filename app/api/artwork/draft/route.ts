@@ -21,9 +21,22 @@ function getSupabase() {
   )
 }
 
-// POST — create a new draft (called on Step 2 Continue)
 export async function POST(req: Request) {
-  const supabase = getSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -34,7 +47,7 @@ export async function POST(req: Request) {
     .from('upload_drafts')
     .insert({
       artist_id:           user.id,
-      type:                body.type,                // 'single' | 'variant' | 'bundle'
+      type:                body.type,
       series_name:         body.series_name,
       category:            body.category,
       bundle_price:        body.bundle_price        ?? null,
@@ -46,13 +59,25 @@ export async function POST(req: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ draft: data })
 }
 
-// PATCH — update a specific draft (piece progress, series details)
 export async function PATCH(req: Request) {
-  const supabase = getSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -60,10 +85,7 @@ export async function PATCH(req: Request) {
   if (!body.draft_id) return NextResponse.json({ error: 'draft_id required' }, { status: 400 })
 
   const admin = createAdminClient()
-
-  const updates: Record<string, any> = {
-    updated_at: new Date().toISOString(),
-  }
+  const updates: Record<string, any> = { updated_at: new Date().toISOString() }
 
   if (body.series_name         !== undefined) updates.series_name         = body.series_name
   if (body.category            !== undefined) updates.category            = body.category
@@ -72,7 +94,6 @@ export async function PATCH(req: Request) {
   if (body.bundle_preview_url  !== undefined) updates.bundle_preview_url  = body.bundle_preview_url
   if (body.pieces              !== undefined) updates.pieces              = body.pieces
 
-  // Verify this draft belongs to this artist
   const { data, error } = await admin
     .from('upload_drafts')
     .update(updates)
@@ -82,18 +103,29 @@ export async function PATCH(req: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ draft: data })
 }
 
-// GET — fetch all drafts for this artist
 export async function GET() {
-  const supabase = getSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-
   const { data, error } = await admin
     .from('upload_drafts')
     .select('*')
@@ -101,13 +133,25 @@ export async function GET() {
     .order('updated_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ drafts: data || [] })
 }
 
-// DELETE — discard a specific draft
 export async function DELETE(req: Request) {
-  const supabase = getSupabase()
+  const cookieStore = cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -115,7 +159,6 @@ export async function DELETE(req: Request) {
   if (!body.draft_id) return NextResponse.json({ error: 'draft_id required' }, { status: 400 })
 
   const admin = createAdminClient()
-
   const { error } = await admin
     .from('upload_drafts')
     .delete()
@@ -123,6 +166,5 @@ export async function DELETE(req: Request) {
     .eq('artist_id', user.id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ ok: true })
 }
