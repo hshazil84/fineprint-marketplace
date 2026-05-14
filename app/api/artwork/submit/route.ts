@@ -83,7 +83,7 @@ export async function POST(req: Request) {
       )
       await admin
         .from('upload_drafts')
-        .update({ pieces: updated, updated_at: new Date().toISOString() })
+        .update({ pieces: JSON.stringify(updated), updated_at: new Date().toISOString() })
         .eq('id', body.draft_id)
         .eq('artist_id', user.id)
     }
