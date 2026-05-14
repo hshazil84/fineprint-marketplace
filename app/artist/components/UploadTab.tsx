@@ -378,7 +378,7 @@ export function UploadTab({ profile, onDraftSaved, onSubmitted }: {
   useEffect(() => { fetchDrafts() }, [])
 
   async function fetchDrafts() {
-    const res  = await fetch('/api/artwork/draft')
+    const res  = await fetch('/api/artwork/draft', { credentials: 'same-origin' })
     const json = await res.json()
     setDrafts(json.drafts || [])
   }
@@ -422,8 +422,9 @@ export function UploadTab({ profile, onDraftSaved, onSubmitted }: {
     }
 
     const res = await fetch('/api/artwork/draft', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({
         type:                uploadType,
         series_name:         seriesName.trim(),
@@ -617,8 +618,9 @@ export function UploadTab({ profile, onDraftSaved, onSubmitted }: {
           i === editingIdx ? { ...pc, label: p.label, submitted: true, sku } : { label: pc.label, submitted: pc.done }
         )
         await fetch('/api/artwork/draft', {
-          method:  'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          method:      'PATCH',
+          headers:     { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ draft_id: draftId, pieces: updatedPieces }),
         })
         onDraftSaved()
@@ -658,11 +660,12 @@ export function UploadTab({ profile, onDraftSaved, onSubmitted }: {
   async function handleFinalSubmit() {
     // Delete draft
     if (draftId) {
-      await fetch('/api/artwork/draft', {
-        method:  'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draft_id: draftId }),
-      })
+        await fetch('/api/artwork/draft', {
+          method:      'DELETE',
+          headers:     { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ draft_id: draftId }),
+        })
     }
     toast.success('Submitted for review!')
     onSubmitted()
@@ -687,8 +690,9 @@ export function UploadTab({ profile, onDraftSaved, onSubmitted }: {
 
   async function discardDraft(draftId: string) {
     await fetch('/api/artwork/draft', {
-      method:  'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      method:      'DELETE',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
       body: JSON.stringify({ draft_id: draftId }),
     })
     fetchDrafts()
