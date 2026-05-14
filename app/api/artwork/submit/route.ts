@@ -1,55 +1,20 @@
 import { createAdminClient } from '@/lib/supabase'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-function getSupabase() {
-  const cookieStore = cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+async function getUser(req: Request) {
+  const token = req.headers.get('Authorization')?.replace('Bearer ', '')
+  if (!token) return null
+  const admin = createAdminClient()
+  const { data: { user } } = await admin.auth.getUser(token)
+  return user ?? null
 }
 
 export async function POST(req: Request) {
-  const supabase = getSupabase()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
+  const body  = await req.json()
   const admin = createAdminClient()
-
-  /*
-    body shape:
-    {
-      draft_id:     string | null       — null for single artwork
-      type:         'single' | 'variant' | 'bundle'
-      series_id:    string | null       — null if this is the first piece (we create it here)
-      series_name:  string | null
-      series_type:  'variant' | 'bundle'
-      bundle_price: number | null
-      individual_listings: boolean | null
-      bundle_preview_url:  string | null
-      is_primary:   boolean             — variant only: does this piece show on storefront
-      is_first_piece: boolean           — true if series_id doesn't exist yet
-      galleryUrls:  string[]
-      artwork: {
-        sku, title, description, price, hires_path, preview_url,
-        sizes, status, category, painting_by, paper_type,
-        edition_size, editions_sold, series_label
-      }
-    }
-  */
 
   let seriesId: string | null = body.series_id ?? null
 
@@ -68,7 +33,7 @@ export async function POST(req: Request) {
       .select()
       .single()
 
-    if (seriesError) return NextResponse.json({ error: seriesError.message }, { status: 500 })
+    if (seriesError) return NextResponse.json({ error: 'series insert: ' + seriesError.message }, { status: 500 })
     seriesId = series.id
   }
 
@@ -77,27 +42,30 @@ export async function POST(req: Request) {
     .from('artworks')
     .insert({
       ...body.artwork,
-      artist_id: user.id,
-      series_id: seriesId,
+      artist_id:  user.id,
+      series_id:  seriesId,
       is_primary: body.type === 'single' ? true : (body.is_primary ?? false),
     })
     .select()
     .single()
 
-  if (artworkError) return NextResponse.json({ error: artworkError.message }, { status: 500 })
+  if (artworkError) return NextResponse.json({ error: 'artwork insert: ' + artworkError.message }, { status: 500 })
 
   // Insert gallery images
   if (body.galleryUrls?.length) {
-    await admin.from('artwork_images').insert(
-      body.galleryUrls.map((url: string, i: number) => ({
-        artwork_id: artwork.id,
-        url,
-        sort_order: i + 1,
-      }))
-    )
+    const { error: galleryError } = await admin
+      .from('artwork_images')
+      .insert(
+        body.galleryUrls.map((url: string, i: number) => ({
+          artwork_id: artwork.id,
+          url,
+          sort_order: i + 1,
+        }))
+      )
+    if (galleryError) return NextResponse.json({ error: 'gallery insert: ' + galleryError.message }, { status: 500 })
   }
 
-  // Update draft pieces jsonb to mark this piece as submitted
+  // Update draft pieces jsonb
   if (body.draft_id) {
     const { data: draft } = await admin
       .from('upload_drafts')
@@ -107,7 +75,7 @@ export async function POST(req: Request) {
       .single()
 
     if (draft) {
-      const pieces = draft.pieces as any[]
+      const pieces = Array.isArray(draft.pieces) ? draft.pieces : JSON.parse(draft.pieces || '[]')
       const updated = pieces.map((p: any) =>
         p.label === body.artwork.series_label
           ? { ...p, submitted: true, artwork_id: artwork.id, sku: body.artwork.sku }
@@ -121,7 +89,7 @@ export async function POST(req: Request) {
     }
   }
 
-  // If all pieces submitted, delete the draft
+  // Delete draft if last piece
   if (body.draft_id && body.is_last_piece) {
     await admin
       .from('upload_drafts')
